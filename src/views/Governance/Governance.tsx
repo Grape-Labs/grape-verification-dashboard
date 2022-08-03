@@ -542,6 +542,7 @@ export function GovernanceView(props: any) {
                 setRealms(uTable);
                 
                 const ownerRecordsbyOwner = await getTokenOwnerRecordsByOwner(connection, programId, governingTokenOwner);
+
                 setOwnerRecordsByOwner(ownerRecordsbyOwner);
             }catch(e){console.log("ERR: "+e)}
         } else{

@@ -186,9 +186,9 @@ const WalletNavigation: FC = (props:any) => {
           blockhash: latestBlockHash.blockhash,
           lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
           signature: sm_signature}, 
-          'processed'
+          'finalized'
       );
-
+      
       closeSnackbar(cnfrmkey);
       //enqueueSnackbar(`Transaction ready`,{ variant: 'info' });
       //enqueueSnackbar(`Please wait while the transaction completes, this may take a few seconds`,{ variant: 'info', autoHideDuration: 5000 });
@@ -197,14 +197,13 @@ const WalletNavigation: FC = (props:any) => {
       //enqueueSnackbar(`Confirming transaction`,{ variant: 'info' });
       //await connection.confirmTransaction(sm_signature, 'processed');
       //if (!transaction.verifySignatures()){
-      
+      console.log("sm_signature "+sm_signature);
       if (!sm_signature){
         console.log("Signature Verification = false");
         disconnectSession(true);
       }
       
       enqueueSnackbar(`Transaction complete`,{ variant: 'success' });
-      
       return sm_signature;
     }catch(e:any){
       closeSnackbar();
@@ -295,6 +294,7 @@ const WalletNavigation: FC = (props:any) => {
               fromTransaction = true;
               sm_signature = await confirmWalletWithTransaction();
               sm_signature = new TextEncoder().encode(sm_signature); // convert to "utf-8"
+                
             }
             
           }
@@ -348,92 +348,92 @@ const WalletNavigation: FC = (props:any) => {
           }));
 
           console.log(wallet?.adapter.name + " connecting to Grape Dashboard...");
-          
-          if (login){ // login
-            console.log("LOGIN GRAPE");
-            if (GRAPE_APP_API_URL){
-              const response = await fetch(`${GRAPE_APP_API_URL}/login`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    token: message,
-                    address: bs58_address,
-                    publicKey: publicKey.toString(),
-                    signature: signature,
-                    fromTransaction: fromTransaction,
-                    //fromSignTransaction: fromSignTransaction
-                })
-              }).catch( err => {
-                console.log("ERROR: "+err);
-                return null;
-              });
-              const session = await response.json();
-            
-              console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
-              session.token = {address, signature};
-              session.publicKey = publicKey.toString();
-              session.isConnected = true;
-              session.fromTransaction = fromTransaction;
-              //session.fromSignTransaction = fromSignTransaction;
-              if (!response)
-                session.isWallet = false;
-              else
-                session.isWallet = true;
-              setSession(session);
-            } else{
-              createNakedSession(publicKey.toBase58());
-            }
-          } else{ // register
-            console.log("REGISTERING WITH GRAPE");
-            console.log(JSON.stringify({
-                userId: userId,
-                token: token,
-                address: bs58_address,
-                publicKey: publicKey.toString(),
-                signature: signature,
-                fromTransaction: fromTransaction,
-                fromSignTransaction: fromSignTransaction
-            }));
-            
-            if (GRAPE_APP_API_URL){
-              const response2 = await fetch(`${GRAPE_APP_API_URL}/register`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    userId: userId,
-                    token: token,
-                    address: bs58_address,
-                    publicKey: publicKey.toString(),
-                    signature: signature,
-                    fromTransaction: fromTransaction,
-                    //fromSignTransaction: fromSignTransaction,
-                })
-              }).catch( err => {
-                console.log("ERROR: "+err);
-                return null;
-              });
-              const session2 = await response2.json();
-              console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
-              session2.token = {address, signature};
-              session2.publicKey = publicKey.toString();
-              session2.discordId = discordId;
-              session.fromTransaction = fromTransaction;
-              //session.fromSignTransaction = fromSignTransaction;
-              if (!response2){
-                session2.isConnected = false;
-                session.isWallet = false;
-              }else{
-                session2.isConnected = true;
-                session.isWallet = true;
+           
+            if (login){ // login
+              console.log("LOGIN GRAPE");
+              if (GRAPE_APP_API_URL){
+                const response = await fetch(`${GRAPE_APP_API_URL}/login`, {
+                  method: "POST",
+                  headers: {
+                      "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                      token: message,
+                      address: bs58_address,
+                      publicKey: publicKey.toString(),
+                      signature: signature,
+                      fromTransaction: fromTransaction,
+                      //fromSignTransaction: fromSignTransaction
+                  })
+                }).catch( err => {
+                  console.log("ERROR: "+err);
+                  return null;
+                });
+                const session = await response.json();
+              
+                console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
+                session.token = {address, signature};
+                session.publicKey = publicKey.toString();
+                session.isConnected = true;
+                session.fromTransaction = fromTransaction;
+                //session.fromSignTransaction = fromSignTransaction;
+                if (!response)
+                  session.isWallet = false;
+                else
+                  session.isWallet = true;
+                setSession(session);
+              } else{
+                createNakedSession(publicKey.toBase58());
               }
-              setSession(session2);
+            } else{ // register
+              console.log("REGISTERING WITH GRAPE");
+              console.log(JSON.stringify({
+                  userId: userId,
+                  token: token,
+                  address: bs58_address,
+                  publicKey: publicKey.toString(),
+                  signature: signature,
+                  fromTransaction: fromTransaction,
+                  fromSignTransaction: fromSignTransaction
+              }));
+              
+              if (GRAPE_APP_API_URL){
+                const response2 = await fetch(`${GRAPE_APP_API_URL}/register`, {
+                  method: "POST",
+                  headers: {
+                      "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                      userId: userId,
+                      token: token,
+                      address: bs58_address,
+                      publicKey: publicKey.toString(),
+                      signature: signature,
+                      fromTransaction: fromTransaction,
+                      //fromSignTransaction: fromSignTransaction,
+                  })
+                }).catch( err => {
+                  console.log("ERROR: "+err);
+                  return null;
+                });
+                const session2 = await response2.json();
+                console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
+                session2.token = {address, signature};
+                session2.publicKey = publicKey.toString();
+                session2.discordId = discordId;
+                session.fromTransaction = fromTransaction;
+                //session.fromSignTransaction = fromSignTransaction;
+                if (!response2){
+                  session2.isConnected = false;
+                  session.isWallet = false;
+                }else{
+                  session2.isConnected = true;
+                  session.isWallet = true;
+                }
+                setSession(session2);
+              }
+              //console.log("CD: Session created ("+publicKey.toString()+")");
             }
-            //console.log("CD: Session created ("+publicKey.toString()+")");
-          }
           
             
         }
