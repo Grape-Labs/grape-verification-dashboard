@@ -8,7 +8,7 @@ import Typography from '@mui/material/Typography';
 import { useWallet } from '@solana/wallet-adapter-react';
 
 import { useSnackbar } from 'notistack';
-import { ServersView, SettingsView, PortfolioView, GovernanceView, MeanfiView } from "../";
+import { ServersView, SettingsView, WalletView } from "../";
 
 function ConnectedWalletComponent(props) {
   return (
@@ -20,10 +20,20 @@ function ConnectedWalletComponent(props) {
 }
 
 function BasicComponent(props) {
+  const { publicKey, wallet } = useWallet();
+  const session = props.session;
+  //const publicKey = props.publicKey;
+  const isConnected = session && session.isConnected;
+
   return (
     <React.Fragment>
-      <PortfolioView />
-      <GovernanceView />
+        {!isConnected &&
+          <Grid container sx={{mt:2}} align='center'>
+            <Grid item >
+            </Grid>
+          </Grid>
+        }
+      
     </React.Fragment>
   );
 }
