@@ -327,7 +327,6 @@ export const ServersView = (props) => {
   const [orderBy, setOrderBy] = React.useState('server.name');
   const [tab, setTab] = useState(0);
   const { session, setSession } = useSession();
-  const [searched, setSearched] = useState('');
   const [filterVal, setFilterVal] = React.useState("");
 
   const [fullServerRows, setFullServerRows] = useState(null);
@@ -650,6 +649,7 @@ export const ServersView = (props) => {
                   fullWidth
                   label="Filter Servers" id="custom-css-outlined-input"
                   onChange={(e) => filter(e.target.value)}
+                  value={filterVal}
                   sx={{ml:1.25,mr:1.25}} />
                 
               </Box>
