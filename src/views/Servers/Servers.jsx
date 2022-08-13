@@ -527,7 +527,6 @@ export const ServersView = (props) => {
         }
         ucnt++;
       }
-
       const sortedResults = theseServers.sort((a,b) => (b.registered > a.registered) ? 1 : -1);
       setFullServerRows(sortedResults);
       setServerRows(sortedResults);
