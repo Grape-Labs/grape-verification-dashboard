@@ -395,7 +395,7 @@ export const ServersView = (props) => {
       console.log("user servers: "+JSON.stringify(userServers))
       var counter = 0;
       for (var item of newServers){
-        console.log("item: "+JSON.stringify(item));
+        //console.log("item: "+JSON.stringify(item));
         
         var registered = false;
         for (var userver of userServers){
