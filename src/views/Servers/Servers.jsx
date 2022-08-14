@@ -365,7 +365,13 @@ export const ServersView = (props) => {
             </>);
         }
     },
-    { field: 'name', headerName: 'Name', width: 350, flex: 1 },
+    { field: 'name', headerName: 'Name', width: 350, flex: 1, 
+      renderCell: (params) => {
+        return (
+          <Button href={`${params.value.url}`} target="_blank">{params.value.name}</Button>
+        )
+      }
+    },
     { field: 'discordId', headerName: 'Discord ID', width: 130, hide: true },
     { field: 'discordUrl', headerName: 'Discord', width: 130, hide: true },
     { field: 'twitter', headerName: 'twitter', width: 130, hide: true },
@@ -527,14 +533,17 @@ export const ServersView = (props) => {
           if (userver.serverId === item.serverId)
             registered = true;
         }
-
+        JSON.stringify("item: " +item)
         theseServers.push({
           id: item.serverId,
           mint: null,
           logo: 'https://verify.grapes.network/server-logos/'+item.logo,
-          name: item.name,
+          name: {
+            name: item.name,
+            url: item.url
+          },
           discord: item.discordId,
-          discordUrl: item.discord,
+          discordUrl: item.url,
           twitter: item.twitter,
           gan: item?.gan,
           registered: registered,
@@ -655,7 +664,7 @@ export const ServersView = (props) => {
     //const keyword = e.target.value;
     if (keyword !== '') {
         const results = serverRows.filter((listitem) => {
-          return listitem.name.toLowerCase().includes(keyword.toLowerCase())
+          return listitem.name.name.toLowerCase().trim().includes(keyword.toLowerCase().trim())
         });
         setServerRows(results);
     } else {
@@ -679,7 +688,7 @@ export const ServersView = (props) => {
                   fullWidth
                   label="Filter Servers" id="custom-css-outlined-input"
                   onChange={(e) => filter(e.target.value)}
-                  value={filterVal}
+                  //fvalue={filterVal}
                   sx={{ml:1.25,mr:1.25}} />
                 
               </Box>
