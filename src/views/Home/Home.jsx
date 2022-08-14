@@ -65,7 +65,7 @@ function BasicComponent(props) {
                       <Typography 
                         align="center"
                         variant="h3">
-                          connected but wallet not prooved...
+                          proof of wallet required (add button here)...
                       </Typography>
                     </Grid>
                   </Grid>
