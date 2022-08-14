@@ -201,7 +201,6 @@ export function Header(props: any) {
                 <Hidden smDown>
                     <Tooltip title={`Streams`}><IconButton sx={{borderRadius:'17px'}} component={NavLink} color="inherit" to="/streams"><DownloadingIcon /></IconButton></Tooltip>
                     <Tooltip title={`About`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapes.network' target="_blank"><InfoOutlinedIcon/></IconButton></Tooltip>
-                    <Tooltip title={`News`}><IconButton sx={{borderRadius:'17px'}} component={NavLink} color="inherit" to="/news"><RssFeedIcon/></IconButton></Tooltip>
                 </Hidden>
             </Box>
             <div>
