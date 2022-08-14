@@ -161,36 +161,6 @@ const StyledTable = styled(Table)(({ theme }) => ({
   },
 }));
 
-function descendingComparator(a, b, orderBy) {
-  if (b[orderBy] < a[orderBy]) {
-    return -1;
-  }
-  if (b[orderBy] > a[orderBy]) {
-    return 1;
-  }
-  return 0;
-}
-
-function getComparator(order, orderBy) {
-  return order === 'desc'
-    ? (a, b) => descendingComparator(a, b, orderBy)
-    : (a, b) => -descendingComparator(a, b, orderBy);
-}
-
-// This method is created for cross-browser compatibility, if you don't
-// need to support IE11, you can use Array.prototype.sort() directly
-function stableSort(array, comparator) {
-  const stabilizedThis = array.map((el, index) => [el, index]);
-  stabilizedThis.sort((a, b) => {
-    const order = comparator(a[0], b[0]);
-    if (order !== 0) {
-      return order;
-    }
-    return a[1] - b[1];
-  });
-  return stabilizedThis.map((el) => el[0]);
-}
-
 function TablePaginationActions(props) {
   const theme = useTheme();
   const { count, page, rowsPerPage, onPageChange } = props;
@@ -259,70 +229,6 @@ TablePaginationActions.propTypes = {
   page: PropTypes.number.isRequired,
   rowsPerPage: PropTypes.number.isRequired,
 };
-
-function ServerRow(props) {
-  const { token, index } = props;
-  const [open, setOpen] = React.useState(false);
-  const labelId = props.labelId;
-  const server = props.server;
-  const indexus = props.indexus;
-  const unregister = props.unregister;
-
-  return (
-      <React.Fragment>
-        <TableRow key={server.name}>
-          <TableCell align="left">
-              <Avatar component={Paper} 
-                  elevation={4}
-                  alt={server.name} 
-                  src={`/server-logos/${server.logo}`}
-                  sx={{ width: 30, height: 30, bgcolor: "#333",ml:1 }}
-              />
-          </TableCell>
-          <TableCell id={labelId}>
-            <Button color="secondary" href={`${server.url}`} target="_blank">{server.name}</Button>
-            {server?.twitter &&
-              <IconButton
-                  aria-label="expand row"
-                  size="small"
-                  onClick={() => setOpen(!open)}
-              >
-                  {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-              </IconButton>
-            }
-          </TableCell>
-          <TableCell align="right">
-            <Tooltip title={`Unregister ${server.name}`}><Button color="error" size="small" variant="outlined" onClick={() => unregister(server.serverId, indexus)} sx={{mr:1}}><RemoveCircleOutlineIcon/></Button></Tooltip>
-          </TableCell>
-        </TableRow>
-        {server?.twitter &&
-          <TableRow key={server.name}>
-              <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
-                  <Collapse in={open} timeout="auto" unmountOnExit>
-                      <Box sx={{ margin: 1 }}>
-                          {/*
-                          <Typography variant="h6" gutterBottom component="div">
-                              Address
-                          </Typography>
-                          */}
-                          <Table size="small" aria-label="purchases">
-                              <TableHead>
-                                  <TableRow>
-                                      <TableCell align="center" sx={{borderBottom:"none"}}>
-                                        Fetching {server.twitter}
-                                        <TwitterFeed title={`${server.name} Feed`} twitterhandle={server.twitter} twitterheight={400} twitterelements={2} componentTwitterFeed={false} />
-                                      </TableCell>
-                                  </TableRow>
-                              </TableHead>
-                          </Table>
-                      </Box>
-                  </Collapse>
-              </TableCell>
-          </TableRow>
-          }
-      </React.Fragment>
-  );
-}
 
 export const ServersView = (props) => {
   const [orderT1, setOrderT1] = React.useState('asc');
@@ -420,24 +326,6 @@ export const ServersView = (props) => {
     }
   ];
 
-  const handleChangePageT1 = (event, newPage) => {
-    setPageT1(newPage);
-  };
-
-  const handleChangeRowsPerPageT1 = (event) => {
-    setRowsPerPageT1(parseInt(event.target.value, 10));
-    setPageT1(0);
-  };
-
-  const handleChangePageT2 = (event, newPage) => {
-    setPageT2(newPage);
-  };
-
-  const handleChangeRowsPerPageT2 = (event) => {
-    setRowsPerPageT2(parseInt(event.target.value, 10));
-    setPageT2(0);
-  };
-
   const register = async (serverId) => {
     //console.log("SESSION: "+JSON.stringify(session))
     //console.log("ServerId: "+JSON.stringify(serverId))
@@ -479,29 +367,6 @@ export const ServersView = (props) => {
       
       
     }
-  };
-
-  const handleChange = (_event, newValue) => {
-    setTab(newValue);
-  };
-
-  const handleRequestSortT1 = (event, property) => {
-    const isAsc = orderByT1 === property && orderT1 === 'asc';
-    setOrderT1(isAsc ? 'desc' : 'asc');
-    setOrderByT1(property);
-  };
-
-  const handleRequestSort = (event, property) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
-  };
-
-  const createSortHandlerT1 = (property) => (event) => {
-    handleRequestSortT1(event, property);
-  };
-  const createSortHandler = (property) => (event) => {
-    handleRequestSort(event, property);
   };
 
   useEffect(() => {
@@ -574,91 +439,6 @@ export const ServersView = (props) => {
     }
 
   }, [session]);
-
-  const servercolumns = [
-    {
-      name:"logo",
-      label:"Org Logo",
-      options: {
-        filter: true,
-        sort: true,
-        display: false,
-        //customHeadRender: ()=>null
-       }
-    },
-    {
-      name:"name",
-      label:"Org Name",
-      options: {
-        filter: false,
-        sort: false,
-        display: false,
-       }
-    },
-    {
-      name:"url",
-      label:"Org Url",
-      options: {
-        filter: false,
-        sort: false,
-        display: false,
-       }
-    },
-    {
-      name: "name",
-      label:"Name",
-      options: {
-        filter: false,
-        sort: true,
-        customBodyRender: (value, tableMeta, updateValue) => {
-            //console.log(tableMeta.rowData, '......');
-            return (
-              <Grid container direction="row" alignItems="center">
-                <Grid item>
-                  <Avatar component={Paper} 
-                      elevation={4}
-                      alt={tableMeta.rowData[1]}
-                      src={`/server-logos/${tableMeta.rowData[0]}`}
-                      sx={{ width: 30, height: 30, bgcolor: "#333", ml:1 }}
-                  />
-                </Grid>
-                <Grid item>
-                <Button color="secondary" href={`${tableMeta.rowData[2]}`} target="_blank">{tableMeta.rowData[1]}</Button>
-                </Grid>
-              </Grid>
-            );
-        }
-      }
-    },
-    {
-      name:"serverId",
-      label:"Actions",
-      options: {
-        filter: false,
-        sort: false,
-        align: "right",
-        style: "",
-        customBodyRender: (value, tableMeta, updateValue) => {
-          return (
-            <Tooltip title={`Register ${tableMeta.rowData[1]}`}><Button color="primary" size="small" variant="contained" onClick={() => register(value)} sx={{mr:1}}><AddCircleOutlineIcon /></Button></Tooltip>
-          )           
-        },
-        setCellProps: () => ({
-          align: "right"
-        }),
-        setCellHeaderProps: () => ({
-          align: "right"
-        })
-       }
-    }];
-  const serveroptions = {
-    responsive:"scroll",
-    selectableRows: false,
-    download:false,
-    print:false,
-    viewColumns:false,
-    filter:false
-  };
 
   const filter = (keyword) => {
     //const keyword = e.target.value;
