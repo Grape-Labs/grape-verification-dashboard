@@ -700,135 +700,40 @@ export const ServersView = (props) => {
                 </Typography>
               </Box>
             </Box>
-            <React.Fragment> 
+              <React.Fragment> 
 
-              <Box sx={{mt:2,p:1}}>
-                <div style={{ height: 600, width: '100%' }}>
-                  <div style={{ display: 'flex', height: '100%' }}>
-                      <div style={{ flexGrow: 1 }}>
-                        <DataGrid
-                          rows={serverRows}
-                          columns={servercols}
-                          rowsPerPageOptions={[25, 50, 100, 250]}
-                          sx={{
-                              borderRadius:'17px',
-                              borderColor:'rgba(255,255,255,0.25)',
-                              '& .MuiDataGrid-cell':{
-                                  borderColor:'rgba(255,255,255,0.25)'
-                              }}}
-                          //onSelectionModelChange={(newSelectionModel) => {
-                          //    setSelectionModel(newSelectionModel);
-                          //}}
-                          initialState={{
-                              sorting: {
-                                  sortModel: [{ field: 'value', sort: 'desc' }],
-                              },
-                          }}
-                          sortingOrder={['asc', 'desc', null]}
-                          //checkboxSelection
-                          disableSelectionOnClick
-                      />
+                <Box sx={{mt:2,p:1}}>
+                  <div style={{ height: 600, width: '100%' }}>
+                    <div style={{ display: 'flex', height: '100%' }}>
+                        <div style={{ flexGrow: 1 }}>
+                          <DataGrid
+                            rows={serverRows}
+                            columns={servercols}
+                            rowsPerPageOptions={[25, 50, 100, 250]}
+                            sx={{
+                                borderRadius:'17px',
+                                borderColor:'rgba(255,255,255,0.25)',
+                                '& .MuiDataGrid-cell':{
+                                    borderColor:'rgba(255,255,255,0.25)'
+                                }}}
+                            //onSelectionModelChange={(newSelectionModel) => {
+                            //    setSelectionModel(newSelectionModel);
+                            //}}
+                            initialState={{
+                                sorting: {
+                                    sortModel: [{ field: 'value', sort: 'desc' }],
+                                },
+                            }}
+                            sortingOrder={['asc', 'desc', null]}
+                            //checkboxSelection
+                            disableSelectionOnClick
+                        />
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-              </Box>
-
-
-              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={tab} onChange={handleChange} aria-label="Server Tabs">
-                  <Tab label="Registered" />
-                  <Tab label="All" />
-                </Tabs>
-
+                </Box>
               
-              </Box>
-
-              {tab === 0 && 
-                <React.Fragment>
-                  <TableContainer>
-                    <StyledTable sx={{ minWidth: 500}} size="small" aria-label="Servers Table">
-                      <TableHead sx={{p:1}}>
-                        <TableRow>
-                          <TableCell 
-                              align="left" 
-                              sx={{ width: '1%' }}
-                              key={'name'}
-                              //align={headCell.numeric ? 'right' : 'left'}
-                              //padding={headCell.disablePadding ? 'none' : 'normal'}
-                              sortDirection={orderByT1 === 'name}' ? orderT1 : false}
-                            >
-                              <TableSortLabel
-                                active={orderByT1 === 'name'}
-                                direction={orderByT1 === 'name' ? orderT1 : 'asc'}
-                                onClick={createSortHandlerT1('name')}
-                              >
-                                <Typography variant="caption" sx={{ml:1}}>Name</Typography>
-                                {orderByT1 === 'name}' ? (
-                                  <Box component="span" sx={visuallyHidden}>
-                                    {orderT1 === 'desc' ? 'sorted descending' : 'sorted ascending'}
-                                  </Box>
-                                ) : null}
-                              </TableSortLabel>
-                          </TableCell>
-                          <TableCell align="left" sx={{ width: '70%' }}></TableCell>
-                          <TableCell align="right"><Typography variant="caption" sx={{mr:1}}>Actions</Typography></TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody sx={{p:1}}>
-                        {(rowsPerPageT1 > 0
-                          ? 
-                          stableSort(userServers, getComparator(orderT1, orderByT1)).slice(pageT1 * rowsPerPageT1, pageT1 * rowsPerPageT1 + rowsPerPageT1)
-                          //userServers.slice(pageT1 * rowsPerPageT1, pageT1 * rowsPerPageT1 + rowsPerPageT1)
-                          : userServers
-                        ).map((server,indexus) => {
-                          const labelId = `enhanced-table-checkbox-${indexus}`;
-                          return(
-                            <ServerRow server={server} indexus={indexus} labelId={labelId} unregister={unregister} />
-                          )})}
-                      {/*emptyRowsT1 > 0 && (
-                          <TableRow style={{ height: 53 * emptyRowsT1 }}>
-                              <TableCell colSpan={4} />
-                          </TableRow>
-                      )*/}  
-                      </TableBody>
-                      <TableFooter>
-                        <TableRow>
-                          <TablePagination
-                            rowsPerPageOptions={[5, 10, 25, 50, 100]}
-                            colSpan={3}
-                            count={userServers.length}
-                            rowsPerPage={rowsPerPageT1}
-                            page={pageT1}
-                            SelectProps={{
-                              inputProps: {
-                                'aria-label': 'rows per page',
-                              },
-                              native: true,
-                            }}
-                            onPageChange={handleChangePageT1}
-                            onRowsPerPageChange={handleChangeRowsPerPageT1}
-                            ActionsComponent={TablePaginationActions}
-                          />
-                        </TableRow>
-                      </TableFooter>
-                    </StyledTable>
-                  </TableContainer>
-                </React.Fragment>
-                }
-                {tab === 1 && 
-                  <>
-                    <StyledTable size="small" aria-label="All Servers Table">
-                    
-                      <MUIDataTable
-                        title={""}
-                        data={servers}
-                        columns={servercolumns}
-                        options={serveroptions}
-                      />
-                    </StyledTable>
-                  </>
-                }
               </React.Fragment>
           </Box>
         </Paper>
