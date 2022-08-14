@@ -27,11 +27,20 @@ function BasicComponent(props) {
 
   return (
     <React.Fragment>
-      right here... {JSON.stringify(isConnected)}
         {!isConnected &&
-          <Grid container sx={{mt:2}} align='center'>
-            <Grid item >
-              nope...
+          <Grid 
+            class="grape-paper" 
+            container
+            spacing={0}
+            align="center"
+            justify="center"
+            direction="column">
+            <Grid item>
+              <Typography 
+                align="center"
+                variant="h3">
+                  not connected...
+              </Typography>
             </Grid>
           </Grid>
         }
