@@ -35,6 +35,10 @@ import {
 
 import { makeStyles, styled, alpha, useTheme } from '@mui/material/styles';
 
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CircleOutlinedIcon from '@mui/icons-material/CircleOutlined';
+
 import QrCode2Icon from '@mui/icons-material/QrCode2';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -366,7 +370,19 @@ export const ServersView = (props) => {
     { field: 'discordUrl', headerName: 'Discord', width: 130, hide: true },
     { field: 'twitter', headerName: 'twitter', width: 130, hide: true },
     { field: 'gan', headerName: 'GAN', width: 130, align: 'center', headerAlign:'center', hide: false },
-    { field: 'registered', headerName: 'Registered', align: 'center', headerAlign:'center', width: 130, hide: false },
+    { field: 'registered', headerName: 'Registered', align: 'center', headerAlign:'center', width: 130, hide: false,
+      renderCell: (params) => {
+        return (
+          <>
+            {params.value ?
+              <CheckCircleIcon />
+            :
+              <CircleOutlinedIcon />
+            }
+          </>
+        )
+      }
+    },
     { field: 'actions', headerName: 'Action', width: 130,  align: 'center', headerAlign:'center', flex: 0.3,
         renderCell: (params) => {
             return (
