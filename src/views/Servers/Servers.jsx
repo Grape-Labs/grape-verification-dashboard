@@ -276,7 +276,7 @@ export const ServersView = (props) => {
       renderCell: (params) => {
         return (
           <>
-          {params.value.name} <Tooltip title="Visit Discord"><Button href={`${params.value.url}`} target="_blank" sx={{color:'white',borderRadius:'17px',ml:1}}><DiscordIcon fontSize="small" /></Button></Tooltip>
+          {params.value.name} <Tooltip title={`Visit ${params.value.name} Discord`}><Button href={`${params.value.url}`} target="_blank" sx={{color:'white',borderRadius:'17px',ml:1}}><DiscordIcon fontSize="small" /></Button></Tooltip>
           </>
         )
       },
