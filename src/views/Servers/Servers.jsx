@@ -361,12 +361,13 @@ export const ServersView = (props) => {
             </>);
         }
     },
-    { field: 'name', headerName: 'Name', width: 350 },
+    { field: 'name', headerName: 'Name', width: 350, flex: 1 },
     { field: 'discordId', headerName: 'Discord ID', width: 130, hide: true },
     { field: 'discordUrl', headerName: 'Discord', width: 130, hide: true },
     { field: 'twitter', headerName: 'twitter', width: 130, hide: true },
+    { field: 'gan', headerName: 'GAN', width: 130, hide: false },
     { field: 'registered', headerName: 'Registered', width: 130, hide: false },
-    { field: 'actions', headerName: 'Action', width: 130,  align: 'center',
+    { field: 'actions', headerName: 'Action', width: 130,  align: 'center', flex: 0.3,
         renderCell: (params) => {
             return (
                 <>
@@ -507,6 +508,7 @@ export const ServersView = (props) => {
           discord: item.discordId,
           discordUrl: item.discord,
           twitter: item.twitter,
+          gan: item?.gan,
           registered: registered,
           actions: {
             serverId: item.serverId,

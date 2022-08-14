@@ -21,13 +21,13 @@ function ConnectedWalletComponent(props) {
 
 function BasicComponent(props) {
   const { publicKey, wallet } = useWallet();
-  const session = props.session;
   //const publicKey = props.publicKey;
-  const isConnected = session && session.isConnected;
+  const isConnected = props.isConnected;
+
 
   return (
     <React.Fragment>
-      right here...
+      right here... {JSON.stringify(isConnected)}
         {!isConnected &&
           <Grid container sx={{mt:2}} align='center'>
             <Grid item >
@@ -50,10 +50,10 @@ const RenderDashboardComponents = (props) => {
   // show if connected
   //if (publicKey){
       switch(isConnected) {
-      case isWallet: // display only if verified pk in wallet
-        return <React.Fragment><BasicComponent /><ConnectedWalletComponent /></React.Fragment>
-      default:
-        return <BasicComponent />
+        case isWallet: // display only if verified pk in wallet
+          return <React.Fragment><BasicComponent isConnected={isConnected} /><ConnectedWalletComponent /></React.Fragment>
+        default:
+          return <BasicComponent isConnected={isConnected} />
       }
   //}
 }
