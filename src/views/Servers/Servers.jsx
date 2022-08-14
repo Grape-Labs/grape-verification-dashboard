@@ -392,7 +392,7 @@ export const ServersView = (props) => {
 
       const theseServers = new Array();
 
-      console.log("user servers: "+JSON.stringify(userServers))
+      //console.log("user servers: "+JSON.stringify(userServers))
       var counter = 0;
       for (var item of newServers){
         //console.log("item: "+JSON.stringify(item));
@@ -402,7 +402,7 @@ export const ServersView = (props) => {
           if (userver.serverId === item.serverId)
             registered = true;
         }
-        JSON.stringify("item: " +item)
+        
         theseServers.push({
           id: item.serverId,
           mint: null,
