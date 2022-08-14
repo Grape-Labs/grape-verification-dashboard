@@ -23,10 +23,11 @@ function BasicComponent(props) {
   const { publicKey, wallet } = useWallet();
   //const publicKey = props.publicKey;
   const isConnected = props.isConnected;
+  const isWallet = props.isWallet;
 
   return (
     <React.Fragment>
-        {!isConnected &&
+        {!isConnected ?
           <Grid item xs={12}>
             <Paper class="grape-paper-background">
               <Grid 
@@ -47,7 +48,35 @@ function BasicComponent(props) {
               </Grid>
             </Paper>
           </Grid>
+          :
+          <>
+            {!isWallet &&
+              <Grid item xs={12}>
+                <Paper class="grape-paper-background">
+                  <Grid 
+                    class="grape-paper" 
+                    container
+                    spacing={0}
+                    align="center"
+                    justify="center"
+                    direction="column"
+                    sx={{mt:4}}>
+                    <Grid item>
+                      <Typography 
+                        align="center"
+                        variant="h3">
+                          connected but wallet not prooved...
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+            }
+          </>
         }
+          
+        
+        
       
     </React.Fragment>
   );
@@ -65,9 +94,9 @@ const RenderDashboardComponents = (props) => {
   //if (publicKey){
       switch(isConnected) {
         case isWallet: // display only if verified pk in wallet
-          return <React.Fragment><BasicComponent isConnected={isConnected} /><ConnectedWalletComponent /></React.Fragment>
+          return <React.Fragment><BasicComponent isConnected={isConnected} isWallet={isWallet} /><ConnectedWalletComponent /></React.Fragment>
         default:
-          return <BasicComponent isConnected={isConnected} />
+          return <BasicComponent isConnected={isConnected} isWallet={isWallet} />
       }
   //}
 }
