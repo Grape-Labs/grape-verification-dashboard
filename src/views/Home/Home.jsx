@@ -24,7 +24,6 @@ function BasicComponent(props) {
   //const publicKey = props.publicKey;
   const isConnected = props.isConnected;
 
-
   return (
     <React.Fragment>
         {!isConnected &&
@@ -56,6 +55,7 @@ const RenderDashboardComponents = (props) => {
   const isConnected = session && session.isConnected;
   const isWallet = session && session.isWallet;
   
+  console.log("session: "+JSON.stringify(session))
   // show if connected
   //if (publicKey){
       switch(isConnected) {
