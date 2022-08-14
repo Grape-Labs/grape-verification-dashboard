@@ -35,6 +35,7 @@ import {
 
 import { makeStyles, styled, alpha, useTheme } from '@mui/material/styles';
 
+import DiscordIcon from '../../components/StaticIcons/DiscordIcon';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CircleOutlinedIcon from '@mui/icons-material/CircleOutlined';
@@ -274,9 +275,12 @@ export const ServersView = (props) => {
     { field: 'name', headerName: 'Name', width: 350, flex: 1, 
       renderCell: (params) => {
         return (
-          <Button href={`${params.value.url}`} target="_blank">{params.value.name}</Button>
+          <>
+          {params.value.name} <Button href={`${params.value.url}`} target="_blank" sx={{color:'white',borderRadius:'17px',ml:1}}><DiscordIcon fontSize="small" /></Button>
+          </>
         )
-      }
+      },
+      sortComparator: (v1, v2) => v1.name.localeCompare(v2.name)
     },
     { field: 'discordId', headerName: 'Discord ID', width: 130, hide: true },
     { field: 'discordUrl', headerName: 'Discord', width: 130, hide: true },
