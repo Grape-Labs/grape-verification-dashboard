@@ -365,9 +365,9 @@ export const ServersView = (props) => {
     { field: 'discordId', headerName: 'Discord ID', width: 130, hide: true },
     { field: 'discordUrl', headerName: 'Discord', width: 130, hide: true },
     { field: 'twitter', headerName: 'twitter', width: 130, hide: true },
-    { field: 'gan', headerName: 'GAN', width: 130, hide: false },
-    { field: 'registered', headerName: 'Registered', width: 130, hide: false },
-    { field: 'actions', headerName: 'Action', width: 130,  align: 'center', flex: 0.3,
+    { field: 'gan', headerName: 'GAN', width: 130, align: 'center', headerAlign:'center', hide: false },
+    { field: 'registered', headerName: 'Registered', align: 'center', headerAlign:'center', width: 130, hide: false },
+    { field: 'actions', headerName: 'Action', width: 130,  align: 'center', headerAlign:'center', flex: 0.3,
         renderCell: (params) => {
             return (
                 <>
