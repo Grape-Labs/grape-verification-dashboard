@@ -31,7 +31,7 @@ import { SnackbarProvider } from 'notistack';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 //import { WalletIdentityProvider } from '@cardinal/namespaces-components'
-import './cardinal.css';
+//import './cardinal.css';
 import { Helmet } from 'react-helmet';
 
 import { useSnackbar } from 'notistack';

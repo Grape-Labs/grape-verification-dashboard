@@ -27,9 +27,11 @@ function BasicComponent(props) {
 
   return (
     <React.Fragment>
+      right here...
         {!isConnected &&
           <Grid container sx={{mt:2}} align='center'>
             <Grid item >
+              nope...
             </Grid>
           </Grid>
         }
