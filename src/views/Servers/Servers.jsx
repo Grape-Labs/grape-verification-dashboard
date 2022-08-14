@@ -369,7 +369,19 @@ export const ServersView = (props) => {
     { field: 'discordId', headerName: 'Discord ID', width: 130, hide: true },
     { field: 'discordUrl', headerName: 'Discord', width: 130, hide: true },
     { field: 'twitter', headerName: 'twitter', width: 130, hide: true },
-    { field: 'gan', headerName: 'GAN', width: 130, align: 'center', headerAlign:'center', hide: false },
+    { field: 'gan', headerName: 'GAN', width: 130, align: 'center', headerAlign:'center', hide: false,
+      renderCell: (params) => {
+        return (
+          <>
+            {params.value ?
+              <CheckCircleIcon />
+            :
+              <CircleOutlinedIcon sx={{ color: 'rgba(255,255,255,0.25)' }} />
+            }
+          </>
+        )
+      }
+    },
     { field: 'registered', headerName: 'Registered', align: 'center', headerAlign:'center', width: 130, hide: false,
       renderCell: (params) => {
         return (
@@ -377,7 +389,7 @@ export const ServersView = (props) => {
             {params.value ?
               <CheckCircleIcon />
             :
-              <CircleOutlinedIcon />
+              <CircleOutlinedIcon sx={{ color: 'rgba(255,255,255,0.25)' }}/>
             }
           </>
         )

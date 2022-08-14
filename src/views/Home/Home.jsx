@@ -33,7 +33,8 @@ function BasicComponent(props) {
             spacing={0}
             align="center"
             justify="center"
-            direction="column">
+            direction="column"
+            sx={{mt:4}}>
             <Grid item>
               <Typography 
                 align="center"
