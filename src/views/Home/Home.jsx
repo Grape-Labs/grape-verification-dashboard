@@ -60,7 +60,7 @@ const RenderDashboardComponents = (props) => {
   const isConnected = session && session.isConnected;
   const isWallet = session && session.isWallet;
   
-  console.log("session: "+JSON.stringify(session))
+  //console.log("session: "+JSON.stringify(session))
   // show if connected
   //if (publicKey){
       switch(isConnected) {
