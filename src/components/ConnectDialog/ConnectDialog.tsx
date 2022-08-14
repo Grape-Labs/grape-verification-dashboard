@@ -348,6 +348,7 @@ const WalletNavigation: FC = (props:any) => {
           }));
 
           console.log(wallet?.adapter.name + " connecting to Grape Dashboard...");
+          
           console.log("Login: "+JSON.stringify(login))+" - "+GRAPE_APP_API_URL;
 
             if (login){ // login
