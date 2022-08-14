@@ -27,21 +27,25 @@ function BasicComponent(props) {
   return (
     <React.Fragment>
         {!isConnected &&
-          <Grid 
-            class="grape-paper" 
-            container
-            spacing={0}
-            align="center"
-            justify="center"
-            direction="column"
-            sx={{mt:4}}>
-            <Grid item>
-              <Typography 
+          <Grid item xs={12}>
+            <Paper class="grape-paper-background">
+              <Grid 
+                class="grape-paper" 
+                container
+                spacing={0}
                 align="center"
-                variant="h3">
-                  not connected...
-              </Typography>
-            </Grid>
+                justify="center"
+                direction="column"
+                sx={{mt:4}}>
+                <Grid item>
+                  <Typography 
+                    align="center"
+                    variant="h3">
+                      connecting...
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Paper>
           </Grid>
         }
       
