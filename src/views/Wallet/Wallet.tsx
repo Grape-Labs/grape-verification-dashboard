@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from '@mui/material/';
 
+import BoltIcon from '@mui/icons-material/Bolt';
 import TollIcon from '@mui/icons-material/Toll';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 
@@ -421,8 +422,7 @@ export const WalletView = (props:any) => {
                     <>loading {loadingPosition}</>
                     :
                         <Grid container>
-                            <Grid item xs={6}
-                            >
+                            <Grid item xs={12} sm={4}>
                                 <Grid container
                                     alignContent="center"
                                     justifyContent="center"
@@ -437,7 +437,7 @@ export const WalletView = (props:any) => {
                                     </Grid>
                                 </Grid>
                             </Grid>
-                            <Grid item xs={6}>
+                            <Grid item xs={12} sm={4}>
                                 <Grid container                                
                                     alignContent="center"
                                     justifyContent="center"
@@ -448,6 +448,21 @@ export const WalletView = (props:any) => {
                                     <Grid item>
                                         <Typography variant='h4' sx={{color:'rgba(255,255,255,0.5)'}}>
                                             Tokens: {tokenCount}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <Grid container                                
+                                    alignContent="center"
+                                    justifyContent="center"
+                                >
+                                    <Grid item>
+                                        <BoltIcon  sx={{ fontSize: 40, mr:1, color:'rgba(255,255,255,0.15)'}} />
+                                    </Grid>
+                                    <Grid item>
+                                        <Typography variant='h4' sx={{color:'rgba(255,255,255,0.15)'}}>
+                                            Connect: soon
                                         </Typography>
                                     </Grid>
                                 </Grid>
