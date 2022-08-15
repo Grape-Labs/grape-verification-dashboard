@@ -1,14 +1,18 @@
 import React, { FC, useCallback, useMemo } from 'react';
 import { useSession } from "../../contexts/session";
 
-import Grid from '@mui/material/Grid';
-import Paper from '@mui/material/Paper';
-import Box from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
+import {
+  Grid,
+  Paper,
+  Box,
+  Typography,
+  Button
+} from '@mui/material';
 import { useWallet } from '@solana/wallet-adapter-react';
 
 import { useSnackbar } from 'notistack';
 import { ServersView, SettingsView, WalletView } from "../";
+import ConnectDialog from '../../components/ConnectDialog/ConnectDialog';
 
 function ConnectedWalletComponent(props) {
   return (
@@ -20,10 +24,24 @@ function ConnectedWalletComponent(props) {
 }
 
 function BasicComponent(props) {
-  const { publicKey, wallet } = useWallet();
+  const { publicKey, wallet, disconnect, connect } = useWallet();
   //const publicKey = props.publicKey;
-  const isConnected = props.isConnected;
-  const isWallet = props.isWallet;
+  const { session, setSession } = useSession();
+  //const setSession = props.setSession;
+  //const session = props.session;
+  const isConnected = session && session.isConnected;
+  const isWallet = session && session.isWallet;
+
+  const handleWalletAuthClick = (event) => {
+    setSession(null);
+    //session.disconnect();
+    disconnect();
+    const timeout = setTimeout(() => {
+      connect().catch(() => {
+        // Silently catch because any errors are caught by the context `onError` handler
+      });
+    }, 2000); // added a small delay
+  };
 
   return (
     <React.Fragment>
@@ -65,8 +83,18 @@ function BasicComponent(props) {
                       <Typography 
                         align="center"
                         variant="h3">
-                          proof of wallet required (add button here)...
+                          Proof of wallet required
                       </Typography>
+                      <Typography 
+                        align="center"
+                        variant="h3">
+                          
+                          <Button
+                            onClick={(event) => 
+                              handleWalletAuthClick(event)}
+                          >Reconnect your wallet</Button>
+                      </Typography>
+                      
                     </Grid>
                   </Grid>
                 </Paper>
@@ -94,9 +122,9 @@ const RenderDashboardComponents = (props) => {
   //if (publicKey){
       switch(isConnected) {
         case isWallet: // display only if verified pk in wallet
-          return <React.Fragment><BasicComponent isConnected={isConnected} isWallet={isWallet} /><ConnectedWalletComponent /></React.Fragment>
+          return <React.Fragment><BasicComponent /><ConnectedWalletComponent /></React.Fragment>
         default:
-          return <BasicComponent isConnected={isConnected} isWallet={isWallet} />
+          return <BasicComponent />
       }
   //}
 }
@@ -126,7 +154,7 @@ export const HomeView = (props) => {
               {wallet ? 
                 <Grid container spacing={3}>
                 <RenderDashboardComponents
-                  session={session}
+                  session={session} setSession={session}
                 />
               </Grid>
               :

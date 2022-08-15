@@ -114,7 +114,7 @@ const WalletNavigation: FC = (props:any) => {
   function createNakedSession(cnsPublicKey: string){
     setSession(NakedWallet(cnsPublicKey, session));
   }
-  
+
   async function confirmWalletWithSignTransaction() { 
     const amountToSend = 0.00001;
     const decimals = 9;
@@ -214,18 +214,19 @@ const WalletNavigation: FC = (props:any) => {
   }
 
   //if (!publicKey) throw new WalletNotConnectedError();
-  const VerifyWallet = useCallback(async (sent_publicKey) => {
+
+  const VerifyWallet = useCallback(async (sent_publicKey:any) => {
     console.log("CD: Running wallet verification...");
     try {
         let naked_session = false;
         // `publicKey` will be null if the wallet isn't connected
         
         //console.log('pubkey: '+publicKey + ' vs ' + sent_publicKey);
-        if (!publicKey){
+        //if (!publicKey){
           //console.log('CD: WALLET NOT CONNECTED...');
           //disconnect().catch(() => { /* catch any errors */ });
           //throw new Error('Wallet not connected!');
-        }
+        //}
         // `signMessage` will be undefined if the wallet doesn't support it
         //console.log("Checking signing support "+wallet?.name + " wallet");
         
@@ -294,7 +295,6 @@ const WalletNavigation: FC = (props:any) => {
               fromTransaction = true;
               sm_signature = await confirmWalletWithTransaction();
               sm_signature = new TextEncoder().encode(sm_signature); // convert to "utf-8"
-                
             }
             
           }
