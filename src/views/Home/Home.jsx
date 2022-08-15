@@ -17,6 +17,7 @@ import ConnectDialog from '../../components/ConnectDialog/ConnectDialog';
 function ConnectedWalletComponent(props) {
   return (
     <React.Fragment>
+      <WalletView /> 
       <ServersView /> 
       <SettingsView />
     </React.Fragment>

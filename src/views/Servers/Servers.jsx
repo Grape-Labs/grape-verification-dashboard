@@ -470,7 +470,7 @@ export const ServersView = (props) => {
                 
                 <CssTextField 
                   fullWidth
-                  label="Filter Servers" id="custom-css-outlined-input"
+                  label="Find &amp; connect to communities" id="custom-css-outlined-input"
                   onChange={(e) => filter(e.target.value)}
                   //fvalue={filterVal}
                   sx={{ml:1.25,mr:1.25}} />

@@ -1,6 +1,7 @@
 export { HomeView } from "./Home/Home";
 export { ServersView } from "./Servers/Servers";
 export { SettingsView } from "./Settings/Settings";
+export { WalletView } from "./Wallet/Wallet";
 export { ConfirmationView } from "./Confirmation/Confirmation";
 export { RegisterView } from "./Register/Register";
 export { PortfolioView } from "./Portfolio/Portfolio";
@@ -11,5 +12,4 @@ export { GrapePartnersView } from "./GrapePartners/GrapePartners";
 export { MembershipView } from "./Membership/Membership";
 export { GovernanceView } from "./Governance/Governance";
 export { PaymentsView } from "./Payments/Payments";
-//export { SwapComponent } from "./Swap/SwapComponent";
 export { MeanfiView } from "./Meanfi/Meanfi";
