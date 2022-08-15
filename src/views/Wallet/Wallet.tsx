@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from '@mui/material/';
 
+import LinkIcon from '@mui/icons-material/Link';
 import BoltIcon from '@mui/icons-material/Bolt';
 import TollIcon from '@mui/icons-material/Toll';
 import QrCodeIcon from '@mui/icons-material/QrCode';
@@ -61,12 +62,27 @@ export const WalletView = (props:any) => {
     const [solanaHoldings, setSolanaHoldings] = React.useState(null);
     const [nftCount, setNftCount] = React.useState(0);
     const [tokenCount, setTokenCount] = React.useState(0);
+    const [connectedCount, setConnectedCount] = React.useState(0);
     const [nftMap, setNftMap] = React.useState(null);
     const { publicKey, wallet, disconnect } = useWallet();
     const rpclimit = 100;
     const MD_PUBKEY = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
     const ggoconnection = new Connection(GRAPE_RPC_ENDPOINT);
     
+    function getConnected(){
+        let servers = session && session.servers;
+        const userServers = session && session.userServers;
+
+        if (userServers){
+            var count = 0;
+            for (var userver of userServers){
+                count++;
+            }
+            setConnectedCount(count);
+        }
+
+    }
+
     const getCollectionData = async (start: number, sholdings: any) => {
         try {
             const mintsPDAs = [];
@@ -382,6 +398,7 @@ export const WalletView = (props:any) => {
     const fetchTokenPositions = async () => {
         setLoadingTokens(true);
         await fetchSolanaTokens();
+        getConnected();
         setLoadingTokens(false);
     }
 
@@ -422,47 +439,62 @@ export const WalletView = (props:any) => {
                     <>loading {loadingPosition}</>
                     :
                         <Grid container>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={3}>
                                 <Grid container
                                     alignContent="center"
                                     justifyContent="center"
                                 >
                                     <Grid item>
-                                        <QrCodeIcon sx={{ fontSize: 40, mr:1, color:'rgba(255,255,255,0.5)'}} />
+                                        <QrCodeIcon sx={{ fontSize: 30, mr:1, color:'rgba(255,255,255,0.5)'}} />
                                     </Grid>
                                     <Grid item>
-                                        <Typography variant='h4' sx={{color:'rgba(255,255,255,0.5)'}}>
+                                        <Typography variant='h5' sx={{color:'rgba(255,255,255,0.5)'}}>
                                             NFTs: {nftCount}
                                         </Typography>
                                     </Grid>
                                 </Grid>
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={3}>
                                 <Grid container                                
                                     alignContent="center"
                                     justifyContent="center"
                                 >
                                     <Grid item>
-                                        <TollIcon  sx={{ fontSize: 40, mr:1, color:'rgba(255,255,255,0.5)'}} />
+                                        <TollIcon  sx={{ fontSize: 30, mr:1, color:'rgba(255,255,255,0.5)'}} />
                                     </Grid>
                                     <Grid item>
-                                        <Typography variant='h4' sx={{color:'rgba(255,255,255,0.5)'}}>
+                                        <Typography variant='h5' sx={{color:'rgba(255,255,255,0.5)'}}>
                                             Tokens: {tokenCount}
                                         </Typography>
                                     </Grid>
                                 </Grid>
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={3}>
                                 <Grid container                                
                                     alignContent="center"
                                     justifyContent="center"
                                 >
                                     <Grid item>
-                                        <BoltIcon  sx={{ fontSize: 40, mr:1, color:'rgba(255,255,255,0.15)'}} />
+                                        <LinkIcon  sx={{ fontSize: 30, mr:1, color:'rgba(255,255,255,0.5)'}} />
                                     </Grid>
                                     <Grid item>
-                                        <Typography variant='h4' sx={{color:'rgba(255,255,255,0.15)'}}>
-                                            Connect: soon
+                                        <Typography variant='h5' sx={{color:'rgba(255,255,255,0.5)'}}>
+                                            Connected: {connectedCount}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                            <Grid item xs={12} sm={3}>
+                                <Grid container                                
+                                    alignContent="center"
+                                    justifyContent="center"
+                                >
+                                    <Grid item>
+                                        <BoltIcon  sx={{ fontSize: 30, mr:1, color:'rgba(255,255,255,0.15)'}} />
+                                    </Grid>
+                                    <Grid item>
+                                        <Typography variant='h5' sx={{color:'rgba(255,255,255,0.15)'}}>
+                                            Auto: soon
                                         </Typography>
                                     </Grid>
                                 </Grid>
@@ -475,8 +507,9 @@ export const WalletView = (props:any) => {
                                 <Button
                                     href='https://grape.art/identity'
                                     target='_blank'
-                                    sx={{}}
-                                >View your holdings at grape.art identity</Button>
+                                    variant='outlined'
+                                    sx={{textTransform:'none',mt:2}}
+                                >View &amp; manage your wallet at Grape Identity</Button>
                             </Grid>
                             {/*solanaHoldings && solanaHoldings.map((item: any, key: number) => (
                                     <ListItem>
