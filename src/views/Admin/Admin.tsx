@@ -10,8 +10,10 @@ import {
     StepLabel,
  } from '@mui/material';
 
- import CheckIcon from '@mui/icons-material/Check';
+import CheckIcon from '@mui/icons-material/Check';
 
+import JupiterSwap from "../JupiterSwap/JupiterSwap";
+import { JupiterProvider, useJupiter } from "@jup-ag/react-hook";
 import { useWallet } from '@solana/wallet-adapter-react';
 
 import { getRealm, getRealms, getAllProposals, getGovernance, getTokenOwnerRecordsByOwner, getTokenOwnerRecord, getRealmConfigAddress, getGovernanceAccount, getAccountTypes, GovernanceAccountType, tryGetRealmConfig  } from '@solana/spl-governance';
@@ -26,13 +28,18 @@ import {
 
 //const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
 const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
+const GRAPE_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
+const USDC_TOKEN = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
 
  const steps = [
     'Get GAN',
     'Associate Discord',
   ];
 
- export default function HorizontalLabelPositionBelowStepper() {
+ export default function HorizontalLabelPositionBelowStepper(props:any) {
+    const tokenMap = props.tokenMap;
+    const portfolioPositions = props.portfolioPositions;
     const [activeStep, setActiveStep] = React.useState(0);
     const [completed, setCompleted] = React.useState<{
         [k: number]: boolean;
@@ -112,10 +119,35 @@ const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
                 <Typography sx={{ mt: 2, mb: 1 }}>
                     Step {activeStep + 1}<br/><br/>
 
-                    Show/detect GAN balance with wallet connected<br/>
+                    <Grid container
+                        textAlign='center'
+                        alignContent='center'
+                        direction='column'
+                    >
+                        <Grid item xs={12}>
+                            Quickly swap and get Grape<br/>
 
-                    Get GAN Token with SOL<br/>
-                    Get GAN Token with USDC
+                            {portfolioPositions &&
+                                <>
+                                    <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap}/>
+                                    <br/>
+                                    <JupiterSwap swapfrom={USDC_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap}/>
+                                </>
+                            }
+                        </Grid>
+                        <Grid item xs={12} sx={{mt:2}}>
+
+                            <Button 
+                                variant='outlined'
+                                component='a'
+                                href='https://app.strataprotocol.com/swap/4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd'
+                                target='_blank'
+                                sx={{borderRadius:'17px'}}
+                            >
+                                Get GAN with swapped Grape
+                            </Button>
+                        </Grid>
+                    </Grid>
                 </Typography>
             }
             
@@ -171,6 +203,7 @@ export function AdminView(props: any) {
     const [ganPosition, setGanPosition] = React.useState(null);
     const [ganGovernance, setGanGovernance] = React.useState(null);
     const [governanceRecord, setGovernanceRecord] = React.useState(null);
+    const [portfolioPositions, setPortfolioPositions] = React.useState(null);
     const ticonnection = new Connection(GOVERNANCE_RPC_ENDPOINT);
     const { publicKey, wallet, disconnect } = useWallet()
 
@@ -237,7 +270,9 @@ export function AdminView(props: any) {
     
 
 
-        var solholdingrows = new Array()
+        var solholdingrows = new Array();
+
+        setPortfolioPositions(sortedholdings)
     }
 
     const fetchGovernance = async () => {
@@ -331,7 +366,7 @@ export function AdminView(props: any) {
         <>
             <Grid item xs={12} sx={{mt:4}}>
                 <Paper className="grape-paper-background">
-                    <HorizontalLabelPositionBelowStepper />
+                    <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} />
                 </Paper>
             </Grid>
 
