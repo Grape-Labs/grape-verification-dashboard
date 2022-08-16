@@ -10,6 +10,23 @@ import {
     StepLabel,
  } from '@mui/material';
 
+ import CheckIcon from '@mui/icons-material/Check';
+
+import { useWallet } from '@solana/wallet-adapter-react';
+
+import { getRealm, getRealms, getAllProposals, getGovernance, getTokenOwnerRecordsByOwner, getTokenOwnerRecord, getRealmConfigAddress, getGovernanceAccount, getAccountTypes, GovernanceAccountType, tryGetRealmConfig  } from '@solana/spl-governance';
+import {ENV, TokenInfo, TokenListProvider} from '@solana/spl-token-registry';
+import { TokenAmount, lt } from '../../utils/token/safe-math';
+import { PublicKey, Connection } from '@solana/web3.js';
+
+import { 
+    GRAPE_RPC_ENDPOINT, 
+    GOVERNANCE_RPC_ENDPOINT,
+    TX_RPC_ENDPOINT } from '../../components/Tools/constants';
+
+//const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
+const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
+
  const steps = [
     'Get GAN',
     'Associate Discord',
@@ -145,6 +162,171 @@ import {
   }
 
 export function AdminView(props: any) {
+    const [loadingPosition, setLoadingPosition] = React.useState(null);
+    const [tokenMap, setTokenMap] = React.useState(null);
+    const [loadingTokens, setLoadingTokens] = React.useState(false);
+    const [loadingWallet, setLoadingWallet] = React.useState(false);
+    const [loadingGovernance, setLoadingGovernance] = React.useState(false);
+    const [hasGAN, setHasGAN] = React.useState(false);
+    const [ganPosition, setGanPosition] = React.useState(null);
+    const [ganGovernance, setGanGovernance] = React.useState(null);
+    const [governanceRecord, setGovernanceRecord] = React.useState(null);
+    const ticonnection = new Connection(GOVERNANCE_RPC_ENDPOINT);
+    const { publicKey, wallet, disconnect } = useWallet()
+
+    const fetchTokens = async () => {
+        setLoadingPosition('Wallet');
+        const tokens = await new TokenListProvider().resolve();
+        const tokenList = tokens.filterByChainId(ENV.MainnetBeta).getList();
+        const tokenMapValue = tokenList.reduce((map, item) => {
+            map.set(item.address, item);
+            return map;
+        }, new Map())
+        setTokenMap(tokenMapValue);
+        return tokenMapValue;
+    }
+
+    const fetchSolanaTokens = async () => {
+        setLoadingPosition('Tokens');
+        //const response = await ggoconnection.getTokenAccountsByOwner(new PublicKey(pubkey), {programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")});
+        /*
+            let meta_final = JSON.parse(item.account.data);
+            let buf = Buffer.from(JSON.stringify(item.account.data), 'base64');
+        */
+        // Use JSONParse for now until we decode 
+        const body = {
+            method: "getTokenAccountsByOwner",
+            jsonrpc: "2.0",
+            params: [
+              publicKey.toBase58(),
+              { programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+              { encoding: "jsonParsed", commitment: "processed" },
+            ],
+            id: "35f0036a-3801-4485-b573-2bf29a7c77d2",
+        };
+        const resp = await window.fetch(GRAPE_RPC_ENDPOINT, {
+            method: "POST",
+            body: JSON.stringify(body),
+            headers: { "Content-Type": "application/json" },
+        })
+        const json = await resp.json();
+        const resultValues = json.result.value
+        //return resultValues;
+    
+        let holdings: any[] = [];
+        let closable = new Array();
+        for (var item of resultValues){
+            //let buf = Buffer.from(item.account, 'base64');
+            //console.log("item: "+JSON.stringify(item));
+
+            if (item.account.data.parsed.info.mint === GAN_TOKEN){
+                setHasGAN(true);
+                setGanPosition(item.account.data.parsed.info);
+            }
+
+
+            if (item.account.data.parsed.info.tokenAmount.amount > 0)
+                holdings.push(item);
+            else
+                closable.push(item);
+            // consider using https://raw.githubusercontent.com/solana-labs/token-list/main/src/tokens/solana.tokenlist.json to view more details on the tokens held
+        }
+    
+        let sortedholdings = JSON.parse(JSON.stringify(holdings));
+        sortedholdings.sort((a:any,b:any) => (b.account.data.parsed.info.tokenAmount.amount - a.account.data.parsed.info.tokenAmount.amount));
+    
+
+
+        var solholdingrows = new Array()
+    }
+
+    const fetchGovernance = async () => {
+        setLoadingPosition('Governance');
+        const GOVERNANCE_PROGRAM_ID = 'GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw';
+        const programId = new PublicKey(GOVERNANCE_PROGRAM_ID);
+        
+        //const rlms = await getRealms(ticonnection, programId);
+        //const uTable = rlms.reduce((acc, it) => (acc[it.pubkey.toBase58()] = it, acc), {})
+        //setRealms(uTable);
+        
+        const ownerRecordsbyOwner = await getTokenOwnerRecordsByOwner(ticonnection, programId, publicKey);
+
+        //console.log("ownerRecordsbyOwner "+JSON.stringify(ownerRecordsbyOwner))
+        const governance = new Array();
+        
+        let cnt = 0;
+        //console.log("all uTable "+JSON.stringify(uTable))
+
+        for (var item of ownerRecordsbyOwner){
+            //const realm = uTable[item.account.realm.toBase58()];
+            //console.log("realm: "+JSON.stringify(realm))
+            //const name = realm.account.name;
+            let votes = +item.account.governingTokenDepositAmount;
+            
+            let thisToken = tokenMap.get(item.account.governingTokenMint.toBase58());
+            
+            if (thisToken){
+
+                if (thisToken.address === GAN_TOKEN){
+                    //console.log("thisToken: "+JSON.stringify(thisToken))
+                    const itemBalance = Number(new TokenAmount(+item.account.governingTokenDepositAmount, thisToken.decimals).format().replace(/[^0-9.-]+/g,""));
+                    console.log("Deposited in Governance: "+itemBalance);
+                    setGanGovernance(itemBalance);
+                }
+            } else{
+                //votes = 'NFT/Council';
+            }
+
+            governance.push({
+                id:cnt,
+                pubkey:item.pubkey,
+                realm:name,
+                governingTokenMint:item.account.governingTokenMint,
+                governingTokenDepositAmount:votes,
+                unrelinquishedVotesCount:item.account.unrelinquishedVotesCount,
+                totalVotesCount:item.account.totalVotesCount,
+                relinquish:item.pubkey,
+                link:item.account.realm
+            });
+            cnt++;
+        }
+
+        setGovernanceRecord(ownerRecordsbyOwner);
+    }
+
+    const fetchTokenPositions = async () => {
+        setLoadingTokens(true);
+        await fetchSolanaTokens();
+        //getConnected();
+        setLoadingTokens(false);
+    }
+
+    const fetchGovernancePositions = async () => {
+        setLoadingGovernance(true);
+        await fetchGovernance();
+        setLoadingGovernance(false);
+    }
+
+  React.useEffect(() => {
+        if (publicKey && tokenMap){
+            fetchTokenPositions();
+            fetchGovernancePositions();
+        }
+    }, [tokenMap]);
+
+    const fetchWalletPositions = async () => {
+        setLoadingWallet(true);
+        const tmap = await fetchTokens();
+        setLoadingWallet(false);
+    }
+    
+    
+      React.useEffect(() => {
+        if (publicKey){
+            fetchWalletPositions();
+        }
+      }, [publicKey]);
+
     return (
         <>
             <Grid item xs={12} sx={{mt:4}}>
@@ -167,7 +349,33 @@ export function AdminView(props: any) {
                             <Typography 
                             align="center"
                             variant="h5">
-                                Server Verification Management coming soon...
+                                {(loadingWallet || loadingTokens || loadingGovernance) ?
+                                    <>loading {loadingPosition}...</>
+                                    :
+                                    <>
+                                        {hasGAN ?
+                                            <>
+                                                <Typography variant='h6'>
+                                                
+                                                    <CheckIcon /> {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format().replace(/[^0-9.-]+/g,""))} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet<br/>
+                                                    {ganGovernance && 
+                                                        <>
+                                                        <CheckIcon /> {ganGovernance} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Governance
+                                                        </>
+                                                    }
+                                                </Typography>
+
+                                                <br/><br/>
+                                                <Typography variant='caption'>
+                                                    Server Verification Management coming soon...
+                                                </Typography>
+                                            </>
+                                        :
+                                            <>GAN token is required for server verification management</>
+                                        }
+                                    </>
+                                }
+                                
                             </Typography>
                         </Grid>
                     </Grid>

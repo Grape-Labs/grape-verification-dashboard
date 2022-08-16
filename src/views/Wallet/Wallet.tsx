@@ -403,10 +403,10 @@ export const WalletView = (props:any) => {
     }
 
   React.useEffect(() => {
-    if (publicKey && tokenMap){
-        fetchTokenPositions();
-    }
-}, [tokenMap]);
+        if (publicKey && tokenMap){
+            fetchTokenPositions();
+        }
+    }, [tokenMap]);
 
   const fetchWalletPositions = async () => {
     setLoadingWallet(true);
