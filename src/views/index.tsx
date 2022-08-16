@@ -13,3 +13,4 @@ export { MembershipView } from "./Membership/Membership";
 export { GovernanceView } from "./Governance/Governance";
 export { PaymentsView } from "./Payments/Payments";
 export { MeanfiView } from "./Meanfi/Meanfi";
+export { AdminView } from "./Admin/Admin";

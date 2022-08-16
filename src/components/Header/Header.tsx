@@ -34,6 +34,7 @@ import {
     DASHBOARD_LOGO
 } from '../Tools/constants';
 
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import BrowseGalleryIcon from '@mui/icons-material/BrowseGallery';
 import DownloadingIcon from '@mui/icons-material/Downloading';
 import StorageIcon from '@mui/icons-material/Storage';
@@ -193,12 +194,16 @@ export function Header(props: any) {
                     </IconButton>
                 </Tooltip>
                 
+
+                
+                <Tooltip title={`Admin`}><IconButton sx={{borderRadius:'17px'}} component={NavLink} to='/admin'><AdminPanelSettingsIcon/></IconButton></Tooltip>
+                
                 <Tooltip title={`Collection`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grape.art' target="_blank"><PhotoOutlinedIcon/></IconButton></Tooltip>
-                <Tooltip title={`Grape Drive`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapedrive.vercel.app' target="_blank"><StorageIcon/></IconButton></Tooltip>
                 {/*
                 <Tooltip title={`Staking`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapestaking.vercel.app' target="_blank"><BrowseGalleryIcon/></IconButton></Tooltip>
                 */} 
                 <Hidden smDown>
+                    <Tooltip title={`Grape Drive`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapedrive.vercel.app' target="_blank"><StorageIcon/></IconButton></Tooltip>
                     <Tooltip title={`Streams`}><IconButton sx={{borderRadius:'17px'}} component={NavLink} color="inherit" to="/streams"><DownloadingIcon /></IconButton></Tooltip>
                     <Tooltip title={`About`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapes.network' target="_blank"><InfoOutlinedIcon/></IconButton></Tooltip>
                 </Hidden>

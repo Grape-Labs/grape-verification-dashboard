@@ -12,7 +12,8 @@ import {
   MembershipView, 
   ContributeView, 
   PaymentsView,
-  MeanfiView } from "./views";
+  MeanfiView,
+  AdminView } from "./views";
 import { SessionProvider } from "./contexts/session";
 import CssBaseline from '@mui/material/CssBaseline';
 import MuiDrawer from '@mui/material/Drawer';
@@ -208,6 +209,7 @@ function DashboardContent() {
                               <Route path="membership" element={<MembershipView />} />
                               <Route path="news" element={<NewsView />} />
                               <Route path="payments" element={<PaymentsView />} />
+                              <Route path="admin" element={<AdminView />} />
                               <Route path="*" element={<NotFound/>} />
                             </Routes>
                             
