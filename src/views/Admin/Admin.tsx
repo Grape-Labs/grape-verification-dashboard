@@ -12,7 +12,7 @@ import {
 
  const steps = [
     'Get GAN',
-    'Assign Discord',
+    'Associate Discord',
   ];
 
  export default function HorizontalLabelPositionBelowStepper() {
