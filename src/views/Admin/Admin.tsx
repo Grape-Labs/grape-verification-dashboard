@@ -33,6 +33,7 @@ import {
     TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 
 const GAN_REQUIREMENT = 1;
+const GRAPE_TO_GAN_REQUIRED = '11,000';
 const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
 //const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
 const GRAPE_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
@@ -173,18 +174,47 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         direction='column'
                         sx={{mt:2}}
                     >
-                        <Grid item xs={12}>
+                        <Grid item 
+                            justifyContent='left'
+                            alignContent='left'
+                            textAlign='left'
+                            sx={{m:1}}>
                             
                             {grapePosition && 
                                 <>
                                     <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet</Alert>
                                 </>
                             }
-                            <Grid container sx={{m:1}}>
-                                <Typography variant='h5'>
-                                    Quickly swap and get Grape<br/>
-                                </Typography>
-                            </Grid>
+                        </Grid>
+                        <Grid item 
+                            justifyContent='left'
+                            alignContent='left'
+                            textAlign='left'
+                            sx={{m:1}}>
+
+                            {totalGan ? 
+                                <>
+                                    {totalGan > GAN_REQUIREMENT ?
+                                        <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{totalGan} GAN Tokens held in Wallet/Governance</Alert>
+                                    :
+                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>At least {GAN_REQUIREMENT} GAN required to proceed, you have {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}, GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step *approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN</Alert>
+                                    }
+
+                                </>
+                            :
+                            <>
+                                <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least {GAN_REQUIREMENT} GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step *approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN</Alert>
+                            </>
+                            }
+                        </Grid>
+
+                        <Grid item>
+                            <Typography variant='h5'>
+                                Quickly swap and get Grape<br/>
+                            </Typography>
+                        </Grid>
+
+                        <Grid item>
                             {portfolioPositions &&
                                 <>
                                     <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap}/>
