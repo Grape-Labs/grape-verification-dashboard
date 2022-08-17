@@ -1,5 +1,6 @@
 import * as React from 'react';
 import {
+    Alert,
     Typography,
     Box,
     Button,
@@ -31,8 +32,9 @@ import {
     GOVERNANCE_RPC_ENDPOINT,
     TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 
-//const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
-const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
+const GAN_REQUIREMENT = 1;
+const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
+//const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
 const GRAPE_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
 const USDC_TOKEN = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
@@ -46,9 +48,10 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
  export default function HorizontalLabelPositionBelowStepper(props:any) {
     const tokenMap = props.tokenMap;
     const grapePosition = props.grapePosition;
+    const ganPosition = props.ganPosition;
     const portfolioPositions = props.portfolioPositions;
     const [verificationType, setVerificationType] = React.useState('');
-
+    const [disabled, setDisabled] = React.useState(false);
     const [activeStep, setActiveStep] = React.useState(0);
     const [completed, setCompleted] = React.useState<{
         [k: number]: boolean;
@@ -105,6 +108,22 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
         setCompleted({});
     };
 
+    React.useEffect(() => {
+        if (activeStep){
+            if (activeStep+1 === 2){
+                if (!ganPosition){
+                    // check balance
+                    setDisabled(true);
+                } else{
+                    const balance = Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format().replace(/[^0-9.-]+/g,""));
+                    if (balance < GAN_REQUIREMENT){
+                        setDisabled(true);
+                    }
+                }
+            }
+        }
+      }, [activeStep]);
+
     return (
       <Box sx={{ width: '100%' }}>
         <Stepper activeStep={activeStep} alternativeLabel>
@@ -143,13 +162,14 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             
                             {grapePosition && 
                                 <>
-                                <CheckIcon /> {Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet
+                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet</Alert>
                                 </>
                             }
-
-                            <Typography variant='h6'>
-                                Quickly swap and get Grape<br/>
-                            </Typography>
+                            <Grid container sx={{m:1}}>
+                                <Typography variant='h6'>
+                                    Quickly swap and get Grape<br/>
+                                </Typography>
+                            </Grid>
                             {portfolioPositions &&
                                 <>
                                     <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap}/>
@@ -172,6 +192,23 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         direction='column'
                         sx={{mt:2}}
                     >
+
+                            
+                        {ganPosition ? 
+                            <>
+                                {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format().replace(/[^0-9.-]+/g,"")) > GAN_REQUIREMENT ?
+                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet</Alert>
+                                :
+                                    <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>At least {GAN_REQUIREMENT} GAN required to proceed, you have {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}</Alert>
+                                }
+
+                            </>
+                        :
+                        <>
+                            <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least 1 GAN Token is required to continue</Alert>
+                        </>
+                        }
+
                         <Grid item xs={12} sx={{mt:2}}>
                             <Button 
                                 variant='outlined'
@@ -201,18 +238,11 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                 Associate your discord
                             </Typography>
 
-                            <Box
-                                component="form"
-                                sx={{
-                                    '& > :not(style)': { m: 1, width: '25ch' },
-                                }}
-                                noValidate
-                                autoComplete="off"
-                                >
-                                    <TextField id="outlined-basic" label="Server ID" variant="outlined" />
-                            </Box>
+                            <FormControl fullWidth sx={{m:1}}>
+                                <TextField id="outlined-basic" label="Server ID" variant="outlined" />
+                            </FormControl>
 
-                            <FormControl fullWidth>
+                            <FormControl fullWidth sx={{m:1}}>
                                 <InputLabel id="demo-simple-select-label">Verification Type</InputLabel>
                                 <Select
                                     labelId="demo-simple-select-label"
@@ -221,10 +251,15 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                     label="Verification Type"
                                     onChange={handleVerificationTypeChange}
                                 >
-                                    <MenuItem value={10}>NFT</MenuItem>
-                                    <MenuItem value={20}>SPL Token</MenuItem>
-                                    <MenuItem value={30}>Something Else...</MenuItem>
+                                    <MenuItem value={10}>Token</MenuItem>
+                                    <MenuItem value={20}>NFT</MenuItem>
+                                    <MenuItem value={30}>Token &amp; Governance</MenuItem>
+                                    <MenuItem value={40}>Staking</MenuItem>
                                 </Select>
+                            </FormControl>
+
+                            <FormControl fullWidth sx={{m:1}}>
+                                <TextField id="outlined-basic" label="Mint" variant="outlined" />
                             </FormControl>
 
 
@@ -244,7 +279,11 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                 Back
               </Button>
               <Box sx={{ flex: '1 1 auto' }} />
-              <Button onClick={handleNext} sx={{ mr: 1 }}>
+              <Button 
+                onClick={handleNext} 
+                disabled={disabled}
+                sx={{ mr: 1 }}
+            >
                 Next
               </Button>
               {activeStep !== steps.length &&
@@ -448,7 +487,7 @@ export function AdminView(props: any) {
             :
             <Grid item xs={12} sx={{mt:4}}>
                 <Paper className="grape-paper-background">
-                    <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} />
+                    <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} />
                 </Paper>
             </Grid>
             }  
@@ -475,10 +514,11 @@ export function AdminView(props: any) {
                                             <>
                                                 <Typography variant='h6'>
                                                 
-                                                    <CheckIcon /> {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet<br/>
+                                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>{Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet</Alert>
+                                
                                                     {ganGovernance && 
                                                         <>
-                                                        <CheckIcon /> {ganGovernance} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Governance
+                                                            <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{ganGovernance} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet</Alert>
                                                         </>
                                                     }
                                                 </Typography>
