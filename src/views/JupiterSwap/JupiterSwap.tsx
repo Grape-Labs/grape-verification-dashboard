@@ -315,8 +315,6 @@ function JupiterForm(props: any) {
         setLpFees([]);
         setPriceImpacts([]);
         
-        console.log('routes: '+JSON.stringify(routes))
-
         setConvertedAmountValue(routes[0].outAmount[0] / (10 ** (tokenMap.get(swapto)!.decimals || 6)));
 
         if (routes[0].outAmount[0] > 0){
@@ -329,11 +327,8 @@ function JupiterForm(props: any) {
                 setPriceImpacts(pi => [...pi, `${mi.amm.label}: ${mi.priceImpactPct * 100 < 0.1 ? '< 0.1' : (mi.priceImpactPct * 100).toFixed(2)}%` ])
             })
         }
-        
-        setMinimumReceived((+(String(routes[0].outAmount))-(+(String(routes[0].outAmount))*0.001)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)) || null)
 
-        console.log("decimals from: "+tokenMap.get(swapfrom)!.decimals);
-        console.log("decimals to: "+tokenMap.get(swapto)!.decimals);
+        setMinimumReceived((+(String(routes[0].outAmount))-(+(String(routes[0].outAmount))*0.001)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)) || null)
 
         const rate = ((+(String(routes[0].outAmount)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)))/ (+routes[0].inAmount[0] / (10 ** tokenMap.get(swapfrom)!.decimals)) || null);
         if (rate)
