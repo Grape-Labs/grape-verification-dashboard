@@ -186,6 +186,8 @@ function JupiterForm(props: any) {
         getPortfolioTokenBalance(swapfrom);
     }, []);
 
+    console.log()
+
     const jupiter = useJupiter({
         amount: JSBI.BigInt(tokenMap?.get(swapfrom) ? amounttoswap * (10 ** (tokenMap.get(swapfrom).decimals || 1)) : 0), // raw input amount of tokens
         inputMint: new PublicKey(swapfrom),
@@ -315,27 +317,27 @@ function JupiterForm(props: any) {
         
         console.log('routes: '+JSON.stringify(routes))
 
-        setConvertedAmountValue(routes[0].outAmount[0] / (10 ** 6));
-        routes[0].marketInfos.forEach(mi => {
-            console.log("rount: "+mi.amm.label)
-            setTradeRoute(tr => tr + (tr && " x ") + mi.amm.label)
+        setConvertedAmountValue(routes[0].outAmount[0] / (10 ** (tokenMap.get(swapto)!.decimals || 6)));
 
-            setLpFees(lpf => [...lpf, `${mi.amm.label}: ${(+mi.lpFee.amount[0]/(10 ** tokenMap.get(mi.lpFee.mint)?.decimals))}` +
-            ` ${tokenMap.get(mi.lpFee.mint)?.symbol} (${mi.lpFee.pct * 100}%)`]);
-            setPriceImpacts(pi => [...pi, `${mi.amm.label}: ${mi.priceImpactPct * 100 < 0.1 ? '< 0.1' : (mi.priceImpactPct * 100).toFixed(2)}%` ])
-        })
+        if (routes[0].outAmount[0] > 0){
+            routes[0].marketInfos.forEach(mi => {
+                console.log("rount: "+mi.amm.label)
+                setTradeRoute(tr => tr + (tr && " x ") + mi.amm.label)
 
-        console.log("outAmountWithSlippage: "+JSON.stringify(routes[0].amount))
-        console.log("outAmount: "+JSON.stringify(routes[0].outAmount[0]))
-
-        // outAmountWithSlippage
-
-        setMinimumReceived((routes[0].outAmount[0]-(routes[0].outAmount[0]*0.001)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)) || 0)
+                setLpFees(lpf => [...lpf, `${mi.amm.label}: ${(+mi.lpFee.amount[0]/(10 ** tokenMap.get(mi.lpFee.mint)?.decimals))}` +
+                ` ${tokenMap.get(mi.lpFee.mint)?.symbol} (${mi.lpFee.pct * 100}%)`]);
+                setPriceImpacts(pi => [...pi, `${mi.amm.label}: ${mi.priceImpactPct * 100 < 0.1 ? '< 0.1' : (mi.priceImpactPct * 100).toFixed(2)}%` ])
+            })
+        }
+        
+        setMinimumReceived((+(String(routes[0].outAmount))-(+(String(routes[0].outAmount))*0.001)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)) || null)
 
         console.log("decimals from: "+tokenMap.get(swapfrom)!.decimals);
         console.log("decimals to: "+tokenMap.get(swapto)!.decimals);
 
-        setRate(`${(+routes[0].outAmount[0] / (10 ** (tokenMap.get(swapto)!.decimals || 6)))/ (+routes[0].inAmount[0] / (10 ** tokenMap.get(swapfrom)!.decimals))} ${tokenMap.get(swapto)!.symbol || ''} per ${tokenMap.get(swapfrom)!.symbol}`)
+        const rate = ((+(String(routes[0].outAmount)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)))/ (+routes[0].inAmount[0] / (10 ** tokenMap.get(swapfrom)!.decimals)) || null);
+        if (rate)
+            setRate(`${rate} ${tokenMap.get(swapto)!.symbol || ''} per ${tokenMap.get(swapfrom)!.symbol}`)
     }, [routes, tokenMap])
 
     useEffect(()=>{
