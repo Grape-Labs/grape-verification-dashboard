@@ -49,9 +49,11 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
     const tokenMap = props.tokenMap;
     const grapePosition = props.grapePosition;
     const ganPosition = props.ganPosition;
+    const ganGovernancePosition = props.ganGovernancePosition;
     const portfolioPositions = props.portfolioPositions;
     const [verificationType, setVerificationType] = React.useState('');
     const [disabled, setDisabled] = React.useState(false);
+    const [totalGan, setTotalGan] = React.useState(0);
     const [activeStep, setActiveStep] = React.useState(0);
     const [completed, setCompleted] = React.useState<{
         [k: number]: boolean;
@@ -111,12 +113,21 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
     React.useEffect(() => {
         if (activeStep){
             if (activeStep+1 === 2){
-                if (!ganPosition){
+                if (!ganPosition && !ganGovernancePosition){
                     // check balance
                     setDisabled(true);
                 } else{
-                    const balance = Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format().replace(/[^0-9.-]+/g,""));
-                    if (balance < GAN_REQUIREMENT){
+                    let aggregate = 0;
+                    if (ganPosition){
+                        aggregate += Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format().replace(/[^0-9.-]+/g,""));
+                    }
+                    if (ganGovernancePosition){
+                        aggregate += ganGovernancePosition;
+                    }
+
+                    setTotalGan(aggregate);
+
+                    if (aggregate < GAN_REQUIREMENT){
                         setDisabled(true);
                     }
                 }
@@ -192,12 +203,11 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         direction='column'
                         sx={{mt:2}}
                     >
-
-                            
-                        {ganPosition ? 
+                        
+                        {totalGan ? 
                             <>
-                                {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format().replace(/[^0-9.-]+/g,"")) > GAN_REQUIREMENT ?
-                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet</Alert>
+                                {totalGan > GAN_REQUIREMENT ?
+                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{totalGan} GAN Tokens held in Wallet/Governance</Alert>
                                 :
                                     <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>At least {GAN_REQUIREMENT} GAN required to proceed, you have {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}</Alert>
                                 }
@@ -205,7 +215,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             </>
                         :
                         <>
-                            <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least 1 GAN Token is required to continue</Alert>
+                            <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least {GAN_REQUIREMENT} GAN Token is required to continue</Alert>
                         </>
                         }
 
@@ -487,7 +497,7 @@ export function AdminView(props: any) {
             :
             <Grid item xs={12} sx={{mt:4}}>
                 <Paper className="grape-paper-background">
-                    <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} />
+                    <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} ganGovernancePosition={ganGovernance} />
                 </Paper>
             </Grid>
             }  
