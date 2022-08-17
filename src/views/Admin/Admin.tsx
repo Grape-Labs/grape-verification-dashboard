@@ -33,7 +33,7 @@ import {
     TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 
 const GAN_REQUIREMENT = 1;
-const GRAPE_TO_GAN_REQUIRED = '11,000';
+const GRAPE_TO_GAN_REQUIRED = 11000;
 const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
 //const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
 const GRAPE_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
@@ -138,6 +138,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
         } else{
             setDisabled(false);
         }
+        console.log("tokenMap "+JSON.stringify(tokenMap))
       }, [activeStep]);
 
     return (
@@ -181,8 +182,12 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             sx={{m:1}}>
                             
                             {grapePosition && 
-                                <>
-                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet</Alert>
+                                <> 
+                                   {+(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed())) < GRAPE_TO_GAN_REQUIRED ?
+                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet<br/>You need approximately {GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))} more Grape for 1 GAN</Alert>
+                                    :
+                                        <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet</Alert>
+                                    }
                                 </>
                             }
                         </Grid>
@@ -197,29 +202,29 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                     {totalGan > GAN_REQUIREMENT ?
                                         <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{totalGan} GAN Tokens held in Wallet/Governance</Alert>
                                     :
-                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>At least {GAN_REQUIREMENT} GAN required to proceed, you have {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}, GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step *approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN</Alert>
+                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>At least {GAN_REQUIREMENT} GAN required to proceed, you have {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}, GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step<br/>*approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN</Alert>
                                     }
 
                                 </>
                             :
                             <>
-                                <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least {GAN_REQUIREMENT} GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step *approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN</Alert>
+                                <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least {GAN_REQUIREMENT} GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step<br/>*approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN</Alert>
                             </>
                             }
                         </Grid>
 
-                        <Grid item>
+                        <Grid item sx={{m:1}}>
                             <Typography variant='h5'>
                                 Quickly swap and get Grape<br/>
                             </Typography>
                         </Grid>
 
                         <Grid item>
-                            {portfolioPositions &&
+                            {portfolioPositions && tokenMap &&
                                 <>
-                                    <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap}/>
+                                    <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap} />
                                     <br />
-                                    <JupiterSwap swapfrom={USDC_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap}/>
+                                    <JupiterSwap swapfrom={USDC_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap} />
                                 </>
                             }
                         </Grid>
@@ -325,8 +330,6 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                 <TextField id="outlined-basic" label="Mint" variant="outlined" />
                             </FormControl>
 
-
-
                         </Grid>
                     </Grid>
                 </Typography>
@@ -376,7 +379,8 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
 
 export function AdminView(props: any) {
     const [loadingPosition, setLoadingPosition] = React.useState(null);
-    const [tokenMap, setTokenMap] = React.useState(null);
+    //const [tokenMap, setTokenMap] = React.useState(null);
+    const [tokenMap, setTokenMap] = React.useState<Map<string,TokenInfo>>(undefined);
     const [loadingTokens, setLoadingTokens] = React.useState(false);
     const [loadingWallet, setLoadingWallet] = React.useState(false);
     const [loadingGovernance, setLoadingGovernance] = React.useState(false);
@@ -398,6 +402,7 @@ export function AdminView(props: any) {
             return map;
         }, new Map())
         setTokenMap(tokenMapValue);
+
         return tokenMapValue;
     }
 
@@ -432,7 +437,7 @@ export function AdminView(props: any) {
         let closable = new Array();
         for (var item of resultValues){
             //let buf = Buffer.from(item.account, 'base64');
-            console.log("item: "+JSON.stringify(item));
+            //console.log("item: "+JSON.stringify(item));
 
             if (item.account.data.parsed.info.mint === GAN_TOKEN){
                 if (item.account.data.parsed.info.tokenAmount.amount > 0)
@@ -441,20 +446,12 @@ export function AdminView(props: any) {
             
             if (item.account.data.parsed.info.mint === GRAPE_TOKEN){
                 if (item.account.data.parsed.info.tokenAmount.amount > 0){
-                    console.log("found grape")
+                    //console.log("found grape")
                     setGrapePosition(item.account.data.parsed.info);
                 }
             }
         }
-    
-        let sortedholdings = JSON.parse(JSON.stringify(holdings));
-        sortedholdings.sort((a:any,b:any) => (b.account.data.parsed.info.tokenAmount.amount - a.account.data.parsed.info.tokenAmount.amount));
-    
-
-
-        var solholdingrows = new Array();
-
-        setPortfolioPositions(sortedholdings)
+        setPortfolioPositions(resultValues)
     }
 
     const fetchGovernance = async () => {
@@ -523,7 +520,7 @@ export function AdminView(props: any) {
         setLoadingGovernance(false);
     }
 
-  React.useEffect(() => {
+    React.useEffect(() => {
         if (publicKey && tokenMap){
             fetchTokenPositions();
             fetchGovernancePositions();
@@ -545,12 +542,14 @@ export function AdminView(props: any) {
 
     return (
         <>
-            {(loadingWallet || loadingTokens && !portfolioPositions) ?
+            {(loadingWallet || loadingTokens || loadingGovernance) ?
                 <></>
             :
             <Grid item xs={12} sx={{mt:4}}>
                 <Paper className="grape-paper-background">
-                    <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} ganGovernancePosition={ganGovernance} />
+                    {portfolioPositions && tokenMap &&
+                        <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} ganGovernancePosition={ganGovernance} />
+                    }
                 </Paper>
             </Grid>
             }  

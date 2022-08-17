@@ -1,5 +1,6 @@
 // ADD CODE FOR JUPITER SWAP IMPLEMENTATION
 import React, {useEffect, useState} from 'react';
+import JSBI from 'jsbi';
 import {WalletAdapterNetwork} from '@solana/wallet-adapter-base';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -123,7 +124,6 @@ export default function JupiterSwap(props: any ){
         </JupiterProvider>);
 }
 
-
 function JupiterForm(props: any) {
     const [tokenSwapAvailableBalance, setPortfolioSwapTokenAvailableBalance] = useState(0);
     const [open, setOpen] = useState(false);
@@ -187,7 +187,7 @@ function JupiterForm(props: any) {
     }, []);
 
     const jupiter = useJupiter({
-        amount: tokenMap?.get(swapfrom) ? amounttoswap * (10 ** tokenMap.get(swapfrom).decimals) : 0, // raw input amount of tokens
+        amount: JSBI.BigInt(tokenMap?.get(swapfrom) ? amounttoswap * (10 ** (tokenMap.get(swapfrom).decimals || 1)) : 0), // raw input amount of tokens
         inputMint: new PublicKey(swapfrom),
         outputMint: new PublicKey(swapto),
         slippage: 1, // 1% slippage
@@ -212,7 +212,7 @@ function JupiterForm(props: any) {
         setOpen(false);
     };
 
-    const handleImageError = (ev) => ev.target.style.display = 'none';
+    const handleImageError = (ev:any) => ev.target.style.display = 'none';
 
     const swapIt = async () => {
         if(amounttoswap === 0)
@@ -243,7 +243,7 @@ function JupiterForm(props: any) {
             const swapResult = await exchange({
                 wallet: {
                     sendTransaction: sendTransaction,
-                    publicKey: publicKey,
+                    //publicKey: publicKey,
                     signAllTransactions: signAllTransactions,
                     signTransaction: signTransaction,
                 },
@@ -290,14 +290,17 @@ function JupiterForm(props: any) {
 
     function getPortfolioTokenBalance(swapingfrom:string){
         let balance = 0;
-        //console.log("props.... "+JSON.stringify(props.portfolioPositions));
-
+        
         props.portfolioPositions.map((token: any) => {
             if (token.account.data.parsed.info.mint === swapingfrom){
-                if (+token.account.data.parsed.info.tokenAmount.uiAmount > 0)
+                if (+token.account.data.parsed.info.tokenAmount.uiAmount > 0){
                     balance = +token.account.data.parsed.info.tokenAmount.uiAmount;
+                }
             }
         });
+
+
+        console.log("Setting balance to: "+balance)
         setPortfolioSwapTokenAvailableBalance(balance);
     }
 
@@ -310,8 +313,11 @@ function JupiterForm(props: any) {
         setLpFees([]);
         setPriceImpacts([]);
         
+        console.log('routes: '+JSON.stringify(routes))
+
         setConvertedAmountValue(routes[0].outAmount[0] / (10 ** 6));
         routes[0].marketInfos.forEach(mi => {
+            console.log("rount: "+mi.amm.label)
             setTradeRoute(tr => tr + (tr && " x ") + mi.amm.label)
 
             setLpFees(lpf => [...lpf, `${mi.amm.label}: ${(+mi.lpFee.amount[0]/(10 ** tokenMap.get(mi.lpFee.mint)?.decimals))}` +
@@ -319,11 +325,17 @@ function JupiterForm(props: any) {
             setPriceImpacts(pi => [...pi, `${mi.amm.label}: ${mi.priceImpactPct * 100 < 0.1 ? '< 0.1' : (mi.priceImpactPct * 100).toFixed(2)}%` ])
         })
 
-        //console.log("outAmountWithSlippage: "+JSON.stringify(routes[0].amount))
-        // outAmountWithSlippage
-        setMinimumReceived((routes[0].outAmount[0]-(routes[0].outAmount[0]*0.001)) / (10 ** 6))
+        console.log("outAmountWithSlippage: "+JSON.stringify(routes[0].amount))
+        console.log("outAmount: "+JSON.stringify(routes[0].outAmount[0]))
 
-        setRate(`${(+routes[0].outAmount[0] / (10 ** 6))/ (+routes[0].inAmount[0] / (10 ** tokenMap.get(swapfrom)!.decimals))} ${tokenMap.get(swapto)!.symbol} per ${tokenMap.get(swapfrom)!.symbol}`)
+        // outAmountWithSlippage
+
+        setMinimumReceived((routes[0].outAmount[0]-(routes[0].outAmount[0]*0.001)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)) || 0)
+
+        console.log("decimals from: "+tokenMap.get(swapfrom)!.decimals);
+        console.log("decimals to: "+tokenMap.get(swapto)!.decimals);
+
+        setRate(`${(+routes[0].outAmount[0] / (10 ** (tokenMap.get(swapto)!.decimals || 6)))/ (+routes[0].inAmount[0] / (10 ** tokenMap.get(swapfrom)!.decimals))} ${tokenMap.get(swapto)!.symbol || ''} per ${tokenMap.get(swapfrom)!.symbol}`)
     }, [routes, tokenMap])
 
     useEffect(()=>{
@@ -347,6 +359,7 @@ function JupiterForm(props: any) {
         if (selectedValue.address === 'So11111111111111111111111111111111111111112'){
             getSolBalance();
         } else{
+            console.log("selectedValue.address: "+selectedValue.address)
             getPortfolioTokenBalance(selectedValue.address);
         }
         // @ts-ignore
