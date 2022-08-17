@@ -8,6 +8,11 @@ import {
     Step,
     Stepper,
     StepLabel,
+    TextField,
+    InputLabel,
+    FormControl,
+    MenuItem,
+    Select,
  } from '@mui/material';
 
 import CheckIcon from '@mui/icons-material/Check';
@@ -33,17 +38,25 @@ const USDC_TOKEN = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
 
  const steps = [
+    'Get Grape',
     'Get GAN',
     'Associate Discord',
   ];
 
  export default function HorizontalLabelPositionBelowStepper(props:any) {
     const tokenMap = props.tokenMap;
+    const grapePosition = props.grapePosition;
     const portfolioPositions = props.portfolioPositions;
+    const [verificationType, setVerificationType] = React.useState('');
+
     const [activeStep, setActiveStep] = React.useState(0);
     const [completed, setCompleted] = React.useState<{
         [k: number]: boolean;
     }>({});
+
+    const handleVerificationTypeChange = (event) => {
+        setVerificationType(event.target.value);
+    };
 
     const totalSteps = () => {
         return steps.length;
@@ -77,6 +90,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
               steps.findIndex((step, i) => !(i in completed))
             : activeStep + 1;
         setActiveStep(newActiveStep);
+        handleStep(newActiveStep)
       };
     
     const handleComplete = () => {
@@ -93,7 +107,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
 
     return (
       <Box sx={{ width: '100%' }}>
-        <Stepper activeStep={1} alternativeLabel>
+        <Stepper activeStep={activeStep} alternativeLabel>
           {steps.map((label,key) => (
             <Step key={label}>
               <StepLabel>{label}</StepLabel>
@@ -117,16 +131,25 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
             
             {activeStep+1 === 1 &&
                 <Typography sx={{ mt: 2, mb: 1 }}>
-                    Step {activeStep + 1}<br/><br/>
+                    {/*Step {activeStep + 1}<br/><br/>*/}
 
                     <Grid container
                         textAlign='center'
                         alignContent='center'
                         direction='column'
+                        sx={{mt:2}}
                     >
                         <Grid item xs={12}>
-                            Quickly swap and get Grape<br/>
+                            
+                            {grapePosition && 
+                                <>
+                                <CheckIcon /> {Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet
+                                </>
+                            }
 
+                            <Typography variant='h6'>
+                                Quickly swap and get Grape<br/>
+                            </Typography>
                             {portfolioPositions &&
                                 <>
                                     <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap}/>
@@ -135,8 +158,21 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                 </>
                             }
                         </Grid>
-                        <Grid item xs={12} sx={{mt:2}}>
+                    </Grid>
+                </Typography>
+            }
 
+            {activeStep+1 === 2 &&
+                <Typography sx={{ mt: 2, mb: 1 }}>
+                    {/*Step {activeStep + 1}<br/><br/>*/}
+
+                    <Grid container
+                        textAlign='center'
+                        alignContent='center'
+                        direction='column'
+                        sx={{mt:2}}
+                    >
+                        <Grid item xs={12} sx={{mt:2}}>
                             <Button 
                                 variant='outlined'
                                 component='a'
@@ -144,20 +180,59 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                 target='_blank'
                                 sx={{borderRadius:'17px'}}
                             >
-                                Get GAN with swapped Grape
+                                Get GAN with Grape
                             </Button>
                         </Grid>
                     </Grid>
                 </Typography>
             }
             
-            {activeStep+1 === 2 &&
+            {activeStep+1 === 3 &&
                 <Typography sx={{ mt: 2, mb: 1 }}>
-                    Step {activeStep + 1}<br/><br/>
-                    Associate your discord
+                    {/*Step {activeStep + 1}<br/><br/>*/}
+                    <Grid container
+                        textAlign='center'
+                        alignContent='center'
+                        direction='column'
+                        sx={{mt:2}}
+                    >
+                        <Grid item xs={12} sx={{mt:2}}>
+                            <Typography>
+                                Associate your discord
+                            </Typography>
+
+                            <Box
+                                component="form"
+                                sx={{
+                                    '& > :not(style)': { m: 1, width: '25ch' },
+                                }}
+                                noValidate
+                                autoComplete="off"
+                                >
+                                    <TextField id="outlined-basic" label="Server ID" variant="outlined" />
+                            </Box>
+
+                            <FormControl fullWidth>
+                                <InputLabel id="demo-simple-select-label">Verification Type</InputLabel>
+                                <Select
+                                    labelId="demo-simple-select-label"
+                                    id="demo-simple-select"
+                                    value={verificationType}
+                                    label="Verification Type"
+                                    onChange={handleVerificationTypeChange}
+                                >
+                                    <MenuItem value={10}>NFT</MenuItem>
+                                    <MenuItem value={20}>SPL Token</MenuItem>
+                                    <MenuItem value={30}>Something Else...</MenuItem>
+                                </Select>
+                            </FormControl>
+
+
+
+                        </Grid>
+                    </Grid>
                 </Typography>
             }
-            
             
             <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
               <Button
@@ -178,11 +253,15 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                     Step {activeStep + 1} already completed
                   </Typography>
                 ) : (
+                  <>
+                  {/*
                   <Button onClick={handleComplete}>
                     {completedSteps() === totalSteps() - 1
                       ? 'Finish'
                       : 'Complete Step'}
                   </Button>
+                    */}
+                  </>
                 ))}
             </Box>
           </React.Fragment>
@@ -200,6 +279,7 @@ export function AdminView(props: any) {
     const [loadingWallet, setLoadingWallet] = React.useState(false);
     const [loadingGovernance, setLoadingGovernance] = React.useState(false);
     const [hasGAN, setHasGAN] = React.useState(false);
+    const [grapePosition, setGrapePosition] = React.useState(null);
     const [ganPosition, setGanPosition] = React.useState(null);
     const [ganGovernance, setGanGovernance] = React.useState(null);
     const [governanceRecord, setGovernanceRecord] = React.useState(null);
@@ -250,19 +330,19 @@ export function AdminView(props: any) {
         let closable = new Array();
         for (var item of resultValues){
             //let buf = Buffer.from(item.account, 'base64');
-            //console.log("item: "+JSON.stringify(item));
+            console.log("item: "+JSON.stringify(item));
 
             if (item.account.data.parsed.info.mint === GAN_TOKEN){
-                setHasGAN(true);
-                setGanPosition(item.account.data.parsed.info);
+                if (item.account.data.parsed.info.tokenAmount.amount > 0)
+                    setGanPosition(item.account.data.parsed.info);
+            }  
+            
+            if (item.account.data.parsed.info.mint === GRAPE_TOKEN){
+                if (item.account.data.parsed.info.tokenAmount.amount > 0){
+                    console.log("found grape")
+                    setGrapePosition(item.account.data.parsed.info);
+                }
             }
-
-
-            if (item.account.data.parsed.info.tokenAmount.amount > 0)
-                holdings.push(item);
-            else
-                closable.push(item);
-            // consider using https://raw.githubusercontent.com/solana-labs/token-list/main/src/tokens/solana.tokenlist.json to view more details on the tokens held
         }
     
         let sortedholdings = JSON.parse(JSON.stringify(holdings));
@@ -301,7 +381,6 @@ export function AdminView(props: any) {
             let thisToken = tokenMap.get(item.account.governingTokenMint.toBase58());
             
             if (thisToken){
-
                 if (thisToken.address === GAN_TOKEN){
                     //console.log("thisToken: "+JSON.stringify(thisToken))
                     const itemBalance = Number(new TokenAmount(+item.account.governingTokenDepositAmount, thisToken.decimals).format().replace(/[^0-9.-]+/g,""));
@@ -364,11 +443,15 @@ export function AdminView(props: any) {
 
     return (
         <>
+            {(loadingWallet || loadingTokens && !portfolioPositions) ?
+                <></>
+            :
             <Grid item xs={12} sx={{mt:4}}>
                 <Paper className="grape-paper-background">
-                    <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} />
+                    <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} />
                 </Paper>
             </Grid>
+            }  
 
             <Grid item xs={12} sx={{mt:4}}>
                 <Paper className="grape-paper-background">
@@ -388,11 +471,11 @@ export function AdminView(props: any) {
                                     <>loading {loadingPosition}...</>
                                     :
                                     <>
-                                        {hasGAN ?
+                                        {ganPosition ?
                                             <>
                                                 <Typography variant='h6'>
                                                 
-                                                    <CheckIcon /> {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format().replace(/[^0-9.-]+/g,""))} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet<br/>
+                                                    <CheckIcon /> {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet<br/>
                                                     {ganGovernance && 
                                                         <>
                                                         <CheckIcon /> {ganGovernance} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Governance
