@@ -131,7 +131,11 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         setDisabled(true);
                     }
                 }
+            } else{
+                setDisabled(false);
             }
+        } else{
+            setDisabled(false);
         }
       }, [activeStep]);
 
@@ -177,14 +181,14 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                 </>
                             }
                             <Grid container sx={{m:1}}>
-                                <Typography variant='h6'>
+                                <Typography variant='h5'>
                                     Quickly swap and get Grape<br/>
                                 </Typography>
                             </Grid>
                             {portfolioPositions &&
                                 <>
                                     <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap}/>
-                                    <br/>
+                                    <br />
                                     <JupiterSwap swapfrom={USDC_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap}/>
                                 </>
                             }
@@ -203,6 +207,25 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         direction='column'
                         sx={{mt:2}}
                     >
+                        <Grid item 
+                            justifyContent='left'
+                            alignContent='left'
+                            textAlign='left'
+                            sx={{m:1}}>
+                            <Typography variant='h5'>
+                                GAN is required for setting up a server with Grape
+                            </Typography>
+                            <Typography variant='caption'>
+                                GAN enabled servers have:
+                                    <ul>
+                                        <li>dedicated discord channel support</li>
+                                        <li>quick role removals</li>
+                                        <li>multi-wallet support</li>
+                                        <li>administrator verification settings for managing your gated communities</li>
+                                        <li>dedicated NFT community tools</li>
+                                    </ul>
+                            </Typography>
+                        </Grid>
                         
                         {totalGan ? 
                             <>
