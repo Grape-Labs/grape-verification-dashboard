@@ -16,6 +16,7 @@ import {
     Select,
  } from '@mui/material';
 
+ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CheckIcon from '@mui/icons-material/Check';
 
 import JupiterSwap from "../JupiterSwap/JupiterSwap";
@@ -279,20 +280,20 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         }
 
                         <Grid item xs={12} sx={{mt:2}}>
+                            <StrataSwap swapfrom={GRAPE_TOKEN} swapto={GAN_TOKEN} swapamount={1} />
+                        </Grid>
+
+                        <Grid item xs={12} sx={{mt:2}}>
                             <Button 
+                                size='small'
                                 variant='outlined'
                                 component='a'
                                 href='https://app.strataprotocol.com/swap/4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd'
                                 target='_blank'
                                 sx={{borderRadius:'17px'}}
                             >
-                                Swap GAN with Grape at Strata
+                                Swap GAN with Grape at Strata <OpenInNewIcon fontSize='small' sx={{ml:1}} />
                             </Button>
-
-                            
-                        </Grid>
-                        <Grid item xs={12} sx={{mt:2}}>
-                            <StrataSwap swapfrom={GRAPE_TOKEN} swapto={GAN_TOKEN} swapamount={1} />
                         </Grid>
                     </Grid>
                 </Typography>
