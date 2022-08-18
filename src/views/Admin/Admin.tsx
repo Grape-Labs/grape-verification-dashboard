@@ -19,6 +19,7 @@ import {
 import CheckIcon from '@mui/icons-material/Check';
 
 import JupiterSwap from "../JupiterSwap/JupiterSwap";
+import StrataSwap from "../StrataSwap/StrataSwap";
 import { JupiterProvider, useJupiter } from "@jup-ag/react-hook";
 import { useWallet } from '@solana/wallet-adapter-react';
 
@@ -285,8 +286,13 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                 target='_blank'
                                 sx={{borderRadius:'17px'}}
                             >
-                                Get GAN with Grape
+                                Swap GAN with Grape at Strata
                             </Button>
+
+                            
+                        </Grid>
+                        <Grid item xs={12} sx={{mt:2}}>
+                            <StrataSwap swapfrom={GRAPE_TOKEN} swapto={GAN_TOKEN} swapamount={1} />
                         </Grid>
                     </Grid>
                 </Typography>
