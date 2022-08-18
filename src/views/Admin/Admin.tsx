@@ -559,13 +559,13 @@ export function AdminView(props: any) {
             {(loadingWallet || loadingTokens || loadingGovernance) ?
                 <></>
             :
-            <Grid item xs={12} sx={{mt:4}}>
-                <Paper className="grape-paper-background">
-                    {portfolioPositions && tokenMap &&
-                        <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} ganGovernancePosition={ganGovernance} />
-                    }
-                </Paper>
-            </Grid>
+                <Grid item xs={12} sx={{mt:4}}>
+                    <Paper className="grape-paper-background">
+                        {portfolioPositions && tokenMap &&
+                            <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} ganGovernancePosition={ganGovernance} />
+                        }
+                    </Paper>
+                </Grid>
             }  
 
             <Grid item xs={12} sx={{mt:4}}>

@@ -127,7 +127,7 @@ export default function JupiterSwap(props: any ){
 function JupiterForm(props: any) {
     const [tokenSwapAvailableBalance, setPortfolioSwapTokenAvailableBalance] = useState(0);
     const [open, setOpen] = useState(false);
-    const [userTokenBalanceInput, setTokenBalanceInput] = useState(0);
+    const [userTokenBalanceInput, setTokenBalanceInput] = useState('0');
     const [convertedAmountValue, setConvertedAmountValue] = useState(null);
     const [amounttoswap, setTokensToSwap] = useState(null);
     
@@ -206,7 +206,7 @@ function JupiterForm(props: any) {
     } = jupiter
 
     const handleClickOpen = () => {
-        setTokenBalanceInput(0);
+        setTokenBalanceInput('0');
         setTokensToSwap(0);
         setOpen(true);
     };
@@ -314,25 +314,28 @@ function JupiterForm(props: any) {
         setTradeRoute('');
         setLpFees([]);
         setPriceImpacts([]);
-        
-        setConvertedAmountValue(+(String(routes[0].outAmount)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)));
 
-        if (+(String(routes[0].outAmount)) > 0){
-            routes[0].marketInfos.forEach(mi => {
-                console.log("rount: "+mi.amm.label)
-                setTradeRoute(tr => tr + (tr && " x ") + mi.amm.label)
+        try{
+            setConvertedAmountValue(+(String(routes[0].outAmount)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)));
+            if (+(String(routes[0].outAmount)) > 0){
+                routes[0].marketInfos.forEach(mi => {
+                    console.log("rount: "+mi.amm.label)
+                    setTradeRoute(tr => tr + (tr && " x ") + mi.amm.label)
 
-                setLpFees(lpf => [...lpf, `${mi.amm.label}: ${(+mi.lpFee.amount[0]/(10 ** tokenMap.get(mi.lpFee.mint)?.decimals))}` +
-                ` ${tokenMap.get(mi.lpFee.mint)?.symbol} (${mi.lpFee.pct * 100}%)`]);
-                setPriceImpacts(pi => [...pi, `${mi.amm.label}: ${mi.priceImpactPct * 100 < 0.1 ? '< 0.1' : (mi.priceImpactPct * 100).toFixed(2)}%` ])
-            })
+                    setLpFees(lpf => [...lpf, `${mi.amm.label}: ${(+mi.lpFee.amount[0]/(10 ** tokenMap.get(mi.lpFee.mint)?.decimals))}` +
+                    ` ${tokenMap.get(mi.lpFee.mint)?.symbol} (${mi.lpFee.pct * 100}%)`]);
+                    setPriceImpacts(pi => [...pi, `${mi.amm.label}: ${mi.priceImpactPct * 100 < 0.1 ? '< 0.1' : (mi.priceImpactPct * 100).toFixed(2)}%` ])
+                })
+            }
+
+            setMinimumReceived((+(String(routes[0].outAmount))-(+(String(routes[0].outAmount))*0.001)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)) || null)
+
+            const rate = ((+(String(routes[0].outAmount)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)))/ (+routes[0].inAmount[0] / (10 ** tokenMap.get(swapfrom)!.decimals)) || null);
+            if (rate)
+                setRate(`${rate} ${tokenMap.get(swapto)!.symbol || ''} per ${tokenMap.get(swapfrom)!.symbol}`)
+        }catch(e){
+            console.log("ERR: "+e);
         }
-
-        setMinimumReceived((+(String(routes[0].outAmount))-(+(String(routes[0].outAmount))*0.001)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)) || null)
-
-        const rate = ((+(String(routes[0].outAmount)) / (10 ** (tokenMap.get(swapto)!.decimals || 6)))/ (+routes[0].inAmount[0] / (10 ** tokenMap.get(swapfrom)!.decimals)) || null);
-        if (rate)
-            setRate(`${rate} ${tokenMap.get(swapto)!.symbol || ''} per ${tokenMap.get(swapfrom)!.symbol}`)
     }, [routes, tokenMap])
 
     useEffect(()=>{
@@ -360,7 +363,7 @@ function JupiterForm(props: any) {
             getPortfolioTokenBalance(selectedValue.address);
         }
         // @ts-ignore
-        setTokenBalanceInput(0);
+        setTokenBalanceInput('0');
         setTokensToSwap(0);
     }, [selectedValue, swapfrom])
 
@@ -442,8 +445,13 @@ function JupiterForm(props: any) {
                                     value={userTokenBalanceInput || 0}
                                     onChange={(e: any) => {
                                         let val = e.target.value.replace(/^0+/, '');
-                                        setTokensToSwap(val)
-                                        setTokenBalanceInput(val)
+                                        if (val === '.'){
+                                            setTokenBalanceInput('0'+val)
+                                        //    val = 0;
+                                        }else{
+                                            setTokensToSwap(val)
+                                            setTokenBalanceInput(val)
+                                        }
                                     }
                                     }
                                     inputProps={{
@@ -473,7 +481,7 @@ function JupiterForm(props: any) {
                                         <Button
                                             onClick={() => {
                                                 setTokensToSwap(tokenSwapAvailableBalance);
-                                                setTokenBalanceInput(tokenSwapAvailableBalance);
+                                                setTokenBalanceInput(tokenSwapAvailableBalance.toString());
                                             }}
                                         >
                                             Max
@@ -481,7 +489,7 @@ function JupiterForm(props: any) {
                                         <Button
                                             onClick={() => {
                                                 setTokensToSwap(+tokenSwapAvailableBalance/2);
-                                                setTokenBalanceInput(+tokenSwapAvailableBalance/2);
+                                                setTokenBalanceInput((+tokenSwapAvailableBalance/2).toString());
                                             }}
                                         >
                                             Half
