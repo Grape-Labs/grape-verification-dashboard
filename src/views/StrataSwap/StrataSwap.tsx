@@ -29,7 +29,11 @@ export default function StrataSwap(props: any) {
     
     const swapUsingStrata = async () => {
         const tokenBondingSdk = await SplTokenBonding.init(provider);
-
+        /*
+        tokenBondingSdk.getPricing(
+            new PublicKey(swapTo)
+        )
+        */
         var { targetAmount } = await tokenBondingSdk.swap({
             baseMint: new PublicKey(swapFrom),
             targetMint: new PublicKey(swapTo),
