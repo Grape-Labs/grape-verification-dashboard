@@ -195,9 +195,10 @@ export function Header(props: any) {
                 </Tooltip>
                 
 
-                
+                {/*
                 <Tooltip title={`Admin`}><IconButton sx={{borderRadius:'17px'}} component={NavLink} to='/admin'><AdminPanelSettingsIcon/></IconButton></Tooltip>
-                
+                */}
+
                 <Tooltip title={`Collection`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grape.art' target="_blank"><PhotoOutlinedIcon/></IconButton></Tooltip>
                 {/*
                 <Tooltip title={`Staking`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapestaking.vercel.app' target="_blank"><BrowseGalleryIcon/></IconButton></Tooltip>

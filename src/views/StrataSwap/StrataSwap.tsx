@@ -8,6 +8,7 @@ import { SplTokenCollective } from "@strata-foundation/spl-token-collective";
 import { getAssociatedAccountBalance, SplTokenMetadata } from "@strata-foundation/spl-utils";
 import { PublicKey, Connection } from '@solana/web3.js';
 import { Wallet as NodeWallet } from "@project-serum/anchor";
+import {useSnackbar} from "notistack";
 
 import {
     Button,
@@ -26,7 +27,8 @@ export default function StrataSwap(props: any) {
     const { publicKey } = useWallet();
     const wallet = useWallet();
     const provider = new AnchorProvider(connection, wallet, {});
-    
+    const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+
     const swapUsingStrata = async () => {
         const tokenBondingSdk = await SplTokenBonding.init(provider);
         /*
@@ -34,14 +36,35 @@ export default function StrataSwap(props: any) {
             new PublicKey(swapTo)
         )
         */
+       
+        enqueueSnackbar(`Preparing to swap GRAPE for ${swapAmount} GAN`,{ variant: 'info' });
+
+        var mintTokenRef = (await SplTokenCollective.mintTokenRefKey(new PublicKey(swapTo)))[0];
+        console.log("mintTokenRef: "+JSON.stringify(mintTokenRef))
+        /*
         var { targetAmount } = await tokenBondingSdk.swap({
             baseMint: new PublicKey(swapFrom),
             targetMint: new PublicKey(swapTo),
             baseAmount: swapAmount,
             slippage: 0.05,
           });
-        
+        */
 
+        var tokenBondingKey = (
+            await SplTokenBonding.tokenBondingKey(new PublicKey(swapTo))
+        )[0];
+        var openCollectiveBonding = await tokenBondingSdk.getTokenBonding(
+            tokenBondingKey
+        );
+        
+        const signedTransaction = await tokenBondingSdk.buy({
+            tokenBonding: tokenBondingKey,
+            desiredTargetAmount: 0.0001, //swapAmount
+            slippage: 0.05,
+        });
+
+
+        
         /*
         await tokenBondingSdk.buy({
             tokenBonding: SplTokenCollective.OPEN_COLLECTIVE_BONDING_ID,
@@ -53,13 +76,7 @@ export default function StrataSwap(props: any) {
             publicKey,
             tokenBondingAcct.baseMint
         );
-        
-            await tokenBondingSdk.buy({
-                tokenBonding,
-                baseAmount: 10,
-                slippage: 0.05,
-            });
-            */
+        */
     }
 
     const setupStrata = async () => {
@@ -82,7 +99,7 @@ export default function StrataSwap(props: any) {
                 }}
                 sx={{borderRadius:'17px'}}
             >
-                Get GAN with Grape
+                Get 1 GAN with Grape
             </Button>
         </>
     );
