@@ -42,7 +42,7 @@ import {
     TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 
 const GAN_REQUIREMENT = 1;
-const GRAPE_TO_GAN_REQUIRED = 11000;
+const GRAPE_TO_GAN_REQUIRED = 10600;
 const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
 //const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
 const GRAPE_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
@@ -107,7 +107,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
             : activeStep + 1;
         setActiveStep(newActiveStep);
         handleStep(newActiveStep)
-      };
+    };
     
     const handleComplete = () => {
         const newCompleted = completed;
@@ -219,7 +219,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             :
                             <>
                                 <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least {GAN_REQUIREMENT} GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step<br/>*approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN
-                                    <br/>
+                                    <br/><br/>
                                     <Button
                                         href='https://discord.gg/rq22BEkD'
                                         target='_blank'
@@ -319,7 +319,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
 
 
                             <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>Discord autoconnect coming soon, please send us the wallet publicKey and your discord server link you have purchased your GAN for so we can associate your discord, please visit 
-                                <Button
+                            <br/><br/><Button
                                     href='https://discord.gg/rq22BEkD'
                                     target='_blank'
                                 >

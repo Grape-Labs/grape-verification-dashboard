@@ -19,8 +19,7 @@ import {
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 import { 
-    GRAPE_RPC_ENDPOINT, 
-    TX_RPC_ENDPOINT } from '../../components/Tools/constants';
+    GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
 
 export default function StrataSwap(props: any) {
     const refresh = props.refresh;
