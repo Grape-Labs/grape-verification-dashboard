@@ -600,7 +600,7 @@ export function AdminView(props: any) {
                     </Grid>
                 }
                 </>
-            }  
+            }
 
             <Grid item xs={12} sx={{mt:4}}>
                 <Paper className="grape-paper-background">
@@ -618,7 +618,7 @@ export function AdminView(props: any) {
                             variant="h5">
                                 {(loadingWallet || loadingTokens || loadingGovernance || loadingStrata) ?
                                     <>loading {loadingPosition}...</>
-                                    :
+                                :
                                     <>
                                         {ganPosition ?
                                             <>
@@ -643,7 +643,6 @@ export function AdminView(props: any) {
                                         }
                                     </>
                                 }
-                                
                             </Typography>
                         </Grid>
                     </Grid>
