@@ -16,7 +16,7 @@ import {
     Select,
  } from '@mui/material';
 
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+
 import CheckIcon from '@mui/icons-material/Check';
 
 import * as anchor from "@project-serum/anchor";
@@ -56,6 +56,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
   ];
 
  export default function HorizontalLabelPositionBelowStepper(props:any) {
+    const refresh = props.refresh;
     const tokenMap = props.tokenMap;
     const grapePosition = props.grapePosition;
     const ganPosition = props.ganPosition;
@@ -218,12 +219,13 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             :
                             <>
                                 <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least {GAN_REQUIREMENT} GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step<br/>*approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN
-                                <Button
-                                    href='https://discord.gg/rq22BEkD'
-                                    target='_blank'
-                                >
-                                For Help Click Here
-                                </Button>
+                                    <br/>
+                                    <Button
+                                        href='https://discord.gg/rq22BEkD'
+                                        target='_blank'
+                                    >
+                                    For Help Click Here
+                                    </Button>
                                 </Alert>
                             </>
                             }
@@ -294,21 +296,9 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         }
 
                         <Grid item xs={12} sx={{mt:2}}>
-                            <StrataSwap swapfrom={GRAPE_TOKEN} swapto={GAN_TOKEN} swapamount={1} />
+                            <StrataSwap swapfrom={GRAPE_TOKEN} swapto={GAN_TOKEN} swapamount={1} refresh={refresh} />
                         </Grid>
 
-                        <Grid item xs={12} sx={{mt:2}}>
-                            <Button 
-                                size='small'
-                                variant='outlined'
-                                component='a'
-                                href='https://app.strataprotocol.com/swap/4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd'
-                                target='_blank'
-                                sx={{borderRadius:'17px'}}
-                            >
-                                Swap GAN with Grape at Strata <OpenInNewIcon fontSize='small' sx={{ml:1}} />
-                            </Button>
-                        </Grid>
                     </Grid>
                 </Typography>
             }
@@ -412,9 +402,11 @@ export function AdminView(props: any) {
     const [loadingPosition, setLoadingPosition] = React.useState(null);
     //const [tokenMap, setTokenMap] = React.useState(null);
     const [tokenMap, setTokenMap] = React.useState<Map<string,TokenInfo>>(undefined);
+    const [strataTokenMetadata, setStrataTokenMedatada] = React.useState(null);
     const [loadingTokens, setLoadingTokens] = React.useState(false);
     const [loadingWallet, setLoadingWallet] = React.useState(false);
     const [loadingGovernance, setLoadingGovernance] = React.useState(false);
+    const [loadingStrata, setLoadingStrata] = React.useState(false);
     const [hasGAN, setHasGAN] = React.useState(false);
     const [grapePosition, setGrapePosition] = React.useState(null);
     const [ganPosition, setGanPosition] = React.useState(null);
@@ -422,7 +414,11 @@ export function AdminView(props: any) {
     const [governanceRecord, setGovernanceRecord] = React.useState(null);
     const [portfolioPositions, setPortfolioPositions] = React.useState(null);
     const ticonnection = new Connection(GOVERNANCE_RPC_ENDPOINT);
-    const { publicKey, wallet, disconnect } = useWallet()
+    const { publicKey, disconnect } = useWallet()
+    const connection = new Connection(GRAPE_RPC_ENDPOINT);
+    //const provider = anchor.getProvider();
+    const wallet = useWallet();
+    const provider = new AnchorProvider(connection, wallet, {});
 
     const fetchTokens = async () => {
         setLoadingPosition('Wallet');
@@ -538,6 +534,22 @@ export function AdminView(props: any) {
         setGovernanceRecord(ownerRecordsbyOwner);
     }
 
+    const fetchStrataMetadata = async () => {
+        setLoadingStrata(true);
+        setLoadingPosition('Loading Grape backed Token Metadata');
+        const tokenMetadataSdk = await SplTokenMetadata.init(provider);
+        /*
+        const {
+            image,
+            metadata,
+            loading: metaLoading,
+          } = useTokenMetadata(tokenBonding && tokenBonding.targetMint);
+        */
+
+        setStrataTokenMedatada(tokenMetadataSdk);
+        setLoadingStrata(false);
+    }
+
     const fetchTokenPositions = async () => {
         setLoadingTokens(true);
         await fetchSolanaTokens();
@@ -555,6 +567,7 @@ export function AdminView(props: any) {
         if (publicKey && tokenMap){
             fetchTokenPositions();
             fetchGovernancePositions();
+            fetchStrataMetadata();
         }
     }, [tokenMap]);
 
@@ -573,16 +586,20 @@ export function AdminView(props: any) {
 
     return (
         <>
-            {(loadingWallet || loadingTokens || loadingGovernance) ?
+            {(loadingWallet || loadingTokens || loadingGovernance || loadingStrata) ?
                 <></>
             :
-                <Grid item xs={12} sx={{mt:4}}>
-                    <Paper className="grape-paper-background">
-                        {portfolioPositions && tokenMap &&
-                            <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} ganGovernancePosition={ganGovernance} />
-                        }
-                    </Paper>
-                </Grid>
+                <>
+                {tokenMap && portfolioPositions &&
+                    <Grid item xs={12} sx={{mt:4}}>
+                        <Paper className="grape-paper-background">
+                            {portfolioPositions && tokenMap &&
+                                <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} ganGovernancePosition={ganGovernance} refresh={fetchTokenPositions} />
+                            }
+                        </Paper>
+                    </Grid>
+                }
+                </>
             }  
 
             <Grid item xs={12} sx={{mt:4}}>
@@ -599,7 +616,7 @@ export function AdminView(props: any) {
                             <Typography 
                             align="center"
                             variant="h5">
-                                {(loadingWallet || loadingTokens || loadingGovernance) ?
+                                {(loadingWallet || loadingTokens || loadingGovernance || loadingStrata) ?
                                     <>loading {loadingPosition}...</>
                                     :
                                     <>

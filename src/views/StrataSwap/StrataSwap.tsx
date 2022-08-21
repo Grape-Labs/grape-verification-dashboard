@@ -12,14 +12,18 @@ import {useSnackbar} from "notistack";
 
 import {
     Button,
+    ButtonGroup,
     CircularProgress,
  } from '@mui/material';
+
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 import { 
     GRAPE_RPC_ENDPOINT, 
     TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 
 export default function StrataSwap(props: any) {
+    const refresh = props.refresh;
     const swapAmount = props.swapAmount || 1;
     const swapFrom = props.swapFrom || '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
     const swapTo = props.swapTo || '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd'; 
@@ -38,7 +42,7 @@ export default function StrataSwap(props: any) {
         )
         */
        
-        enqueueSnackbar(`Preparing to swap GRAPE for ${swapAmount} GAN`,{ variant: 'info' });
+        enqueueSnackbar(`Generating token bonding PDA`,{ variant: 'info' });
 
         var mintTokenRef = (await SplTokenCollective.mintTokenRefKey(new PublicKey(swapTo)))[0];
         console.log("mintTokenRef: "+JSON.stringify(mintTokenRef))
@@ -59,7 +63,7 @@ export default function StrataSwap(props: any) {
                 tokenBondingKey
             );
             
-            enqueueSnackbar(`Preparing to swap Grape for ${swapAmount} GAN`,{ variant: 'info' });
+            enqueueSnackbar(`Token Bonding PDA Generated ${tokenBondingKey.toBase58()}, preparing to swap GRAPE for ${swapAmount} GAN`,{ variant: 'info' });
             
             const signedTransaction = await tokenBondingSdk.buy({
                 tokenBonding: tokenBondingKey,
@@ -83,14 +87,16 @@ export default function StrataSwap(props: any) {
             closeSnackbar(cnfrmkey);
             
             enqueueSnackbar(`Complete - ${signedTransaction}`,{ variant: 'success' });
+
+            try{
+                if (refresh)
+                    refresh();
+            }catch(err:any){console.log("ERR: "+err)}
         }catch(e:any){
             closeSnackbar();
             enqueueSnackbar(e.message ? `${e.name}: ${e.message}` : e.name, { variant: 'error' });
         } 
 
-
-
-        
         /*
         await tokenBondingSdk.buy({
             tokenBonding: SplTokenCollective.OPEN_COLLECTIVE_BONDING_ID,
@@ -107,9 +113,10 @@ export default function StrataSwap(props: any) {
 
     const setupStrata = async () => {
         //const tokenCollectiveSdk = await SplTokenCollective.init(new Provider(connection, new NodeWallet(payerServiceAccount), {}));
-        const tokenCollectiveSdk = await SplTokenCollective.init(provider);
-        const tokenBondingSdk = await SplTokenBonding.init(provider);
-        const tokenMetadataSdk = await SplTokenMetadata.init(provider);
+        
+        //const tokenCollectiveSdk = await SplTokenCollective.init(provider);
+        //const tokenBondingSdk = await SplTokenBonding.init(provider);
+        //const tokenMetadataSdk = await SplTokenMetadata.init(provider);
     }
 
     React.useEffect(() => {
@@ -118,15 +125,25 @@ export default function StrataSwap(props: any) {
 
     return (
         <>
-            <Button 
-                variant='outlined'
-                onClick={() => {
-                    swapUsingStrata();
-                }}
-                sx={{borderRadius:'17px'}}
+            <ButtonGroup
             >
-                Get 1 GAN with Grape
-            </Button>
+                <Button 
+                    onClick={() => {
+                        swapUsingStrata();
+                    }}
+                    sx={{borderTopLeftRadius:'17px',borderBottomLeftRadius:'17px'}}
+                >
+                    Get {swapAmount} GAN with Grape
+                </Button>
+                <Button 
+                    component='a'
+                    href='https://app.strataprotocol.com/swap/4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd'
+                    target='_blank'
+                    sx={{borderTopRightRadius:'17px',borderBottomRightRadius:'17px'}}
+                >
+                    <OpenInNewIcon fontSize='small' />
+                </Button>
+            </ButtonGroup>
         </>
     );
 }
