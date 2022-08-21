@@ -12,6 +12,7 @@ import {useSnackbar} from "notistack";
 
 import {
     Button,
+    CircularProgress,
  } from '@mui/material';
 
 import { 
@@ -50,18 +51,43 @@ export default function StrataSwap(props: any) {
           });
         */
 
-        var tokenBondingKey = (
-            await SplTokenBonding.tokenBondingKey(new PublicKey(swapTo))
-        )[0];
-        var openCollectiveBonding = await tokenBondingSdk.getTokenBonding(
-            tokenBondingKey
-        );
-        
-        const signedTransaction = await tokenBondingSdk.buy({
-            tokenBonding: tokenBondingKey,
-            desiredTargetAmount: 0.0001, //swapAmount
-            slippage: 0.05,
-        });
+        try{
+            var tokenBondingKey = (
+                await SplTokenBonding.tokenBondingKey(new PublicKey(swapTo))
+            )[0];
+            var openCollectiveBonding = await tokenBondingSdk.getTokenBonding(
+                tokenBondingKey
+            );
+            
+            enqueueSnackbar(`Preparing to swap Grape for ${swapAmount} GAN`,{ variant: 'info' });
+            
+            const signedTransaction = await tokenBondingSdk.buy({
+                tokenBonding: tokenBondingKey,
+                desiredTargetAmount: swapAmount, //swapAmount
+                slippage: 0.05,
+            });
+
+            const snackprogress = (key:any) => (
+                <CircularProgress sx={{padding:'10px'}} />
+            );
+            const cnfrmkey = enqueueSnackbar(`Confirming transaction`,{ variant: 'info', action:snackprogress, persist: true });
+            const latestBlockHash = await connection.getLatestBlockhash();
+            /*
+            await connection.confirmTransaction({
+                blockhash: latestBlockHash.blockhash,
+                lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+                signature: signedTransaction}, 
+                'processed'
+            );
+            */
+            closeSnackbar(cnfrmkey);
+            
+            enqueueSnackbar(`Complete - ${signedTransaction}`,{ variant: 'success' });
+        }catch(e:any){
+            closeSnackbar();
+            enqueueSnackbar(e.message ? `${e.name}: ${e.message}` : e.name, { variant: 'error' });
+        } 
+
 
 
         
