@@ -217,7 +217,14 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                 </>
                             :
                             <>
-                                <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least {GAN_REQUIREMENT} GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step<br/>*approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN</Alert>
+                                <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>At least {GAN_REQUIREMENT} GAN Token is required to connect a Discord server with Grape<br />You can swap Grape for GAN in the next step<br/>*approximately {GRAPE_TO_GAN_REQUIRED} Grape is required for 1 GAN
+                                <Button
+                                    href='https://discord.gg/rq22BEkD'
+                                    target='_blank'
+                                >
+                                For Help Click Here
+                                </Button>
+                                </Alert>
                             </>
                             }
                         </Grid>
@@ -319,6 +326,16 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             <Typography>
                                 Associate your discord
                             </Typography>
+
+
+                            <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>Discord autoconnect coming soon, please send us the wallet publicKey and your discord server link you have purchased your GAN for so we can associate your discord, please visit 
+                                <Button
+                                    href='https://discord.gg/rq22BEkD'
+                                    target='_blank'
+                                >
+                                https://discord.gg/rq22BEkD
+                                </Button>
+                            </Alert>
 
                             <FormControl fullWidth sx={{m:1}}>
                                 <TextField id="outlined-basic" label="Server ID" variant="outlined" />
