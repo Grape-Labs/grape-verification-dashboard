@@ -29,7 +29,8 @@ import { useWallet } from '@solana/wallet-adapter-react';
 
 import { SplTokenBonding } from "@strata-foundation/spl-token-bonding";
 import { SplTokenCollective } from "@strata-foundation/spl-token-collective";
-import { getAssociatedAccountBalance, SplTokenMetadata } from "@strata-foundation/spl-utils";
+import { getAssociatedAccountBalance, SplTokenMetadata, getMintInfo, getTokenAccount } from "@strata-foundation/spl-utils";
+//import { StrataProviders } from "@strata-foundation/react";
 
 import { getRealm, getRealms, getAllProposals, getGovernance, getTokenOwnerRecordsByOwner, getTokenOwnerRecord, getRealmConfigAddress, getGovernanceAccount, getAccountTypes, GovernanceAccountType, tryGetRealmConfig  } from '@solana/spl-governance';
 import {ENV, TokenInfo, TokenListProvider} from '@solana/spl-token-registry';
@@ -56,6 +57,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
   ];
 
  export default function HorizontalLabelPositionBelowStepper(props:any) {
+    const strataTokenMetadata = props.strataTokenMetadata;
     const refresh = props.refresh;
     const tokenMap = props.tokenMap;
     const grapePosition = props.grapePosition;
@@ -194,9 +196,9 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             {grapePosition && 
                                 <> 
                                    {+(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed())) < GRAPE_TO_GAN_REQUIRED ?
-                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet<br/>You need approximately {GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))} more Grape for 1 GAN</Alert>
+                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {strataTokenMetadata.metadata.data.symbol || tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet<br/>You need approximately {GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))} more Grape for 1 GAN</Alert>
                                     :
-                                        <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet</Alert>
+                                        <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {strataTokenMetadata.metadata.data.symbol ||tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet</Alert>
                                     }
                                 </>
                             }
@@ -285,7 +287,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                 {totalGan > GAN_REQUIREMENT ?
                                     <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{totalGan} GAN Tokens held in Wallet/Governance</Alert>
                                 :
-                                    <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>At least {GAN_REQUIREMENT} GAN required to proceed, you have {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}</Alert>
+                                    <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>At least {GAN_REQUIREMENT} GAN required to proceed, you have {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {strataTokenMetadata.metadata.data.symbol || tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}</Alert>
                                 }
 
                             </>
@@ -324,7 +326,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                     href='https://discord.gg/rq22BEkD'
                                     target='_blank'
                                 >
-                                https://discord.gg/rq22BEkD
+                                Grape GAN Discord
                                 </Button>
                             </Alert>
 
@@ -539,15 +541,22 @@ export function AdminView(props: any) {
         setLoadingStrata(true);
         setLoadingPosition('Loading Grape backed Token Metadata');
         const tokenMetadataSdk = await SplTokenMetadata.init(provider);
-        /*
-        const {
-            image,
-            metadata,
-            loading: metaLoading,
-          } = useTokenMetadata(tokenBonding && tokenBonding.targetMint);
-        */
+        const tokenCollectiveSdk = await SplTokenCollective.init(provider);
 
-        setStrataTokenMedatada(tokenMetadataSdk);
+        var mintTokenRef = (await SplTokenCollective.mintTokenRefKey(new PublicKey(GAN_TOKEN)))[0];
+        console.log("mintTokenRef: "+JSON.stringify(mintTokenRef));
+
+        var tokenRef = await tokenCollectiveSdk.getTokenRef(mintTokenRef);
+
+        const meta = await tokenMetadataSdk.getTokenMetadata(tokenRef.tokenMetadata)
+
+        //var collectiveAcct = await tokenCollectiveSdk.getCollective(new PublicKey(GAN_TOKEN));
+
+        //var mint = await getMintInfo(provider, new PublicKey(GAN_TOKEN));
+        
+        console.log("meta: "+JSON.stringify(meta))
+        
+        setStrataTokenMedatada(meta);
         setLoadingStrata(false);
     }
 
@@ -595,7 +604,7 @@ export function AdminView(props: any) {
                     <Grid item xs={12} sx={{mt:4}}>
                         <Paper className="grape-paper-background">
                             {portfolioPositions && tokenMap &&
-                                <HorizontalLabelPositionBelowStepper tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} ganGovernancePosition={ganGovernance} refresh={fetchTokenPositions} />
+                                <HorizontalLabelPositionBelowStepper strataTokenMetadata={strataTokenMetadata} tokenMap={tokenMap} portfolioPositions={portfolioPositions} grapePosition={grapePosition} ganPosition={ganPosition} ganGovernancePosition={ganGovernance} refresh={fetchTokenPositions} />
                             }
                         </Paper>
                     </Grid>
@@ -625,11 +634,11 @@ export function AdminView(props: any) {
                                             <>
                                                 <Typography variant='h6'>
                                                 
-                                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>{Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet</Alert>
+                                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>{Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {strataTokenMetadata.metadata.data.symbol || tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet</Alert>
                                 
                                                     {ganGovernance && 
                                                         <>
-                                                            <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{ganGovernance} {tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Governance</Alert>
+                                                            <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{ganGovernance} {strataTokenMetadata.metadata.data.symbol || tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Governance</Alert>
                                                         </>
                                                     }
                                                 </Typography>
