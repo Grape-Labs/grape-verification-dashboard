@@ -319,7 +319,8 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
 
 
                             <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>Discord autoconnect coming soon, please send us the wallet publicKey and your discord server link you have purchased your GAN for so we can associate your discord, please visit 
-                            <br/><br/><Button
+                                <br/><br/>
+                                <Button
                                     href='https://discord.gg/rq22BEkD'
                                     target='_blank'
                                 >
