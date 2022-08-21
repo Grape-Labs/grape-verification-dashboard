@@ -1,5 +1,6 @@
 import * as React from 'react';
 import {
+    Avatar,
     Alert,
     Typography,
     Box,
@@ -196,9 +197,9 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             {grapePosition && 
                                 <> 
                                    {+(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed())) < GRAPE_TO_GAN_REQUIRED ?
-                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {strataTokenMetadata.metadata.data.symbol || tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet<br/>You need approximately {GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))} more Grape for 1 GAN</Alert>
+                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet<br/>You need approximately {GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))} more Grape for 1 GAN</Alert>
                                     :
-                                        <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {strataTokenMetadata.metadata.data.symbol ||tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet</Alert>
+                                        <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet</Alert>
                                     }
                                 </>
                             }
@@ -634,7 +635,17 @@ export function AdminView(props: any) {
                                             <>
                                                 <Typography variant='h6'>
                                                 
-                                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>{Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())} {strataTokenMetadata.metadata.data.symbol || tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet</Alert>
+                                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>
+                                                        {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())}&nbsp;
+                                                        {strataTokenMetadata.metadata.data.symbol || tokenMap.get(ganPosition.mint)?.name || ganPosition.mint} Tokens held in Wallet
+                                                        <Avatar
+                                                            sx={{backgroundColor:'#222'}}
+                                                                src={strataTokenMetadata?.image}
+                                                                alt={GAN_TOKEN}
+                                                        >
+                                                            {GAN_TOKEN}
+                                                        </Avatar>
+                                                    </Alert>
                                 
                                                     {ganGovernance && 
                                                         <>
