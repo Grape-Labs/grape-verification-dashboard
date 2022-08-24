@@ -34,6 +34,7 @@ import {
     DASHBOARD_LOGO
 } from '../Tools/constants';
 
+import { AccountBalanceWalletOutlined } from '@mui/icons-material';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import BrowseGalleryIcon from '@mui/icons-material/BrowseGallery';
 import DownloadingIcon from '@mui/icons-material/Downloading';
@@ -200,6 +201,8 @@ export function Header(props: any) {
                 */}
 
                 <Tooltip title={`Collection`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grape.art' target="_blank"><PhotoOutlinedIcon/></IconButton></Tooltip>
+                <Tooltip title={`Wallet`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grape.art/identity' target="_blank"><AccountBalanceWalletOutlined/></IconButton></Tooltip>
+                
                 {/*
                 <Tooltip title={`Staking`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapestaking.vercel.app' target="_blank"><BrowseGalleryIcon/></IconButton></Tooltip>
                 */} 
