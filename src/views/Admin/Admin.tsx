@@ -44,7 +44,7 @@ import {
     TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 
 const GAN_REQUIREMENT = 1;
-const GRAPE_TO_GAN_REQUIRED = 10600;
+const GRAPE_TO_GAN_REQUIRED = 10527;
 const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
 //const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
 const GRAPE_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';

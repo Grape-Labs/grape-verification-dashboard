@@ -69,7 +69,7 @@ export default function StrataSwap(props: any) {
                 desiredTargetAmount: swapAmount, //swapAmount
                 slippage: 0.05,
             });
-
+            
             const snackprogress = (key:any) => (
                 <CircularProgress sx={{padding:'10px'}} />
             );
