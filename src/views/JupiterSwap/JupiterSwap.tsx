@@ -129,7 +129,7 @@ function JupiterForm(props: any) {
     const [open, setOpen] = useState(false);
     const [userTokenBalanceInput, setTokenBalanceInput] = useState('0');
     const [convertedAmountValue, setConvertedAmountValue] = useState(null);
-    const [amounttoswap, setTokensToSwap] = useState(null);
+    const [tokenAmountToSwap, setTokensToSwap] = useState(0);
     
     //const [swapfrom, setSwapFrom] = useState('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
     //const [swapto, setSwapTo] = useState('8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA');
@@ -186,10 +186,14 @@ function JupiterForm(props: any) {
         getPortfolioTokenBalance(swapfrom);
     }, []);
 
-    console.log()
+    console.log("tokenAmountToSwap: " + tokenAmountToSwap)
 
+
+
+    
     const jupiter = useJupiter({
-        amount: JSBI.BigInt(tokenMap?.get(swapfrom) ? amounttoswap * (10 ** (tokenMap.get(swapfrom).decimals || 1)) : 0), // raw input amount of tokens
+
+        amount: JSBI.BigInt(tokenMap?.get(swapfrom) ? ((tokenAmountToSwap * (10 ** (+tokenMap.get(swapfrom).decimals || 1))).toFixed(0)) : 0), // raw input amount of tokens
         inputMint: new PublicKey(swapfrom),
         outputMint: new PublicKey(swapto),
         slippage: 1, // 1% slippage
@@ -217,12 +221,12 @@ function JupiterForm(props: any) {
     const handleImageError = (ev:any) => ev.target.style.display = 'none';
 
     const swapIt = async () => {
-        if(amounttoswap === 0)
+        if(tokenAmountToSwap === 0)
         {
             enqueueSnackbar('Input a non-zero amount to swap.',{ variant: 'error' });
             return
         }
-        if(amounttoswap > tokenSwapAvailableBalance)
+        if(tokenAmountToSwap > tokenSwapAvailableBalance)
         {
             enqueueSnackbar(`Your ${tokenMap.get(swapfrom).name} balance is not high enough to make this swap.`,{ variant: 'error' });
             return
@@ -235,7 +239,7 @@ function JupiterForm(props: any) {
             sendTransaction &&
             publicKey
         ) {
-            enqueueSnackbar(`Preparing to swap ${amounttoswap.toString()} ${tokenMap.get(swapfrom).name} for at least ${minimumReceived} ${tokenMap.get(swapto).name}`,{ variant: 'info' });
+            enqueueSnackbar(`Preparing to swap ${tokenAmountToSwap.toString()} ${tokenMap.get(swapfrom).name} for at least ${minimumReceived} ${tokenMap.get(swapto).name}`,{ variant: 'info' });
 
             const snackprogress = (key:any) => (
                 <CircularProgress sx={{padding:'10px'}} />
@@ -480,7 +484,7 @@ function JupiterForm(props: any) {
                                     <ButtonGroup variant="text" size="small" aria-label="outlined primary button group" sx={{ml:1}}>
                                         <Button
                                             onClick={() => {
-                                                setTokensToSwap(tokenSwapAvailableBalance);
+                                                setTokensToSwap(+tokenSwapAvailableBalance);
                                                 setTokenBalanceInput(tokenSwapAvailableBalance.toString());
                                             }}
                                         >

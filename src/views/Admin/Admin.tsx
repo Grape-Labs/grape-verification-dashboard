@@ -194,16 +194,42 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             textAlign='left'
                             sx={{m:1}}>
                             
-                            {grapePosition && 
+                            {grapePosition ?
                                 <> 
                                    {+(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed())) < GRAPE_TO_GAN_REQUIRED ?
-                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet<br/>You need approximately {GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))} more Grape for 1 GAN</Alert>
+                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>
+                                            {grapePosition.tokenAmount.amount /(10 ** grapePosition.tokenAmount.decimals) } {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} 
+                                            Tokens held in Wallet<br/>You need {GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))} more Grape for 1 GAN
+                                        </Alert>
                                     :
                                         <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} Tokens held in Wallet</Alert>
                                     }
                                 </>
+                            :
+                                <>
+                                    <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>
+                                        You don't have Grape in your wallet
+                                    </Alert>
+                                </>
                             }
                         </Grid>
+
+                        <Grid item sx={{m:1}}>
+                            <Typography variant='h5'>
+                                Quickly swap and get Grape<br/>
+                            </Typography>
+                        </Grid>
+
+                        <Grid item>
+                            {portfolioPositions && tokenMap &&
+                                <>
+                                    <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap} />
+                                    <br />
+                                    <JupiterSwap swapfrom={USDC_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap} />
+                                </>
+                            }
+                        </Grid>
+
                         <Grid item 
                             justifyContent='left'
                             alignContent='left'
@@ -234,21 +260,6 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             }
                         </Grid>
 
-                        <Grid item sx={{m:1}}>
-                            <Typography variant='h5'>
-                                Quickly swap and get Grape<br/>
-                            </Typography>
-                        </Grid>
-
-                        <Grid item>
-                            {portfolioPositions && tokenMap &&
-                                <>
-                                    <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap} />
-                                    <br />
-                                    <JupiterSwap swapfrom={USDC_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap} />
-                                </>
-                            }
-                        </Grid>
                     </Grid>
                 </Typography>
             }
