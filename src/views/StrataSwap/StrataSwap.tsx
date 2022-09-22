@@ -22,7 +22,7 @@ import {
     GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
 
 export default function StrataSwap(props: any) {
-    const refresh = props.refresh;
+    const refreshCallback = props.refreshCallback;
     const swapAmount = props.swapAmount || 1;
     const swapFrom = props.swapFrom || '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
     const swapTo = props.swapTo || '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd'; 
@@ -85,11 +85,11 @@ export default function StrataSwap(props: any) {
             */
             closeSnackbar(cnfrmkey);
             
-            enqueueSnackbar(`Complete - ${signedTransaction}`,{ variant: 'success' });
+            enqueueSnackbar(`Swap completed`,{ variant: 'success' });
 
             try{
-                if (refresh)
-                    refresh();
+                if (refreshCallback)
+                    refreshCallback();
             }catch(err:any){console.log("ERR: "+err)}
         }catch(e:any){
             closeSnackbar();

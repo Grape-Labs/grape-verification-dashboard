@@ -43,8 +43,8 @@ import {
     GOVERNANCE_RPC_ENDPOINT,
     TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 
-const GAN_REQUIREMENT = 1;
-const GRAPE_TO_GAN_REQUIRED = 10527;
+const GAN_REQUIREMENT = 0.0001;//1; // 0.0001
+const GRAPE_TO_GAN_REQUIRED = 10;//10527; //10
 const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
 //const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
 const GRAPE_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
@@ -62,7 +62,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
     const refresh = props.refresh;
     const tokenMap = props.tokenMap;
     const [grapePosition, setGrapePosition] = React.useState(props.grapePosition);
-    const ganPosition = props.ganPosition;
+    const [ganPosition, setGanPosition] = React.useState(props.ganPosition);
     const ganGovernancePosition = props.ganGovernancePosition;
     const portfolioPositions = props.portfolioPositions;
     const [verificationType, setVerificationType] = React.useState('');
@@ -123,6 +123,12 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
         setActiveStep(0);
         setCompleted({});
     };
+
+    const handleGanGrapeAdjust = () => {
+        //setGanPosition(+ganPosition + +GAN_REQUIREMENT);
+        setTotalGan(+totalGan + +GAN_REQUIREMENT);
+        //setGrapePosition(+grapePosition - +GRAPE_TO_GAN_REQUIRED);
+    }
 
     React.useEffect(() => {
         if (activeStep){
@@ -196,19 +202,41 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             
                             {grapePosition ?
                                 <> 
-                                   {+(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed())) < GRAPE_TO_GAN_REQUIRED ?
-                                        <Alert severity="error" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>
-                                            {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint}: {grapePosition.tokenAmount.amount /(10 ** grapePosition.tokenAmount.decimals) } - in wallet
-                                            <br/>1 GAN = {GRAPE_TO_GAN_REQUIRED} Grape
-                                            <br/>You need <strong>{GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))}</strong> more Grape to swap for 1 GAN
-                                            <br/><br/>First swap SOL or USDC for Grape bellow
-                                        </Alert>
+
+                                    <Typography variant='h5'>
+                                        Setup Discord Verification with Grape
+                                    </Typography>
+                                    <Typography variant='caption'>
+                                        You need to get the GAN Token to proceed, to get GAN
+                                            <ul>
+                                                <li>You can swap Grape to GAN using this wizard</li>
+                                                <li>If you do not hold Grape you can swap USDC or SOL to GRAPE using our tool bellow (powered by Jupiter Swap)</li>
+                                                <li>Once you have the required Grape ({GRAPE_TO_GAN_REQUIRED}) to swap to GAN you can then proceed to the next step to get your GAN Token</li>
+                                            </ul>
+                                    </Typography>
+
+                                    <Typography variant='h5'>
+                                        Your Wallet
+                                    </Typography>
+                                    
+                                    {+(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed())) < GRAPE_TO_GAN_REQUIRED ?
+                                        <Typography variant='body2'>
+                                            <ul>
+                                                <li>You currently have <strong>{grapePosition.tokenAmount.amount /(10 ** grapePosition.tokenAmount.decimals) } {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint}</strong></li>
+                                                <li>You need <strong>{GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))}</strong> more Grape to swap for {GAN_REQUIREMENT} GAN</li>
+                                                <li>First swap SOL or USDC for Grape bellow</li>
+                                            </ul>
+                                        </Typography>
                                     :
-                                        <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>
-                                            {Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} tokens held in Wallet<br/>
-                                            1 GAN = {GRAPE_TO_GAN_REQUIRED} Grape
-                                            <br/><br/>You can swap GRAPE to GAN in the next step
-                                        </Alert>
+                                        <Typography variant='body2'>
+                                            <ul>
+                                                <li>You can proceed to the next step and swap Grape to GAN<br/>
+                                                    <Typography variant='caption'>
+                                                        *{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} tokens held in Wallet
+                                                    </Typography>
+                                                </li>
+                                            </ul>
+                                        </Typography>
                                     }
                                 </>
                             :
@@ -295,6 +323,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                         <li>multi-wallet support</li>
                                         <li>administrator verification settings for managing your gated communities</li>
                                         <li>dedicated NFT community tools</li>
+                                        <li>complimentary listing on Grape.art &amp; marketplace discovery (recommended to first establish SPL Governance)</li>
                                     </ul>
                             </Typography>
                         </Grid>
@@ -315,7 +344,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         }
 
                         <Grid item xs={12} sx={{mt:2}}>
-                            <StrataSwap swapfrom={GRAPE_TOKEN} swapto={GAN_TOKEN} swapamount={1} refresh={refresh} />
+                            <StrataSwap swapfrom={GRAPE_TOKEN} swapto={GAN_TOKEN} swapAmount={GAN_REQUIREMENT} refreshCallback={handleGanGrapeAdjust} />
                         </Grid>
 
                     </Grid>
@@ -340,7 +369,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>Discord autoconnect coming soon, please send us the wallet publicKey and your discord server link you have purchased your GAN for so we can associate your discord, please visit 
                                 <br/><br/>
                                 <Button
-                                    href='https://discord.gg/rq22BEkD'
+                                    href='https://discord.gg/d9Y38Cfn'
                                     target='_blank'
                                 >
                                 Grape GAN Discord
@@ -348,7 +377,11 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             </Alert>
 
                             <FormControl fullWidth sx={{m:1}}>
-                                <TextField id="outlined-basic" label="Server ID" variant="outlined" />
+                                <TextField 
+                                    id="outlined-basic" 
+                                    label="Server ID" 
+                                    variant="outlined"
+                                    disabled={true} />
                             </FormControl>
 
                             <FormControl fullWidth sx={{m:1}}>
@@ -359,6 +392,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                     value={verificationType}
                                     label="Verification Type"
                                     onChange={handleVerificationTypeChange}
+                                    disabled={true}
                                 >
                                     <MenuItem value={10}>Token</MenuItem>
                                     <MenuItem value={20}>NFT</MenuItem>
@@ -368,7 +402,11 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             </FormControl>
 
                             <FormControl fullWidth sx={{m:1}}>
-                                <TextField id="outlined-basic" label="Mint" variant="outlined" />
+                                <TextField 
+                                    id="outlined-basic" 
+                                    label="Mint" 
+                                    variant="outlined"
+                                    disabled={true} />
                             </FormControl>
 
                         </Grid>
@@ -649,26 +687,35 @@ export function AdminView(props: any) {
                                     <>
                                         {ganPosition ?
                                             <>
-                                                <Typography variant='h6'>
                                                 
-                                                    <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)',m:1}}>
-                                                        {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())}&nbsp;
-                                                        {strataTokenMetadata.metadata.data.symbol || tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}&nbsp; tokens held in Wallet
-                                                        <Avatar
-                                                            sx={{backgroundColor:'#222'}}
-                                                                src={strataTokenMetadata?.image}
-                                                                alt={GAN_TOKEN}
-                                                        >
-                                                            {GAN_TOKEN}
-                                                        </Avatar>
-                                                    </Alert>
+                                                
+                                                    <Paper elevation={3}>
+                                                        <Grid container>
+                                                            <Grid item xs={2}>
+                                                                <Avatar
+                                                                    sx={{backgroundColor:'#222'}}
+                                                                        src={strataTokenMetadata?.image}
+                                                                        alt={GAN_TOKEN}
+                                                                >
+                                                                    {GAN_TOKEN}
+                                                                </Avatar>
+                                                            </Grid>
+                                                            <Grid item xs={10}>
+                                                                <Typography variant='caption'>
+                                                                    {Number(new TokenAmount(ganPosition.tokenAmount.amount, ganPosition.tokenAmount.decimals).format())}&nbsp;
+                                                                    {strataTokenMetadata.metadata.data.symbol || tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}&nbsp; tokens held in Wallet
+                                                                </Typography>
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Paper>
                                 
                                                     {ganGovernance && 
                                                         <>
-                                                            <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>{ganGovernance} {strataTokenMetadata.metadata.data.symbol || tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}&nbsp;tokens held in Governance</Alert>
+                                                            <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>
+                                                                {ganGovernance} {strataTokenMetadata.metadata.data.symbol || tokenMap.get(ganPosition.mint)?.name || ganPosition.mint}&nbsp;tokens held in Governance
+                                                            </Alert>
                                                         </>
                                                     }
-                                                </Typography>
 
                                                 <br/><br/>
                                                 <Typography variant='caption'>
