@@ -130,6 +130,7 @@ function JupiterForm(props: any) {
     const [userTokenBalanceInput, setTokenBalanceInput] = useState('0');
     const [convertedAmountValue, setConvertedAmountValue] = useState(null);
     const [tokenAmountToSwap, setTokensToSwap] = useState(0);
+    const refreshCallback = props.refreshCallback || null;
     
     //const [swapfrom, setSwapFrom] = useState('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
     //const [swapto, setSwapTo] = useState('8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA');
@@ -283,6 +284,9 @@ function JupiterForm(props: any) {
                 );*/
                 enqueueSnackbar(`Swapped: ${swapResult.txid}`,{ variant: 'success' });
                 setOpen(false);
+                if (refreshCallback){
+                    refreshCallback();
+                }
             }
         } else{
             enqueueSnackbar(`Unable to setup a valid swap`,{ variant: 'error' });
