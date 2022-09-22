@@ -201,7 +201,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                             {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint}: {grapePosition.tokenAmount.amount /(10 ** grapePosition.tokenAmount.decimals) } - in wallet
                                             <br/>1 GAN = {GRAPE_TO_GAN_REQUIRED} Grape
                                             <br/>You need <strong>{GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))}</strong> more Grape to swap for 1 GAN
-                                            <br/><br/>You can swap SOL or USDC to get Grape bellow
+                                            <br/><br/>First swap SOL or USDC for Grape bellow
                                         </Alert>
                                     :
                                         <Alert severity="success" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>
