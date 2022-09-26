@@ -43,8 +43,8 @@ import {
     GOVERNANCE_RPC_ENDPOINT,
     TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 
-const GAN_REQUIREMENT = 0.0001;//1; // 0.0001
-const GRAPE_TO_GAN_REQUIRED = 10;//10527; //10
+const GAN_REQUIREMENT = 1;//0.0001;//1; // 0.0001
+const GRAPE_TO_GAN_REQUIRED = 10527;//10;//10527; //10
 const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
 //const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
 const GRAPE_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
@@ -66,7 +66,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
     const ganGovernancePosition = props.ganGovernancePosition;
     const portfolioPositions = props.portfolioPositions;
     const [verificationType, setVerificationType] = React.useState('');
-    const [disabled, setDisabled] = React.useState(true);
+    const [disabled, setDisabled] = React.useState(props.disabled);
     const [totalGan, setTotalGan] = React.useState(0);
     const [activeStep, setActiveStep] = React.useState(0);
     const [completed, setCompleted] = React.useState<{
@@ -131,8 +131,18 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
     }
 
     React.useEffect(() => {
+
+        
         if (activeStep){
-            if (activeStep+1 === 2){
+            if (activeStep+1 === 1){
+                
+                if ( (grapePosition.tokenAmount.amount /(10 ** grapePosition.tokenAmount.decimals)) < GRAPE_TO_GAN_REQUIRED){
+                    setDisabled(true);
+                } else{
+                    setDisabled(false);
+                }
+                
+            } else if (activeStep+1 === 2){
                 if (!ganPosition && !ganGovernancePosition){
                     // check balance
                     setDisabled(true);
@@ -157,8 +167,8 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
         } else{
             setDisabled(false);
         }
-        console.log("tokenMap "+JSON.stringify(tokenMap))
-    }, [activeStep]);
+        //console.log("tokenMap "+JSON.stringify(tokenMap))
+    }, [activeStep, grapePosition]);
 
     return (
       <Box sx={{ width: '100%' }}>
@@ -210,7 +220,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                         You need to get the GAN Token to proceed, to get GAN
                                             <ul>
                                                 <li>You can swap Grape to GAN using this wizard</li>
-                                                <li>If you do not hold Grape you can swap USDC or SOL to GRAPE using our tool bellow (powered by Jupiter Swap)</li>
+                                                <li>If you do not hold Grape you can swap USDC or SOL to GRAPE using our tool below (powered by Jupiter Swap)</li>
                                                 <li>Once you have the required Grape ({GRAPE_TO_GAN_REQUIRED}) to swap to GAN you can then proceed to the next step to get your GAN Token</li>
                                             </ul>
                                     </Typography>
@@ -224,7 +234,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                             <ul>
                                                 <li>You currently have <strong>{grapePosition.tokenAmount.amount /(10 ** grapePosition.tokenAmount.decimals) } {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint}</strong></li>
                                                 <li>You need <strong>{GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))}</strong> more Grape to swap for {GAN_REQUIREMENT} GAN</li>
-                                                <li>First swap SOL or USDC for Grape bellow</li>
+                                                <li>First swap SOL or USDC for Grape below</li>
                                             </ul>
                                         </Typography>
                                     :
@@ -323,7 +333,8 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                         <li>multi-wallet support</li>
                                         <li>administrator verification settings for managing your gated communities</li>
                                         <li>dedicated NFT community tools</li>
-                                        <li>complimentary listing on Grape.art &amp; marketplace discovery (recommended to first establish SPL Governance)</li>
+                                        <li>complimentary listing on Grape.art &amp; cross marketplace discovery</li>
+                                        <li>assistance with setting up SPL Governance</li>
                                     </ul>
                             </Typography>
                         </Grid>
@@ -343,9 +354,23 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         </>
                         }
 
-                        <Grid item xs={12} sx={{mt:2}}>
-                            <StrataSwap swapfrom={GRAPE_TOKEN} swapto={GAN_TOKEN} swapAmount={GAN_REQUIREMENT} refreshCallback={handleGanGrapeAdjust} />
-                        </Grid>
+                        
+                        {grapePosition && 
+                            <Grid item xs={12} sx={{mt:2}}>
+                                {(grapePosition.tokenAmount.amount /(10 ** grapePosition.tokenAmount.decimals)) < GRAPE_TO_GAN_REQUIRED ?
+                                    <Button
+                                        variant='outlined'
+                                        color="inherit"
+                                        onClick={handleBack}
+                                        sx={{borderRadius:'17px'}}
+                                    >
+                                        You need {GRAPE_TO_GAN_REQUIRED-(grapePosition.tokenAmount.amount /(10 ** grapePosition.tokenAmount.decimals))} more Grape to get a GAN Token
+                                    </Button>
+                                :
+                                    <StrataSwap swapfrom={GRAPE_TOKEN} swapto={GAN_TOKEN} swapAmount={GAN_REQUIREMENT} refreshCallback={handleGanGrapeAdjust} />
+                                }
+                            </Grid>
+                        }
 
                     </Grid>
                 </Typography>
@@ -366,11 +391,14 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                             </Typography>
 
 
-                            <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>Discord autoconnect coming soon, please send us the wallet publicKey and your discord server link you have purchased your GAN for so we can associate your discord, please visit 
+                            <Alert severity="warning" sx={{borderRadius:'17px',backgroundColor:'rgba(0,0,0,0.5)'}}>Discord Connect coming soon, please send us the wallet publicKey and your discord server id/link that have your GAN for so we can associate your discord, visit 
                                 <br/><br/>
                                 <Button
+                                    color='inherit'
+                                    variant='outlined'
                                     href='https://discord.gg/d9Y38Cfn'
                                     target='_blank'
+                                    sx={{borderRadius:'17px'}}
                                 >
                                 Grape GAN Discord
                                 </Button>
@@ -472,7 +500,8 @@ export function AdminView(props: any) {
     const [governanceRecord, setGovernanceRecord] = React.useState(null);
     const [portfolioPositions, setPortfolioPositions] = React.useState(null);
     const ticonnection = new Connection(GOVERNANCE_RPC_ENDPOINT);
-    const { publicKey, disconnect } = useWallet()
+    const { publicKey, disconnect } = useWallet();
+    const [disabled, setDisabled] = React.useState(false);
     const connection = new Connection(GRAPE_RPC_ENDPOINT);
     //const provider = anchor.getProvider();
     const wallet = useWallet();
@@ -594,7 +623,7 @@ export function AdminView(props: any) {
 
     const fetchStrataMetadata = async () => {
         setLoadingStrata(true);
-        setLoadingPosition('Loading Grape backed Token Metadata');
+        setLoadingPosition('Grape backed Token Metadata');
         const tokenMetadataSdk = await SplTokenMetadata.init(provider);
         const tokenCollectiveSdk = await SplTokenCollective.init(provider);
 
@@ -655,7 +684,7 @@ export function AdminView(props: any) {
                 <></>
             :
                 <>
-                {tokenMap && portfolioPositions &&
+                {tokenMap && portfolioPositions && grapePosition &&
                     <Grid item xs={12} sx={{mt:4}}>
                         <Paper className="grape-paper-background">
                             {portfolioPositions && tokenMap &&
@@ -719,7 +748,7 @@ export function AdminView(props: any) {
 
                                                 <br/><br/>
                                                 <Typography variant='caption'>
-                                                    Server Verification Management coming soon...
+                                                    Server Verification Management &amp; Community Tools coming soon...
                                                 </Typography>
                                             </>
                                         :

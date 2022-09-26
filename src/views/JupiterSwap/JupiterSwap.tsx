@@ -187,10 +187,7 @@ function JupiterForm(props: any) {
         getPortfolioTokenBalance(swapfrom);
     }, []);
 
-    console.log("tokenAmountToSwap: " + tokenAmountToSwap)
-
-
-
+    //console.log("tokenAmountToSwap: " + tokenAmountToSwap)
     
     const jupiter = useJupiter({
 
