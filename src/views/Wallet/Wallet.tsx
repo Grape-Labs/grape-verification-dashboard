@@ -8,6 +8,7 @@ import {
   TableHead,
   TableRow,
   Button,
+  ButtonGroup,
   Tabs,
   Tab,
   Box,
@@ -504,12 +505,14 @@ export const WalletView = (props:any) => {
                                     alignContent="center"
                                     justifyContent="center"
                                 >
-                                <Button
-                                    href='https://grape.art/identity'
-                                    target='_blank'
-                                    variant='outlined'
-                                    sx={{textTransform:'none',mt:2}}
-                                >View &amp; manage your wallet at Grape Identity</Button>
+                                    <Button
+                                        href='https://grape.art/identity'
+                                        target='_blank'
+                                        variant='outlined'
+                                        color='inherit'
+                                        sx={{textTransform:'none',mt:2,borderRadius:'17px'}}
+                                    
+                                    >View &amp; manage your wallet at Grape Art</Button>
                             </Grid>
                             {/*solanaHoldings && solanaHoldings.map((item: any, key: number) => (
                                     <ListItem>
