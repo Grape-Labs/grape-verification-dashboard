@@ -132,7 +132,6 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
 
     React.useEffect(() => {
 
-        
         if (activeStep){
             if (activeStep+1 === 1){
                 
@@ -684,7 +683,7 @@ export function AdminView(props: any) {
                 <></>
             :
                 <>
-                {tokenMap && portfolioPositions && grapePosition &&
+                {tokenMap && portfolioPositions &&
                     <Grid item xs={12} sx={{mt:4}}>
                         <Paper className="grape-paper-background">
                             {portfolioPositions && tokenMap &&
