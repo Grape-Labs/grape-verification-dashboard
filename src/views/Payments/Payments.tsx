@@ -123,7 +123,7 @@ export function PaymentsView(props: any) {
             
             const accountInfo = await connection.getParsedAccountInfo(tokenAccount);
             const accountParsed = JSON.parse(JSON.stringify(accountInfo.value.data));
-            //const decimals = accountParsed.parsed.info.decimals;
+            const decimals = accountParsed.parsed.info.decimals;
             const adjustedAmountToSend = amountToSend * Math.pow(10, decimals);
 
             const fromTokenAccount = await getAssociatedTokenAddress(
