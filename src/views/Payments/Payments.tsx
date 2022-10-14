@@ -6,7 +6,7 @@ import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstructi
 import {CopyToClipboard} from 'react-copy-to-clipboard';
 import { GRAPE_RPC_ENDPOINT, TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 import { getTokenOwnerRecordForRealm } from '@solana/spl-governance';
-import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getOrCreateAssociatedTokenAccount, createTransferInstruction } from "@solana/spl-token-v2";
+import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getOrCreateAssociatedTokenAccount, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from "@solana/spl-token-v2";
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletError, WalletNotConnectedError } from '@solana/wallet-adapter-base';
 import { ValidateAddress } from '../../components/Tools/WalletAddress';
@@ -119,9 +119,58 @@ export function PaymentsView(props: any) {
             
             return transaction;
         } else{
+            
+            
+            const accountInfo = await connection.getParsedAccountInfo(tokenAccount);
+            const accountParsed = JSON.parse(JSON.stringify(accountInfo.value.data));
+            //const decimals = accountParsed.parsed.info.decimals;
+
+
+            const fromTokenAccount = await getAssociatedTokenAddress(
+                mintPubkey,
+                publicKey
+            )
+
+            const fromPublicKey = publicKey
+            const destPublicKey = new PublicKey(to)
+            const destTokenAccount = await getAssociatedTokenAddress(
+                mintPubkey,
+                destPublicKey
+            )
+            const receiverAccount = await connection.getAccountInfo(
+                destTokenAccount
+            )
+
+            const transaction = new Transaction()
+            if (receiverAccount === null) {
+                transaction.add(
+                  createAssociatedTokenAccountInstruction(
+                    fromPublicKey,
+                    destTokenAccount,
+                    destPublicKey,
+                    mintPubkey,
+                    TOKEN_PROGRAM_ID,
+                    ASSOCIATED_TOKEN_PROGRAM_ID
+                  )
+                )
+              }
+
+            transaction.add(
+                createTransferInstruction(
+                    fromTokenAccount,
+                    destTokenAccount,
+                    fromPublicKey,
+                    amount
+                )
+            )
+            
+            
+            /*
             const accountInfo = await connection.getParsedAccountInfo(tokenAccount);
             const accountParsed = JSON.parse(JSON.stringify(accountInfo.value.data));
             const decimals = accountParsed.parsed.info.decimals;
+
+
 
             let fromTokenAccount = await getOrCreateAssociatedTokenAccount(
                 connection,
@@ -133,8 +182,6 @@ export function PaymentsView(props: any) {
                 ASSOCIATED_TOKEN_PROGRAM_ID
             );
             
-            //console.log("validateAddress onCurve: "+ValidateAddress(toWallet.toBase58()))
-            //console.log("Checking from: "+fromWallet.toBase58()+ " "+fromTokenAccount?.address?.toBase58());
             try{
                 let toTokenAccount = await getOrCreateAssociatedTokenAccount(
                     connection,
@@ -163,13 +210,13 @@ export function PaymentsView(props: any) {
                 } else{
                     console.log("Skipping: "+toWallet.toBase58()+ " could not get ATA (TokenAccountNotFoundError)");
                 }
-
+               
                 console.log("here...")
                 
                 return transaction;
             }catch(e){
                 return null;
-            }
+            } */
         }
     }
 
