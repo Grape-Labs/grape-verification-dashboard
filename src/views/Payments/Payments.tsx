@@ -164,7 +164,7 @@ export function PaymentsView(props: any) {
                 )
             )
             
-            
+            return transaction;
             /*
             const accountInfo = await connection.getParsedAccountInfo(tokenAccount);
             const accountParsed = JSON.parse(JSON.stringify(accountInfo.value.data));
