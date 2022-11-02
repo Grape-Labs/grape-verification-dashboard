@@ -442,7 +442,7 @@ export function PaymentsView(props: any) {
                                         </Typography>
                                     </Box>
                                 </Box>
-                                {grapeMemberBalance && grapeMemberBalance > 1130 ? (
+                                {grapeMemberBalance && grapeMemberBalance > 1 ? (//1130 ? (
                                     <Box sx={{ alignItems: 'center' }}>
                                             
                                         {transactionSignature ?

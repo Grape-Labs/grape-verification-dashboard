@@ -42,15 +42,13 @@ import ConfirmDialog from './components/ConfirmDialog/ConfirmDialog';
 
 
 import {
-
   SolflareWalletAdapter,
-  GlowWalletAdapter,
-  //LedgerWalletAdapter,
+  //GlowWalletAdapter,
+  LedgerWalletAdapter,
   PhantomWalletAdapter,
-  BackpackWalletAdapter,
+  //BackpackWalletAdapter,
   AvanaWalletAdapter,
   //MagicEdenWalletAdapter,
-  SlopeWalletAdapter,
   SolletExtensionWalletAdapter,
   SolletWalletAdapter,
   BraveWalletAdapter,
@@ -58,6 +56,7 @@ import {
   TorusWalletAdapter,
   CloverWalletAdapter,
   ExodusWalletAdapter,
+  SlopeWalletAdapter,
   //MathWalletAdapter,
   //Coin98WalletAdapter,
   //SolongWalletAdapter,
@@ -123,13 +122,13 @@ function DashboardContent() {
 
   const wallets = useMemo(() => [
     new SolflareWalletAdapter(),
-    new GlowWalletAdapter(),
+    //new GlowWalletAdapter(),
     new PhantomWalletAdapter(),
-    new BackpackWalletAdapter(),
+    //new BackpackWalletAdapter(),
     //new MagicEdenWalletAdapter(),
     new ExodusWalletAdapter(),
     new TorusWalletAdapter(),
-    //new LedgerWalletAdapter(),
+    new LedgerWalletAdapter(),
     new SolletWalletAdapter({ network }),
     new SolletExtensionWalletAdapter({ network }),
     new BraveWalletAdapter(),
