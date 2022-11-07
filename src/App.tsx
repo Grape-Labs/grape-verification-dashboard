@@ -61,6 +61,7 @@ import {
   //Coin98WalletAdapter,
   //SolongWalletAdapter,
 } from '@solana/wallet-adapter-wallets';
+import { CrossmintSolanaWalletAdapter, networkToCrossmintEnvironment } from "@crossmint/connect"
 
 //import { mainListItems, secondaryListItems } from './components/SidebarList/SidebarList';
 import grapeTheme from  './config/theme'
@@ -126,6 +127,10 @@ function DashboardContent() {
     new PhantomWalletAdapter(),
     //new BackpackWalletAdapter(),
     //new MagicEdenWalletAdapter(),
+    new CrossmintSolanaWalletAdapter({
+      apiKey: "grape-verification",
+      environment: networkToCrossmintEnvironment(network),
+    }),
     new ExodusWalletAdapter(),
     new TorusWalletAdapter(),
     new LedgerWalletAdapter(),
