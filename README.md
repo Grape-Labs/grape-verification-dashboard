@@ -17,6 +17,7 @@ CREATE YOU OWN COMPONENT TO INTEGRATE WITH THE DASHBOARD:
 BUILD:
 ```
 yarn install
-yarn run build
 yarn start
 ```
+
+<img width="1196" alt="Screenshot 2022-11-07 at 11 24 51 AM" src="https://user-images.githubusercontent.com/13381905/200274413-31d7e28e-0c82-4e10-8fff-4b53e4425c35.png">
