@@ -39,9 +39,10 @@
   },
   "dependencies": {
     "@bonfida/spl-name-service": "^0.1.50",
+    "@crossmint/connect": "^0.0.5-alpha-2",
     "@emotion/react": "^11.4.1",
     "@emotion/styled": "^11.3.0",
-    "@identity.com/prove-solana-wallet": "^0.2.9",
+    "@identity.com/prove-solana-wallet": "^0.3.1",
     "@jup-ag/core": "^2.0.0-beta.4",
     "@jup-ag/react-hook": "^2.0.0-beta.4",
     "@mean-dao/msp": "^2.8.2",

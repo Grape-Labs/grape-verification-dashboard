@@ -31,8 +31,7 @@ import Header from './components/Header/Header';
 import { SnackbarProvider } from 'notistack';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-//import { WalletIdentityProvider } from '@cardinal/namespaces-components'
-//import './cardinal.css';
+
 import { Helmet } from 'react-helmet';
 
 import { useSnackbar } from 'notistack';
@@ -61,6 +60,7 @@ import {
   //Coin98WalletAdapter,
   //SolongWalletAdapter,
 } from '@solana/wallet-adapter-wallets';
+import { CrossmintSolanaWalletAdapter, networkToCrossmintEnvironment } from "@crossmint/connect"
 
 //import { mainListItems, secondaryListItems } from './components/SidebarList/SidebarList';
 import grapeTheme from  './config/theme'
@@ -126,6 +126,10 @@ function DashboardContent() {
     new PhantomWalletAdapter(),
     //new BackpackWalletAdapter(),
     //new MagicEdenWalletAdapter(),
+    new CrossmintSolanaWalletAdapter({
+      apiKey: "grape-verification",
+      environment: networkToCrossmintEnvironment(network),
+    }),
     new ExodusWalletAdapter(),
     new TorusWalletAdapter(),
     new LedgerWalletAdapter(),
