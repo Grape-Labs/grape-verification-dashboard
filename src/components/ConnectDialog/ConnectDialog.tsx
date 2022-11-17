@@ -3,7 +3,7 @@ import { styled } from '@mui/material/styles';
 import {
   Box,
   Typography,
-
+  ButtonGroup,
   Button,
   Dialog,
   DialogTitle,
@@ -24,6 +24,7 @@ import {
 
 const {prove} = require('@identity.com/prove-solana-wallet');
 import { useSnackbar } from 'notistack';
+import LinkIcon from '@mui/icons-material/Link';
 import CloseIcon from '@mui/icons-material/Close';
 import DisconnectIcon from '@mui/icons-material/LinkOff';
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
@@ -230,9 +231,6 @@ const WalletNavigation: FC = (props:any) => {
       // ask to sign message only if no session
       
       if (!session.isConnected){
-        console.log("No session");
-      }
-       
         // validate message signed
         //  if (!sign.detached.verify(message, signature, publicKey.toBytes())) throw new Error('Message signature invalid!');
 
@@ -437,7 +435,9 @@ const WalletNavigation: FC = (props:any) => {
             }
             //console.log("CD: Session created ("+publicKey.toString()+")");
           }
-        
+      } else{
+        console.log("Has Session")
+      }  
          
       return session;
     } catch (error: any) {
@@ -480,11 +480,13 @@ const WalletNavigation: FC = (props:any) => {
   // <WalletDisconnectButton startIcon={<DisconnectIcon />} style={{ marginLeft: 8 }} />
   return(
     <>
-      <WalletMultiButton />
+      <ButtonGroup>
+        <WalletMultiButton />
 
         <Button variant="contained" color="secondary" onClick={() => onClick(publicKey)} disabled={!publicKey || !signMessage}>
-            Grape Access
+          <LinkIcon />
         </Button>
+      </ButtonGroup>
     </>
   );
 }
