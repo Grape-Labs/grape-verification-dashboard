@@ -234,6 +234,7 @@ const WalletNavigation: FC = (props:any) => {
         
         if (!session.isConnected){
           //console.log("No session");
+          
           if (!signMessage){ 
             if (wallet?.adapter.name){
               console.log(wallet?.adapter.name + ' wallet does not support message signing!');
@@ -263,6 +264,7 @@ const WalletNavigation: FC = (props:any) => {
             throw new Error('Wallet does not support message signing!');
           }
           
+
           // Encode anything as bytes
           const smessage = new TextEncoder().encode(message);
           // Sign the bytes using the wallet
