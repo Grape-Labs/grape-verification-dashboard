@@ -219,7 +219,7 @@ const WalletNavigation: FC = (props:any) => {
       let naked_session = false;
       // `publicKey` will be null if the wallet isn't connected
       
-      console.log('pubkey: '+publicKey.toBase58() + ' vs ' + sent_publicKey.toBase58());
+      //console.log('pubkey: '+publicKey.toBase58() + ' vs ' + sent_publicKey.toBase58());
       //if (!publicKey){
         //console.log('CD: WALLET NOT CONNECTED...');
         //disconnect().catch(() => { /* catch any errors */ });
@@ -230,7 +230,8 @@ const WalletNavigation: FC = (props:any) => {
       
       // ask to sign message only if no session
       
-      if (!session.isConnected){
+      //if (!session.isConnected){
+      {
         // validate message signed
         //  if (!sign.detached.verify(message, signature, publicKey.toBytes())) throw new Error('Message signature invalid!');
 
@@ -435,9 +436,9 @@ const WalletNavigation: FC = (props:any) => {
             }
             //console.log("CD: Session created ("+publicKey.toString()+")");
           }
-      } else{
-        console.log("Has Session")
-      }  
+      }/* else{
+        console.log("Has Session: "+JSON.stringify(session));
+      }  */
          
       return session;
     } catch (error: any) {
@@ -450,14 +451,24 @@ const WalletNavigation: FC = (props:any) => {
 
   //if (!publicKey) throw new WalletNotConnectedError();
   const onClick = useCallback(async (sent_publicKey:any) => {
-    console.log('CD: Manual Connect')
-    connectGrapeAccess(sent_publicKey);
+    if (publicKey){
+      //disconnectSession(true);
+      console.log('CD: Manual Connect')
+      connectGrapeAccess(sent_publicKey);
+    }
   }, [publicKey, signMessage]);
 
   const VerifyWallet = useCallback(async (sent_publicKey:any) => {
   //  const VerifyWallet = async (sent_publicKey:any) => {
-    console.log("CD: Running auto-connect verification...");
-    connectGrapeAccess(sent_publicKey);
+    console.log("here...")
+    if (publicKey){
+      console.log("CD: Running auto-connect verification...");
+      //const timeout = setTimeout(() => {
+      console.log("signMessage 2: "+JSON.stringify(signMessage))
+
+        connectGrapeAccess(sent_publicKey);
+      //}, 2000);
+    }
   }, [publicKey, signMessage]);
 
 
@@ -472,6 +483,7 @@ const WalletNavigation: FC = (props:any) => {
         //console.log(callstopk+". CD SESSION CHANGED: "+session.publicKey);
         //console.log(callstopk+". CD WALLET PK: "+publicKey);  
         // show dialog to connect 
+        console.log("signMessage 1: "+JSON.stringify(signMessage))
         VerifyWallet(publicKey);
       }
     }
