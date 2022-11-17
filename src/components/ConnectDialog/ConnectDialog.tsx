@@ -36,8 +36,8 @@ import { useSession } from "../../contexts/session";
 import Session from '../../models/Session';
 import { PublicKey, SystemProgram, Transaction, TransactionInstruction, Signer } from '@solana/web3.js';
 import { useConnection, ConnectionProvider, WalletProvider, useWallet } from '@solana/wallet-adapter-react';
-import { WalletDialogProvider, WalletDisconnectButton, WalletMultiButton } from '../WalletAdapterMui';
-//import { WalletDialogProvider, WalletDisconnectButton, WalletMultiButton } from '@solana/wallet-adapter-material-ui';
+//import { WalletDialogProvider, WalletDisconnectButton, WalletMultiButton } from '../WalletAdapterMui';
+import { WalletDialogProvider, WalletDisconnectButton, WalletMultiButton } from '@solana/wallet-adapter-material-ui';
 import { WalletAdapterNetwork, WalletError, WalletNotConnectedError } from '@solana/wallet-adapter-base';
 import { propsToClassKey } from '@mui/styles';
 
@@ -213,244 +213,253 @@ const WalletNavigation: FC = (props:any) => {
     }
   }
 
-  //if (!publicKey) throw new WalletNotConnectedError();
-
-  const VerifyWallet = useCallback(async (sent_publicKey:any) => {
-    console.log("CD: Running wallet verification...");
+  const connectGrapeAccess = async (sent_publicKey:any) => {
     try {
-        let naked_session = false;
-        // `publicKey` will be null if the wallet isn't connected
-        
-        //console.log('pubkey: '+publicKey + ' vs ' + sent_publicKey);
-        //if (!publicKey){
-          //console.log('CD: WALLET NOT CONNECTED...');
-          //disconnect().catch(() => { /* catch any errors */ });
-          //throw new Error('Wallet not connected!');
-        //}
-        // `signMessage` will be undefined if the wallet doesn't support it
-        //console.log("Checking signing support "+wallet?.name + " wallet");
-        
-        // ask to sign message only if no session
-        
-        if (!session.isConnected){
-          //console.log("No session");
-          
-          if (!signMessage){ 
-            if (wallet?.adapter.name){
-              console.log(wallet?.adapter.name + ' wallet does not support message signing!');
+      let naked_session = false;
+      // `publicKey` will be null if the wallet isn't connected
+      
+      console.log('pubkey: '+publicKey.toBase58() + ' vs ' + sent_publicKey.toBase58());
+      //if (!publicKey){
+        //console.log('CD: WALLET NOT CONNECTED...');
+        //disconnect().catch(() => { /* catch any errors */ });
+        //throw new Error('Wallet not connected!');
+      //}
+      // `signMessage` will be undefined if the wallet doesn't support it
+      //console.log("Checking signing support "+wallet?.name + " wallet");
+      
+      // ask to sign message only if no session
+      
+      if (!session.isConnected){
+        console.log("No session");
+      }
+       
+        // validate message signed
+        //  if (!sign.detached.verify(message, signature, publicKey.toBytes())) throw new Error('Message signature invalid!');
 
-              if (wallet?.adapter.name == "Solflare"){
-              //  console.log("CD: SOLFLARE WALLET CONNECTED!");
-              }
+        if (!signMessage){ 
+          if (wallet?.adapter.name){
+            console.log(wallet?.adapter.name + ' wallet does not support message signing!');
 
-              if (wallet?.adapter.name){ // only if a wallet has a name but cannot sign (naked wallet)
-                alert("WARNING: Message signing is not supported with "+wallet?.adapter.name+" for Grape Access!");
-                // allow wallet to board but only as a naked wallet (since signing is required)
-                createNakedSession(publicKey.toBase58());
-                return null;
-                //publicKey = null;
-              }
-            } else{
-              //alert(publicKey);
-              if ((publicKey)&&(login)){ // no wallet name but we have the publicKey:
-                createNakedSession(publicKey.toBase58());
-                naked_session = true;
-                return null;
-              }
-            }
-            //if (wallet.name != "Ledger"){
-            disconnectSession(false);
-            //alert("Wallet does not support message signing!");
-            throw new Error('Wallet does not support message signing!');
-          }
-          
-
-          // Encode anything as bytes
-          const smessage = new TextEncoder().encode(message);
-          // Sign the bytes using the wallet
-          console.log(wallet?.adapter.name + " attempting to sign message");
-
-          let fromTransaction = false;
-          let fromSignTransaction = false;
-          let sm_signature = await signMessage(smessage)
-          .catch((error: any)=>{
-            
-            if (publicKey){
-             
-            } else{
-                return null;
+            if (wallet?.adapter.name == "Solflare"){
+            //  console.log("CD: SOLFLARE WALLET CONNECTED!");
             }
 
-          });
-
-          /*
-          if (!sm_signature){
-            if (window.confirm("Grape signs a message to verify your wallet\n\nYour current wallet could not be verified, some wallets including Ledger do not support message signing, but can sign a transaction for verification, if you would like to sign a transaction to your wallet to confirm your wallet please press OK")){
-              fromTransaction = true;
-              sm_signature = await confirmWalletWithSignTransaction();
-              sm_signature = new TextEncoder().encode(sm_signature); // convert to "utf-8"
+            if (wallet?.adapter.name){ // only if a wallet has a name but cannot sign (naked wallet)
+              alert("WARNING: Message signing is not supported with "+wallet?.adapter.name+" for Grape Access!");
+              // allow wallet to board but only as a naked wallet (since signing is required)
+              createNakedSession(publicKey.toBase58());
+              return null;
+              //publicKey = null;
             }
-          }*/
-          
-          if (!sm_signature){
-            if (window.confirm("Grape signs a message to verify your wallet\n\nYour current wallet could not be verified, some wallets including Ledger do not support message signing, if you would like to send a transaction to your wallet to confirm your wallet please press OK")){
-              fromTransaction = true;
-              sm_signature = await confirmWalletWithTransaction();
-              sm_signature = new TextEncoder().encode(sm_signature); // convert to "utf-8"
-            }
-            
-          }
-          
-          //console.log("sm_signature: "+sm_signature);
-          if ((!sm_signature)&&(publicKey)){ // signature is null but there is a publickey
-            // 1. set naked session (above)
-            // 2. prompt user that they will need to make a transaction to themselves in order to have access to add/remove servers
-            createNakedSession(publicKey.toString());
-            return null;
-          } else if (!sm_signature){ // invalid signature
-            disconnectSession(false);
-          }
-          
-          //console.log("smessage: "+smessage);
-          //console.log("Signature: "+sm_signature);
-          //console.log("pKey: "+publicKey.toBytes());
-
-          // Verify that the bytes were signed using the private key that matches the known public key
-          if (wallet?.adapter.name != "Slope"){
-            if ((!fromTransaction)){ // verify signature from signed message
-              if (!sign.detached.verify(smessage, sm_signature, publicKey.toBytes())){ 
-                disconnectSession(false);
-                throw new Error('CD: Invalid signature!');
-              }
+          } else{
+            //alert(publicKey);
+            if ((publicKey)&&(login)){ // no wallet name but we have the publicKey:
+              createNakedSession(publicKey.toBase58());
+              naked_session = true;
+              return null;
             }
           }
-
-          const bs58_address = bs58.decode(publicKey.toString());
-          const address = {"type":"Buffer","data":Object.values(bs58_address)}
-          const signature = {"type":"Buffer","data":Object.values(sm_signature)}
-          
-          //const address = bs58.decode(bs58_address.toString());
-          //const signature2 = bs58.decode(sm_signature); 
-
-          //console.log("Signature 1: "+signature);
-          //console.log("Signature 2: "+signature2);
-
-          //const address = bs58.decode(signed.publicKey);
-          //const decoded_signature = Buffer.from(signature, 'utf8');
-          //const decoded_signature = Buffer.from(signature).toString('utf8');
-          
-          console.log(JSON.stringify({
-              userId: userId,
-              token: message,
-              address: bs58_address,
-              publicKey: publicKey.toString(),
-              signature: signature,
-              fromTransaction: fromTransaction,
-              fromSignTransaction: fromSignTransaction
-          }));
-
-          console.log(wallet?.adapter.name + " connecting to Grape Dashboard...");
-          
-            if (login){ // login
-              console.log("LOGIN GRAPE");
-              if (GRAPE_APP_API_URL){
-                const response = await fetch(`${GRAPE_APP_API_URL}/login`, {
-                  method: "POST",
-                  headers: {
-                      "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                      token: message,
-                      address: bs58_address,
-                      publicKey: publicKey.toString(),
-                      signature: signature,
-                      fromTransaction: fromTransaction,
-                      //fromSignTransaction: fromSignTransaction
-                  })
-                }).catch( err => {
-                  console.log("ERROR: "+err);
-                  return null;
-                });
-                const session = await response.json();
-              
-                console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
-                session.token = {address, signature};
-                session.publicKey = publicKey.toString();
-                session.isConnected = true;
-                session.fromTransaction = fromTransaction;
-                //session.fromSignTransaction = fromSignTransaction;
-                if (!response)
-                  session.isWallet = false;
-                else
-                  session.isWallet = true;
-                setSession(session);
-              } else{
-                createNakedSession(publicKey.toBase58());
-              }
-            } else{ // register
-              console.log("REGISTERING WITH GRAPE");
-              console.log(JSON.stringify({
-                  userId: userId,
-                  token: token,
-                  address: bs58_address,
-                  publicKey: publicKey.toString(),
-                  signature: signature,
-                  fromTransaction: fromTransaction,
-                  fromSignTransaction: fromSignTransaction
-              }));
-              
-              if (GRAPE_APP_API_URL){
-                const response2 = await fetch(`${GRAPE_APP_API_URL}/register`, {
-                  method: "POST",
-                  headers: {
-                      "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                      userId: userId,
-                      token: token,
-                      address: bs58_address,
-                      publicKey: publicKey.toString(),
-                      signature: signature,
-                      fromTransaction: fromTransaction,
-                      //fromSignTransaction: fromSignTransaction,
-                  })
-                }).catch( err => {
-                  console.log("ERROR: "+err);
-                  return null;
-                });
-                const session2 = await response2.json();
-                console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
-                session2.token = {address, signature};
-                session2.publicKey = publicKey.toString();
-                session2.discordId = discordId;
-                session.fromTransaction = fromTransaction;
-                //session.fromSignTransaction = fromSignTransaction;
-                if (!response2){
-                  session2.isConnected = false;
-                  session.isWallet = false;
-                }else{
-                  session2.isConnected = true;
-                  session.isWallet = true;
-                }
-                setSession(session2);
-              }
-              //console.log("CD: Session created ("+publicKey.toString()+")");
-            }
-          
-            
+          //if (wallet.name != "Ledger"){
+          disconnectSession(false);
+          //alert("Wallet does not support message signing!");
+          throw new Error('Wallet does not support message signing!');
         }
-        return session;
-    
+        
+
+        // Encode anything as bytes
+        const smessage = new TextEncoder().encode(message);
+        // Sign the bytes using the wallet
+        console.log(wallet?.adapter.name + " attempting to sign message");
+
+        let fromTransaction = false;
+        let fromSignTransaction = false;
+        let sm_signature = await signMessage(smessage)
+        .catch((error: any)=>{
+          
+          if (publicKey){
+          
+          } else{
+              return null;
+          }
+
+        });
+
+        /*
+        if (!sm_signature){
+          if (window.confirm("Grape signs a message to verify your wallet\n\nYour current wallet could not be verified, some wallets including Ledger do not support message signing, but can sign a transaction for verification, if you would like to sign a transaction to your wallet to confirm your wallet please press OK")){
+            fromTransaction = true;
+            sm_signature = await confirmWalletWithSignTransaction();
+            sm_signature = new TextEncoder().encode(sm_signature); // convert to "utf-8"
+          }
+        }*/
+        
+        if (!sm_signature){
+          if (window.confirm("Grape signs a message to verify your wallet\n\nYour current wallet could not be verified, some wallets including Ledger do not support message signing, if you would like to send a transaction to your wallet to confirm your wallet please press OK")){
+            fromTransaction = true;
+            sm_signature = await confirmWalletWithTransaction();
+            sm_signature = new TextEncoder().encode(sm_signature); // convert to "utf-8"
+          }
+          
+        }
+        
+        //console.log("sm_signature: "+sm_signature);
+        if ((!sm_signature)&&(publicKey)){ // signature is null but there is a publickey
+          // 1. set naked session (above)
+          // 2. prompt user that they will need to make a transaction to themselves in order to have access to add/remove servers
+          createNakedSession(publicKey.toString());
+          return null;
+        } else if (!sm_signature){ // invalid signature
+          disconnectSession(false);
+        }
+        
+        //console.log("smessage: "+smessage);
+        //console.log("Signature: "+sm_signature);
+        //console.log("pKey: "+publicKey.toBytes());
+
+        // Verify that the bytes were signed using the private key that matches the known public key
+        if (wallet?.adapter.name != "Slope"){
+          if ((!fromTransaction)){ // verify signature from signed message
+            if (!sign.detached.verify(smessage, sm_signature, publicKey.toBytes())){ 
+              disconnectSession(false);
+              throw new Error('CD: Invalid signature!');
+            }
+          }
+        }
+
+        const bs58_address = bs58.decode(publicKey.toString());
+        const address = {"type":"Buffer","data":Object.values(bs58_address)}
+        const signature = {"type":"Buffer","data":Object.values(sm_signature)}
+        
+        //const address = bs58.decode(bs58_address.toString());
+        //const signature2 = bs58.decode(sm_signature); 
+
+        //console.log("Signature 1: "+signature);
+        //console.log("Signature 2: "+signature2);
+
+        //const address = bs58.decode(signed.publicKey);
+        //const decoded_signature = Buffer.from(signature, 'utf8');
+        //const decoded_signature = Buffer.from(signature).toString('utf8');
+        
+        console.log(JSON.stringify({
+            userId: userId,
+            token: message,
+            address: bs58_address,
+            publicKey: publicKey.toString(),
+            signature: signature,
+            fromTransaction: fromTransaction,
+            fromSignTransaction: fromSignTransaction
+        }));
+
+        console.log(wallet?.adapter.name + " connecting to Grape Dashboard...");
+        
+          if (login){ // login
+            console.log("LOGIN GRAPE");
+            if (GRAPE_APP_API_URL){
+              const response = await fetch(`${GRAPE_APP_API_URL}/login`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    token: message,
+                    address: bs58_address,
+                    publicKey: publicKey.toString(),
+                    signature: signature,
+                    fromTransaction: fromTransaction,
+                    //fromSignTransaction: fromSignTransaction
+                })
+              }).catch( err => {
+                console.log("ERROR: "+err);
+                return null;
+              });
+              const session = await response.json();
+            
+              console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
+              session.token = {address, signature};
+              session.publicKey = publicKey.toString();
+              session.isConnected = true;
+              session.fromTransaction = fromTransaction;
+              //session.fromSignTransaction = fromSignTransaction;
+              if (!response)
+                session.isWallet = false;
+              else
+                session.isWallet = true;
+              setSession(session);
+            } else{
+              createNakedSession(publicKey.toBase58());
+            }
+          } else{ // register
+            console.log("REGISTERING WITH GRAPE");
+            console.log(JSON.stringify({
+                userId: userId,
+                token: token,
+                address: bs58_address,
+                publicKey: publicKey.toString(),
+                signature: signature,
+                fromTransaction: fromTransaction,
+                fromSignTransaction: fromSignTransaction
+            }));
+            
+            if (GRAPE_APP_API_URL){
+              const response2 = await fetch(`${GRAPE_APP_API_URL}/register`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    userId: userId,
+                    token: token,
+                    address: bs58_address,
+                    publicKey: publicKey.toString(),
+                    signature: signature,
+                    fromTransaction: fromTransaction,
+                    //fromSignTransaction: fromSignTransaction,
+                })
+              }).catch( err => {
+                console.log("ERROR: "+err);
+                return null;
+              });
+              const session2 = await response2.json();
+              console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
+              session2.token = {address, signature};
+              session2.publicKey = publicKey.toString();
+              session2.discordId = discordId;
+              session.fromTransaction = fromTransaction;
+              //session.fromSignTransaction = fromSignTransaction;
+              if (!response2){
+                session2.isConnected = false;
+                session.isWallet = false;
+              }else{
+                session2.isConnected = true;
+                session.isWallet = true;
+              }
+              setSession(session2);
+            }
+            //console.log("CD: Session created ("+publicKey.toString()+")");
+          }
+        
+         
+      return session;
     } catch (error: any) {
       console.log(`Signing failed: ${error?.message}`);
       disconnectSession(false);
       //setSession(null);
       return null;
     }
-  }, [signMessage]);
-//};
+  }
 
-  //console.log('Pre call: '+publicKey);
+  //if (!publicKey) throw new WalletNotConnectedError();
+  const onClick = useCallback(async (sent_publicKey:any) => {
+    console.log('clicky...')
+    connectGrapeAccess(sent_publicKey);
+  }, [publicKey, signMessage]);
+
+  const VerifyWallet = useCallback(async (sent_publicKey:any) => {
+  //  const VerifyWallet = async (sent_publicKey:any) => {
+    console.log("CD: Running wallet verification...");
+    connectGrapeAccess(sent_publicKey);
+  }, [publicKey, signMessage]);
+
 
   const [callstopk, setCallToPk] = React.useState(0);
   
@@ -470,43 +479,17 @@ const WalletNavigation: FC = (props:any) => {
 
   // <WalletDisconnectButton startIcon={<DisconnectIcon />} style={{ marginLeft: 8 }} />
   return(
-    <React.Fragment>
+    <>
       <WalletMultiButton />
-    </React.Fragment>
+
+        <Button variant="contained" color="secondary" onClick={() => onClick(publicKey)} disabled={!publicKey || !signMessage}>
+            Grape Access
+        </Button>
+    </>
   );
 }
 
-const WalletButton: FC = (props:any) => {
-  const [open, setOpen] = React.useState(false);
-  const { publicKey, wallet, disconnect, sendTransaction, signMessage, signTransaction } = useWallet();
-  
-  function trimAddress(addr: string) {
-    let start = addr.substring(0, 5);
-    let end = addr.substring(addr.length - 4);
-    return `${start}...${end}`;
-  }
-
-  function showWalletAddress(addr: string){
-    return (
-      <React.Fragment>
-        <AccountBalanceWalletOutlinedIcon fontSize="small" sx={{ mr:1 }}  /> {trimAddress(addr)}
-      </React.Fragment>
-    )
-  }
-  
-  const handleOpen = () => {
-      setOpen(true);
-    };
-    const handleClose = () => {
-      setOpen(false);
-    };
-    
-   return(
-      <WalletNavigation {...props} />
-   );
-  
-};
-
+//export const ConnectDialog: FC = (props: any) => {
 export default function ConnectDialog(props: any) {
   const { isConnected, menuId, handleProfileMenuOpen, handleClickOpen, buttonText, nakedWallet, userId, discordId, token, login } = props;
   const [open, setOpen] = React.useState(false);
@@ -603,8 +586,9 @@ export default function ConnectDialog(props: any) {
 
   return (
     <>
-      <WalletDialogProvider>    
-        <WalletButton {...props}/>
+      <WalletDialogProvider>   
+      
+        <WalletNavigation {...props} />
         {wallet_connect_body}
       </WalletDialogProvider>
     </>

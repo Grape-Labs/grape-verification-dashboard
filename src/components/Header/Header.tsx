@@ -56,8 +56,6 @@ import PhotoOutlinedIcon from '@mui/icons-material/PhotoOutlined';
 import InsertChartOutlinedIcon from '@mui/icons-material/InsertChartOutlined';
 
 import ConnectDialog from '../ConnectDialog/ConnectDialog';
-import { truncate } from 'lodash';
-import RssFeed from '@mui/icons-material/RssFeed';
 
 export interface State extends SnackbarOrigin {
     open: boolean;

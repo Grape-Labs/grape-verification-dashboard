@@ -10,9 +10,7 @@ import {
 } from '@mui/material';
 import { useWallet } from '@solana/wallet-adapter-react';
 
-import { useSnackbar } from 'notistack';
 import { ServersView, SettingsView, WalletView } from "../";
-import ConnectDialog from '../../components/ConnectDialog/ConnectDialog';
 
 function ConnectedWalletComponent(props) {
   return (
