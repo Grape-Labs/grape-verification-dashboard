@@ -450,13 +450,13 @@ const WalletNavigation: FC = (props:any) => {
 
   //if (!publicKey) throw new WalletNotConnectedError();
   const onClick = useCallback(async (sent_publicKey:any) => {
-    console.log('clicky...')
+    console.log('CD: Manual Connect')
     connectGrapeAccess(sent_publicKey);
   }, [publicKey, signMessage]);
 
   const VerifyWallet = useCallback(async (sent_publicKey:any) => {
   //  const VerifyWallet = async (sent_publicKey:any) => {
-    console.log("CD: Running wallet verification...");
+    console.log("CD: Running auto-connect verification...");
     connectGrapeAccess(sent_publicKey);
   }, [publicKey, signMessage]);
 
