@@ -494,10 +494,11 @@ const WalletNavigation: FC = (props:any) => {
     <>
       <ButtonGroup>
         <WalletMultiButton />
-
-        <Button variant="contained" color="secondary" onClick={() => onClick(publicKey)} disabled={!publicKey || !signMessage}>
-          <LinkIcon />
-        </Button>
+        {!session.isWallet &&
+          <Button variant="contained" color="secondary" onClick={() => onClick(publicKey)} disabled={!publicKey || !signMessage}>
+            <LinkIcon />
+          </Button>
+        }
       </ButtonGroup>
     </>
   );
