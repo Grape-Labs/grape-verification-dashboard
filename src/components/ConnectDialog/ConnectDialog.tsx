@@ -162,6 +162,7 @@ const WalletNavigation: FC = (props:any) => {
     const amountToSend = 0.00001;
     const decimals = 9;
     const adjustedAmountToSend = amountToSend * Math.pow(10, decimals);
+    console.log("attempting to send: "+adjustedAmountToSend);
     try{
       const transaction = new Transaction()
       .add(
@@ -175,7 +176,10 @@ const WalletNavigation: FC = (props:any) => {
       //enqueueSnackbar(`Preparing to send ${amountToSend} ${name} to ${toaddress}`,{ variant: 'info' });
       console.log("Preparing transaction to self: " + amountToSend);
       enqueueSnackbar(`Preparing transaction`,{ variant: 'info' });
-      const sm_signature = await sendTransaction(transaction, connection);
+      const sm_signature = await sendTransaction(transaction, connection, {
+        skipPreflight: true,
+        preflightCommitment: "confirmed"
+      });
 
       const snackprogress = (key:any) => (
         <CircularProgress sx={{padding:'10px'}} />
