@@ -498,7 +498,7 @@ export function AdminView(props: any) {
     const [ganGovernance, setGanGovernance] = React.useState(null);
     const [governanceRecord, setGovernanceRecord] = React.useState(null);
     const [portfolioPositions, setPortfolioPositions] = React.useState(null);
-    const ticonnection = new Connection(GOVERNANCE_RPC_ENDPOINT);
+    const ticonnection = new Connection(GRAPE_RPC_ENDPOINT);
     const { publicKey, disconnect } = useWallet();
     const [disabled, setDisabled] = React.useState(false);
     const connection = new Connection(GRAPE_RPC_ENDPOINT);
