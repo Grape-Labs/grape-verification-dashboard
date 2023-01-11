@@ -16,6 +16,7 @@ import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
   
 export default function ModalSwapView(props: any){
+    const refreshCallback = props.refreshCallback;
     const setLoadingPosition = props?.setLoadingPosition;
     const [loadingSwap, setLoadingSwap] = React.useState(false);
     const { publicKey, wallet } = useWallet();
@@ -32,6 +33,13 @@ export default function ModalSwapView(props: any){
             endpoint:GRAPE_RPC_ENDPOINT,
             passThroughWallet: wallet,
             containerStyles: {height: 500},
+            onSuccess: ({ txid }) => {
+                try{
+                    console.log('onSuccess', txid);
+                    if (refreshCallback)
+                        refreshCallback();
+                }catch(err:any){console.log("ERR: "+err)}
+            }
           });
         }
     }; 
