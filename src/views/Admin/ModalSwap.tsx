@@ -27,7 +27,7 @@ export default function ModalSwapView(props: any){
     const initJupiter = () => {
         if (wallet) {
             window?.Jupiter.init({
-            mode: 'default',        
+            mode: 'outputOnly',        
             displayMode: 'modal',
             mint: swapto,
             endpoint:GRAPE_RPC_ENDPOINT,
