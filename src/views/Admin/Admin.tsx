@@ -23,6 +23,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import * as anchor from "@project-serum/anchor";
 import { Provider, AnchorProvider } from "@project-serum/anchor";
 
+import ModalSwapView from "./ModalSwap";
 import JupiterSwap from "../JupiterSwap/JupiterSwap";
 import StrataSwap from "../StrataSwap/StrataSwap";
 import { JupiterProvider, useJupiter } from "@jup-ag/react-hook";
@@ -266,9 +267,12 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                         <Grid item>
                             {portfolioPositions && tokenMap &&
                                 <>
+                                    <ModalSwapView swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} toTokenLabel={'Grape'} refreshCallback={refresh} />
+                                    {/*
                                     <JupiterSwap swapfrom={SOL_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap} refreshCallback={refresh} />
                                     <br />
                                     <JupiterSwap swapfrom={USDC_TOKEN} swapto={GRAPE_TOKEN} portfolioPositions={portfolioPositions} tokenMap={tokenMap} refreshCallback={refresh} />
+                                    */}
                                 </>
                             }
                         </Grid>
