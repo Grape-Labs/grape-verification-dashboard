@@ -89,9 +89,7 @@ dist
 build
 
 #lock files
-*.lock
 .package-lock.json
-.yarn.lock
 .parcel-cache
 package.json
 Archive.zip
