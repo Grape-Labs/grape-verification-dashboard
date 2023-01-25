@@ -1,6 +1,6 @@
 {
   "name": "grape-dashboard",
-  "version": "1.2.247",
+  "version": "1.2.248",
   "author": "Grape Developer subDAO",
   "private": true,
   "repository": "https://github.com/grape-labs/grape-dashboard",
@@ -63,7 +63,7 @@
     "@saberhq/solana-contrib": "^1.13.31",
     "@self.id/web": "^0.3.0",
     "@solana/pay": "^0.2.0",
-    "@solana/spl-governance": "^0.3.14",
+    "@solana/spl-governance": "^0.3.20",
     "@solana/spl-name-service": "^0.1.3",
     "@solana/spl-token-registry": "^0.2.3992",
     "@solana/spl-token-v2": "npm:@solana/spl-token@0.2.0",
