@@ -66,7 +66,7 @@ export default function StrataSwap(props: any) {
             
             const signedTransaction = await tokenBondingSdk.buy({
                 tokenBonding: tokenBondingKey,
-                desiredTargetAmount: swapAmount, //swapAmount
+                desiredTargetAmount: new BN(swapAmount), //swapAmount
                 slippage: 0.05,
             });
             
