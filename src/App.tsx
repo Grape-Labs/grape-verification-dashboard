@@ -123,10 +123,7 @@ function DashboardContent() {
 
   const wallets = useMemo(() => [
     new SolflareWalletAdapter(),
-    //new GlowWalletAdapter(),
     new PhantomWalletAdapter(),
-    //new BackpackWalletAdapter(),
-    //new MagicEdenWalletAdapter(),
     new CrossmintSolanaWalletAdapter({
       apiKey: "grape-verification",
       environment: networkToCrossmintEnvironment(network),
