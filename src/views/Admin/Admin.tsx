@@ -17,7 +17,6 @@ import {
     Select,
  } from '@mui/material';
 
-
 import CheckIcon from '@mui/icons-material/Check';
 
 import * as anchor from "@project-serum/anchor";
@@ -40,9 +39,8 @@ import { TokenAmount, lt } from '../../utils/token/safe-math';
 import { PublicKey, Connection } from '@solana/web3.js';
 
 import { 
-    GRAPE_RPC_ENDPOINT, 
-    GOVERNANCE_RPC_ENDPOINT,
-    TX_RPC_ENDPOINT } from '../../components/Tools/constants';
+    GRAPE_RPC_ENDPOINT,
+    RPC_CONNECTION } from '../../components/Tools/constants';
 
 const GAN_REQUIREMENT = 1;//0.0001;//1; // 0.0001
 const GRAPE_TO_GAN_REQUIRED = 10527;//10;//10527; //10
@@ -502,10 +500,10 @@ export function AdminView(props: any) {
     const [ganGovernance, setGanGovernance] = React.useState(null);
     const [governanceRecord, setGovernanceRecord] = React.useState(null);
     const [portfolioPositions, setPortfolioPositions] = React.useState(null);
-    const ticonnection = new Connection(GRAPE_RPC_ENDPOINT);
+    const ticonnection = RPC_CONNECTION;
     const { publicKey, disconnect } = useWallet();
     const [disabled, setDisabled] = React.useState(false);
-    const connection = new Connection(GRAPE_RPC_ENDPOINT);
+    const connection = RPC_CONNECTION;
     //const provider = anchor.getProvider();
     const wallet = useWallet();
     const provider = new AnchorProvider(connection, wallet, {});

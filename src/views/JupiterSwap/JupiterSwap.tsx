@@ -26,7 +26,7 @@ import {
 import { createFilterOptions} from '@mui/material/useAutocomplete'
 
 import { 
-    GRAPE_RPC_ENDPOINT, 
+    RPC_CONNECTION, 
 } from '../../components/Tools/constants';
 
 import CircularProgress from '@mui/material/CircularProgress';
@@ -151,7 +151,7 @@ function JupiterForm(props: any) {
     const [ allAutoCompleteOptions, setAllAutoCompleteOptions ] = useState([]);
     const {publicKey, wallet, signAllTransactions, signTransaction, sendTransaction} = useWallet();
     const connection = useConnection();
-    const ggoconnection = new Connection(GRAPE_RPC_ENDPOINT);
+    const ggoconnection = RPC_CONNECTION;
 
     const getPrices = async (path?: string): Promise<any> => {
         return fetch(path || "https://api.raydium.io/coin/price", {

@@ -31,7 +31,6 @@ import {
 
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 
-import { GRAPE_RPC_ENDPOINT, TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 import { RegexTextField } from '../../components/Tools/RegexTextField';
 import { MakeLinkableAddress, ValidateAddress } from '../../components/Tools/WalletAddress'; // global key handling
 import { useSnackbar } from 'notistack';
@@ -120,7 +119,7 @@ export default function OrcaSwap(props: any) {
     //const name = props.name;
     //const balance = props.balance;
     ///const conversionrate = props.conversionrate;
-    const solanarpcconnection = new Connection(TX_RPC_ENDPOINT);
+    const solanarpcconnection = RPC_CONNECTION;
     const { connection } = useConnection();
     const orca = getOrca(connection);
 

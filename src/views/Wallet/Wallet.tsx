@@ -39,8 +39,7 @@ import QrCodeIcon from '@mui/icons-material/QrCode';
 import { decodeMetadata } from './metadataHelper'
 
 import { 
-    GRAPE_RPC_ENDPOINT, 
-    TX_RPC_ENDPOINT } from '../../components/Tools/constants';
+    RPC_CONNECTION, GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
 import { PublicKey, Connection, Commitment } from '@solana/web3.js';
 import {ENV, TokenInfo, TokenListProvider} from '@solana/spl-token-registry';
 import { TokenAmount, lt } from '../../utils/token/safe-math';
@@ -68,7 +67,7 @@ export const WalletView = (props:any) => {
     const { publicKey, wallet, disconnect } = useWallet();
     const rpclimit = 100;
     const MD_PUBKEY = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
-    const ggoconnection = new Connection(GRAPE_RPC_ENDPOINT);
+    const ggoconnection = RPC_CONNECTION;
     
     function getConnected(){
         let servers = session && session.servers;

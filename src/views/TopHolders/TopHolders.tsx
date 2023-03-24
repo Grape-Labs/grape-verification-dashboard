@@ -28,7 +28,7 @@ import { MakeLinkableAddress, ValidateAddress } from '../../components/Tools/Wal
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import { GRAPE_RPC_ENDPOINT, TX_RPC_ENDPOINT } from '../../components/Tools/constants';
+import { RPC_CONNECTION } from '../../components/Tools/constants';
 
 const StyledTable = styled(Table)(({ theme }) => ({
   '& .MuiTableCell-root': {
@@ -92,7 +92,7 @@ export default function TopHolders(props: any) {
     const mint = props.mint;
     const logoURI = props.logoURI;
     const name = props.name;
-    const ggoconnection = new Connection(GRAPE_RPC_ENDPOINT);
+    const ggoconnection = RPC_CONNECTION;
 
     const handleClickOpen = () => {
         setOpen(true);

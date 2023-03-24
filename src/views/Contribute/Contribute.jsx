@@ -28,7 +28,7 @@ import { TokenAmount, lt } from '../../utils/token/safe-math';
 import {PublicKey} from '@solana/web3.js';
 import { PretifyCommaNumber } from '../../components/Tools/PretifyCommaNumber';
 
-import { GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
+import { RPC_CONNECTION, GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
 import TransactionHistory from '../TransactionHistory/TransactionHistory';
 
 import CircularProgress from '@mui/material/CircularProgress';

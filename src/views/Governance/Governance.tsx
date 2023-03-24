@@ -44,7 +44,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import { PretifyCommaNumber } from '../../components/Tools/PretifyCommaNumber';
-import { REALM_ID, GOVERNING_TOKEN, GOVERNANCE_PROGRAM_ID, GOVERNANCE_RPC_ENDPOINT } from '../../components/Tools/constants';
+import { REALM_ID, GOVERNING_TOKEN, GOVERNANCE_PROGRAM_ID, RPC_CONNECTION } from '../../components/Tools/constants';
 
 import PropTypes from 'prop-types';
 
@@ -165,12 +165,12 @@ function RealmProposals(props:any) {
             try{
             
                 const programId = new PublicKey(GOVERNANCE_PROGRAM_ID);
-                const gprops = await getAllProposals(new Connection(GOVERNANCE_RPC_ENDPOINT), programId, realm);
+                const gprops = await getAllProposals(RPC_CONNECTION, programId, realm);
                 
                 //console.log("realm: "+JSON.stringify(realm));
 
                 // Arrange
-                const gvotes = await getVoteRecordsByVoter(connection, programId, publicKey);
+                const gvotes = await getVoteRecordsByVoter(RPC_CONNECTION, programId, publicKey);
                 //console.log("votes: "+JSON.stringify(gvotes));
                 setVoteRecords(gvotes);
                 

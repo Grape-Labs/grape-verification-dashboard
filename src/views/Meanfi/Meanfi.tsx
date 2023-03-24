@@ -5,7 +5,6 @@ import { AccountsProvider } from './contexts/accounts';
 import AppStateProvider from './contexts/appstate';
 import { AppStateContext } from './contexts/appstate';
 import { MoneyStreamsPage } from '../../components/MoneyStreamsPage';
-import { GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
 import {
     Typography,
     Grid,
@@ -15,7 +14,7 @@ import {
 } from '@mui/material/';
 import { SnackbarUtilsConfigurator } from './helpers/SnackBarUtils';
 import "./Meanfi.css";
-import { DEDICATED_FREE_FAST_RPC } from './constants';
+import { GRAPE_RPC_ENDPOINT } from './constants';
 
 const MeanfiUiView = (props: any) => {
     const [loading, setLoading] = React.useState(true);
@@ -71,7 +70,7 @@ export function MeanfiView(props: any) {
 
     // Fallback values if not passed (.Devnet | .Mainnet)
     const network = WalletAdapterNetwork.Mainnet;
-    const endpoint = DEDICATED_FREE_FAST_RPC;
+    const endpoint = GRAPE_RPC_ENDPOINT;
 
     return (
         <AppStateProvider network={network} endpoint={endpoint}>

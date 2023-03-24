@@ -4,7 +4,7 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { Signer, Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getOrCreateAssociatedTokenAccount, createAssociatedTokenAccountInstruction, createTransferInstruction } from "@solana/spl-token-v2";
 
-import { GRAPE_RPC_ENDPOINT, TX_RPC_ENDPOINT } from '../../components/Tools/constants';
+import { RPC_CONNECTION } from '../../components/Tools/constants';
 import { GRAPE_TREASURY } from '../../components/Tools/constants';
 import { RegexTextField } from '../../components/Tools/RegexTextField';
 
@@ -105,7 +105,7 @@ export default function SendToken(props: any) {
     const [memoref, setMemoRef] = React.useState('');
     const [memonotes, setMemoNotes] = React.useState(''); 
     const [memoText, setMemoText] = React.useState(null); 
-    const freeconnection = new Connection(TX_RPC_ENDPOINT);
+    const freeconnection = RPC_CONNECTION;
     const { connection } = useConnection();
     const { publicKey, wallet, sendTransaction } = useWallet();
     const { enqueueSnackbar, closeSnackbar } = useSnackbar();
