@@ -6,7 +6,6 @@ export const TX_RPC_ENDPOINT = process.env.REACT_APP_API_GRAPE_RPC_ENDPOINT || '
 export const GRAPE_RPC_ENDPOINT = process.env.REACT_APP_API_GRAPE_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 export const QUICKNODE_RPC_ENDPOINT = process.env.REACT_APP_API_GRAPE_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 
-
 export const RPC_CONNECTION = new Connection(
     "https://rest-api.hellomoon.io/v0/rpc",
     {
