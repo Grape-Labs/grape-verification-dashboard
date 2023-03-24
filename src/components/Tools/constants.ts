@@ -6,7 +6,7 @@ export const TX_RPC_ENDPOINT = process.env.REACT_APP_API_GRAPE_RPC_ENDPOINT || '
 export const GRAPE_RPC_ENDPOINT = process.env.REACT_APP_API_GRAPE_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 export const QUICKNODE_RPC_ENDPOINT = process.env.REACT_APP_API_GRAPE_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 
-/*
+
 export const RPC_CONNECTION = new Connection(
     "https://rest-api.hellomoon.io/v0/rpc",
     {
@@ -15,10 +15,11 @@ export const RPC_CONNECTION = new Connection(
       },
     }
   );
-*/
+/*
 export const RPC_CONNECTION = new Connection(
     QUICKNODE_RPC_ENDPOINT
 );
+*/
 //export const GOVERNANCE_RPC_ENDPOINT = process.env.REACT_APP_API_GOVERNANCE_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 export const GOVERNANCE_RPC_ENDPOINT = process.env.REACT_APP_API_GRAPE_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 export const BONFIDA_TWITTER_REGISTRAR_URL = process.env.REACT_APP_API_BONFIDA_TWITTER_REGISTRAR_SERVER_URL || null;
