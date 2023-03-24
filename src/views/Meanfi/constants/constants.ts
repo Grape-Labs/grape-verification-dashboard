@@ -13,7 +13,7 @@ export const VERBOSE_DATE_FORMAT = 'ddd mmm dd yyyy';
 export const VERBOSE_DATE_TIME_FORMAT = 'ddd mmm dd yyyy HH:MM';
 export const SOLANA_EXPLORER_URI_INSPECT_ADDRESS = 'https://solscan.io/account/';
 export const SOLANA_EXPLORER_URI_INSPECT_TRANSACTION = 'https://solscan.io/tx/';
-export const DEDICATED_FREE_FAST_RPC = process.env.REACT_APP_API_DEDICATED_FREE_FAST_RPC || process.env.REACT_APP_API_GRAPE_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
+export const DEDICATED_FREE_FAST_RPC = process.env.REACT_APP_API_GRAPE_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 export const BANNED_TOKENS = [
     'CRT',
     'FROG',
