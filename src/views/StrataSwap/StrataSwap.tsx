@@ -126,6 +126,7 @@ export default function StrataSwap(props: any) {
         <>
             <ButtonGroup
             >
+                {/*
                 <Button 
                     onClick={() => {
                         swapUsingStrata();
@@ -141,6 +142,15 @@ export default function StrataSwap(props: any) {
                     sx={{borderTopRightRadius:'17px',borderBottomRightRadius:'17px'}}
                 >
                     <OpenInNewIcon fontSize='small' />
+                </Button>
+                */}
+                <Button 
+                    component='a'
+                    href='https://app.strataprotocol.com/swap/4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd'
+                    target='_blank'
+                    sx={{borderTopRightRadius:'17px',borderBottomRightRadius:'17px'}}
+                >
+                    Get {swapAmount} GAN with Grape <OpenInNewIcon fontSize='small' />
                 </Button>
             </ButtonGroup>
         </>
