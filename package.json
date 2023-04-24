@@ -39,7 +39,6 @@
   },
   "dependencies": {
     "@bonfida/spl-name-service": "^0.1.50",
-    "@coral-xyz/borsh": "^0.27.0",
     "@crossmint/connect": "^0.0.5-alpha-2",
     "@emotion/react": "^11.4.1",
     "@emotion/styled": "^11.3.0",
@@ -168,10 +167,12 @@
     "parcel": "^2.8.0",
     "path-browserify": "^1.0.1",
     "prettier": "^2.5.1",
+    "punycode": "^1.4.1",
     "querystring-es3": "^0.2.1",
     "shx": "^0.3.4",
     "stream-http": "^3.2.0",
     "tslib": "^2.3.1",
+    "url": "^0.11.0",
     "util": "^0.12.3"
   },
   "resolutions": {
