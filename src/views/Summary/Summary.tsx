@@ -39,8 +39,8 @@ export default function Summary(props: any) {
   }
 
   React.useEffect(() => {
-    if (publicKey)
-      setFtxUrl(makeFtxPayUrl(publicKey.toBase58(), 'SOL'));
+    //if (publicKey)
+    //  setFtxUrl(makeFtxPayUrl(publicKey.toBase58(), 'SOL'));
   }, [publicKey]);
 
 
@@ -79,7 +79,7 @@ export default function Summary(props: any) {
         }
         {token && token === 'sol' &&
           <>
-          {ftxurl && ftxurl.length > 0 &&
+          {/*ftxurl && ftxurl.length > 0 &&
             <Grid item>
               <Button
                   variant="outlined"
@@ -90,7 +90,7 @@ export default function Summary(props: any) {
                   FTX Pay
               </Button>
             </Grid>
-          }
+          */}
           </>
         }
       </Grid>

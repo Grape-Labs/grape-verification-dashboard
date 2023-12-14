@@ -194,9 +194,9 @@ export function Header(props: any) {
                 </Tooltip>
                 
 
-                
+                {/*
                 <Tooltip title={`GAN`}><IconButton sx={{borderRadius:'17px'}} component={NavLink} to='/admin'><AdminPanelSettingsIcon/></IconButton></Tooltip>
-                
+                */}
                 <Tooltip title={`Collection`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grape.art' target="_blank"><PhotoOutlinedIcon/></IconButton></Tooltip>
                 <Tooltip title={`Wallet`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grape.art/identity' target="_blank"><AccountBalanceWalletOutlined/></IconButton></Tooltip>
                 
