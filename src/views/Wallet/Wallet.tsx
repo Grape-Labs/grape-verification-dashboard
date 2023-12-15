@@ -439,7 +439,7 @@ export const WalletView = (props:any) => {
                     <>loading {loadingPosition}</>
                     :
                         <Grid container>
-                            <Grid item xs={12} sm={3}>
+                            <Grid item xs={12} sm={4}>
                                 <Grid container
                                     alignContent="center"
                                     justifyContent="center"
@@ -454,7 +454,7 @@ export const WalletView = (props:any) => {
                                     </Grid>
                                 </Grid>
                             </Grid>
-                            <Grid item xs={12} sm={3}>
+                            <Grid item xs={12} sm={4}>
                                 <Grid container                                
                                     alignContent="center"
                                     justifyContent="center"
@@ -469,7 +469,7 @@ export const WalletView = (props:any) => {
                                     </Grid>
                                 </Grid>
                             </Grid>
-                            <Grid item xs={12} sm={3}>
+                            <Grid item xs={12} sm={4}>
                                 <Grid container                                
                                     alignContent="center"
                                     justifyContent="center"
@@ -484,6 +484,7 @@ export const WalletView = (props:any) => {
                                     </Grid>
                                 </Grid>
                             </Grid>
+                            {/*
                             <Grid item xs={12} sm={3}>
                                 <Grid container                                
                                     alignContent="center"
@@ -499,6 +500,7 @@ export const WalletView = (props:any) => {
                                     </Grid>
                                 </Grid>
                             </Grid>
+                            */}
                             
                             <Grid container                                
                                     alignContent="center"
