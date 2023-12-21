@@ -4,7 +4,7 @@ import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { useAccountsContext } from "./accounts";
 import { TokenInfo, TokenListProvider } from "@solana/spl-token-registry";
 import { TransactionStatusInfo } from "../models/transactions";
-import { BANNED_TOKENS, DEDICATED_FREE_FAST_RPC, MONEY_STREAMING_PROGRAM_ADDRESS, PRICE_REFRESH_TIMEOUT, STREAMS_REFRESH_TIMEOUT } from "../constants";
+import { BANNED_TOKENS, MONEY_STREAMING_PROGRAM_ADDRESS, PRICE_REFRESH_TIMEOUT, STREAMS_REFRESH_TIMEOUT } from "../constants";
 import { findATokenAddress, getChainIdByClusterName } from "../helpers/common";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
@@ -12,6 +12,7 @@ import { MSP, Stream, StreamActivity } from "@mean-dao/msp";
 import { initialSummary, StreamsSummary } from "../models/streams";
 import { getPrices } from "../helpers/api";
 import { shortenAddress } from "../helpers/ui";
+import { RPC_ENDPOINT } from '../../../components/Tools/constants'
 
 export interface AppStateProviderProps {
   children: ReactNode;
@@ -67,7 +68,7 @@ interface AppStateConfig {
 const contextDefaultValues: AppStateConfig = {
   connection: null,
   network: WalletAdapterNetwork.Mainnet,
-  endpoint: DEDICATED_FREE_FAST_RPC,
+  endpoint: RPC_ENDPOINT,
   detailsPanelOpen: false,
   tokenList: [],
   selectedToken: undefined,

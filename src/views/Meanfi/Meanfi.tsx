@@ -14,7 +14,7 @@ import {
 } from '@mui/material/';
 import { SnackbarUtilsConfigurator } from './helpers/SnackBarUtils';
 import "./Meanfi.css";
-import { DEDICATED_FREE_FAST_RPC } from './constants';
+import { RPC_ENDPOINT } from '../../components/Tools/constants'
 
 const MeanfiUiView = (props: any) => {
     const [loading, setLoading] = React.useState(true);
@@ -70,7 +70,7 @@ export function MeanfiView(props: any) {
 
     // Fallback values if not passed (.Devnet | .Mainnet)
     const network = WalletAdapterNetwork.Mainnet;
-    const endpoint = DEDICATED_FREE_FAST_RPC;
+    const endpoint = RPC_ENDPOINT;
 
     return (
         <AppStateProvider network={network} endpoint={endpoint}>
