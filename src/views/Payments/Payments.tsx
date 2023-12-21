@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction, Signer } from '@solana/web3.js';
 
 import {CopyToClipboard} from 'react-copy-to-clipboard';
-import { GRAPE_RPC_ENDPOINT, TX_RPC_ENDPOINT } from '../../components/Tools/constants';
+import { RPC_ENDPOINT, TX_RPC_ENDPOINT } from '../../components/Tools/constants';
 import { getTokenOwnerRecordForRealm } from '@solana/spl-governance';
 import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getOrCreateAssociatedTokenAccount, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from "@solana/spl-token-v2";
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
@@ -361,7 +361,7 @@ export function PaymentsView(props: any) {
         id: "35f0036a-3801-4485-b573-2bf29a7c77d2",
         };
 
-        const response = await fetch(GRAPE_RPC_ENDPOINT, {
+        const response = await fetch(RPC_ENDPOINT, {
             method: "POST",
             body: JSON.stringify(body),
             headers: { "Content-Type": "application/json" },

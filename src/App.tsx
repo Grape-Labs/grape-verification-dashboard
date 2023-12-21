@@ -66,7 +66,7 @@ import { CrossmintSolanaWalletAdapter, networkToCrossmintEnvironment } from "@cr
 //import { mainListItems, secondaryListItems } from './components/SidebarList/SidebarList';
 import grapeTheme from  './config/theme'
 import "./App.less";
-import { GRAPE_RPC_ENDPOINT } from './components/Tools/constants';
+import { RPC_ENDPOINT } from './components/Tools/constants';
 
 function Copyright(props: any) {
   return (
@@ -119,7 +119,7 @@ function DashboardContent() {
   // You can also provide a custom RPC endpoint
   const network = WalletAdapterNetwork.Mainnet; //.Devnet; //.Mainnet;
   // You can also provide a custom RPC endpoint
-  const endpoint = GRAPE_RPC_ENDPOINT; //useMemo(() => clusterApiUrl(network), [network]);
+  const endpoint = RPC_ENDPOINT; //useMemo(() => clusterApiUrl(network), [network]);
 
   const wallets = useMemo(() => [
     new SolflareWalletAdapter(),

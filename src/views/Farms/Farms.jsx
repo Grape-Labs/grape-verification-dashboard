@@ -29,7 +29,7 @@ import { TokenAmount, lt } from '../../utils/token/safe-math';
 import { getFarmByPoolId } from '../../utils/token/farms';
 import BigNumber from 'bignumber.js'
 
-import { GRAPE_RPC_ENDPOINT, RAYDIUM_LOGO } from '../../components/Tools/constants';
+import { RPC_ENDPOINT, RAYDIUM_LOGO } from '../../components/Tools/constants';
 //import { useTheme } from '@mui/material/styles';
 import { Connection, Keypair } from "@solana/web3.js";
 //import { getOrca, OrcaPoolConfig, OrcaU64 } from "@orca-so/sdk";
@@ -122,7 +122,7 @@ export const FarmsView = (props) => {
       };
       
       //const response = await fetch("https://solana-api.projectserum.com/", {
-      const response = await fetch(GRAPE_RPC_ENDPOINT, {
+      const response = await fetch(RPC_ENDPOINT, {
           method: "POST",
         body: JSON.stringify(body),
         headers: { "Content-Type": "application/json" },
@@ -214,7 +214,7 @@ export const FarmsView = (props) => {
       id: "35f0036a-3801-4485-b573-2bf29a7c77d2",
     };
 
-    const response = await fetch(GRAPE_RPC_ENDPOINT, {
+    const response = await fetch(RPC_ENDPOINT, {
     //const response = await fetch("https://solana-api.projectserum.com/", {
       method: "POST",
       body: JSON.stringify(body),
@@ -237,7 +237,7 @@ export const FarmsView = (props) => {
       id: "35f0036a-3801-4485-b573-2bf29a7c77d3",
     };
 
-    const response = await fetch(GRAPE_RPC_ENDPOINT, {
+    const response = await fetch(RPC_ENDPOINT, {
     //const response = await fetch("https://solana-api.projectserum.com/", {
       method: "POST",
       body: JSON.stringify(body),

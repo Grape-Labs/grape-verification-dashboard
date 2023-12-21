@@ -33,7 +33,7 @@ import { TokenAmount, lt } from '../../utils/token/safe-math';
 //import { useTheme } from '@mui/material/styles';
 import {PublicKey} from '@solana/web3.js';
 import { PretifyCommaNumber } from '../../components/Tools/PretifyCommaNumber';
-import { GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
+import { RPC_ENDPOINT } from '../../components/Tools/constants';
 
 import CachedIcon from '@mui/icons-material/Cached';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -137,7 +137,7 @@ export const PortfolioView = () => {
         id: "84203270-a3eb-4812-96d7-0a3c40c87a88"
       };
       
-      const response = await fetch(GRAPE_RPC_ENDPOINT, {
+      const response = await fetch(RPC_ENDPOINT, {
         method: "POST",
         body: JSON.stringify(body),
         headers: { "Content-Type": "application/json" },
@@ -230,7 +230,7 @@ export const PortfolioView = () => {
     };
 
     //try{
-      const response = await fetch(GRAPE_RPC_ENDPOINT, {
+      const response = await fetch(RPC_ENDPOINT, {
         method: "POST",
         body: JSON.stringify(body),
         headers: { "Content-Type": "application/json" },
@@ -251,7 +251,7 @@ export const PortfolioView = () => {
       id: "35f0036a-3801-4485-b573-2bf29a7c77d3",
     };
 
-    const response = await fetch(GRAPE_RPC_ENDPOINT, {
+    const response = await fetch(RPC_ENDPOINT, {
       method: "POST",
       body: JSON.stringify(body),
       headers: { "Content-Type": "application/json" },

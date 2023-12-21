@@ -39,7 +39,7 @@ import { TokenAmount, lt } from '../../utils/token/safe-math';
 import { PublicKey, Connection } from '@solana/web3.js';
 
 import { 
-    GRAPE_RPC_ENDPOINT,
+    RPC_ENDPOINT,
     RPC_CONNECTION } from '../../components/Tools/constants';
 
 const GAN_REQUIREMENT = 1;//0.0001;//1; // 0.0001
@@ -539,7 +539,7 @@ export function AdminView(props: any) {
             ],
             id: "35f0036a-3801-4485-b573-2bf29a7c77d2",
         };
-        const resp = await window.fetch(GRAPE_RPC_ENDPOINT, {
+        const resp = await window.fetch(RPC_ENDPOINT, {
             method: "POST",
             body: JSON.stringify(body),
             headers: { "Content-Type": "application/json" },

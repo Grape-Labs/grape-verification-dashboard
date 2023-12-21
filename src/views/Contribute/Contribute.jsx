@@ -28,7 +28,7 @@ import { TokenAmount, lt } from '../../utils/token/safe-math';
 import {PublicKey} from '@solana/web3.js';
 import { PretifyCommaNumber } from '../../components/Tools/PretifyCommaNumber';
 
-import { RPC_CONNECTION, GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
+import { RPC_CONNECTION, RPC_ENDPOINT } from '../../components/Tools/constants';
 import TransactionHistory from '../TransactionHistory/TransactionHistory';
 
 import CircularProgress from '@mui/material/CircularProgress';
@@ -122,7 +122,7 @@ export const ContributeView = () => {
       };
       
       
-      const response = await fetch(GRAPE_RPC_ENDPOINT, {
+      const response = await fetch(RPC_ENDPOINT, {
         method: "POST",
         body: JSON.stringify(body),
         headers: { "Content-Type": "application/json" },
@@ -215,7 +215,7 @@ export const ContributeView = () => {
     };
 
     //try{
-      const response = await fetch(GRAPE_RPC_ENDPOINT, {
+      const response = await fetch(RPC_ENDPOINT, {
         method: "POST",
         body: JSON.stringify(body),
         headers: { "Content-Type": "application/json" },
@@ -248,7 +248,7 @@ export const ContributeView = () => {
       id: "35f0036a-3801-4485-b573-2bf29a7c77d3",
     };
 
-    const response = await fetch(GRAPE_RPC_ENDPOINT, {
+    const response = await fetch(RPC_ENDPOINT, {
       method: "POST",
       body: JSON.stringify(body),
       headers: { "Content-Type": "application/json" },

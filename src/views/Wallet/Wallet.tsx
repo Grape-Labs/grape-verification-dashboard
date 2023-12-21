@@ -39,7 +39,7 @@ import QrCodeIcon from '@mui/icons-material/QrCode';
 import { decodeMetadata } from './metadataHelper'
 
 import { 
-    RPC_CONNECTION, GRAPE_RPC_ENDPOINT } from '../../components/Tools/constants';
+    RPC_CONNECTION, RPC_ENDPOINT } from '../../components/Tools/constants';
 import { PublicKey, Connection, Commitment } from '@solana/web3.js';
 import {ENV, TokenInfo, TokenListProvider} from '@solana/spl-token-registry';
 import { TokenAmount, lt } from '../../utils/token/safe-math';
@@ -234,7 +234,7 @@ export const WalletView = (props:any) => {
         ],
         id: "35f0036a-3801-4485-b573-2bf29a7c77d2",
     };
-    const resp = await window.fetch(GRAPE_RPC_ENDPOINT, {
+    const resp = await window.fetch(RPC_ENDPOINT, {
         method: "POST",
         body: JSON.stringify(body),
         headers: { "Content-Type": "application/json" },
