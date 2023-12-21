@@ -10,9 +10,8 @@ export const HELLO_MOON_BEARER = process.env.REACT_APP_API_HELLOMOON_API_KEY;
 export const HELLO_MOON_ENDPOINT = HELLO_MOON_BEARER ? `https://rpc.hellomoon.io/${HELLO_MOON_BEARER}` : `https://api.mainnet-beta.solana.com`;
 export const RPC_ENDPOINT = QUICKNODE_RPC_ENDPOINT || HELLO_MOON_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 
-export const RPC_CONNECTION = new Connection(RPC_ENDPOINT);
 
-/*
+
 export const RPC_CONNECTION = new Connection(
     "https://rest-api.hellomoon.io/v0/rpc",
     {
@@ -20,7 +19,7 @@ export const RPC_CONNECTION = new Connection(
         Authorization: `Bearer ${process.env.REACT_APP_API_HELLOMOON_API_KEY}`, 
       },
     }
-  );*/
+  );
 /*
 export const RPC_CONNECTION = new Connection(
     RPC_ENDPOINT
