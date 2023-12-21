@@ -513,7 +513,7 @@ export const WalletView = (props:any) => {
                                         color='inherit'
                                         sx={{textTransform:'none',mt:2,borderRadius:'17px'}}
                                     
-                                    >View &amp; manage your wallet at Grape Art</Button>
+                                    >View &amp; manage your wallet at Grape.art Identity</Button>
                             </Grid>
                             {/*solanaHoldings && solanaHoldings.map((item: any, key: number) => (
                                     <ListItem>
