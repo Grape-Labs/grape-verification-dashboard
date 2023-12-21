@@ -11,20 +11,10 @@ export const RPC_ENDPOINT = QUICKNODE_RPC_ENDPOINT || HELLO_MOON_ENDPOINT || 'ht
 export const TX_RPC_ENDPOINT = RPC_ENDPOINT;
 
 
-
-export const RPC_CONNECTION = new Connection(
-    "https://rest-api.hellomoon.io/v0/rpc",
-    {
-      httpHeaders: {
-        Authorization: `Bearer ${process.env.REACT_APP_API_HELLOMOON_API_KEY}`, 
-      },
-    }
-  );
-/*
 export const RPC_CONNECTION = new Connection(
     RPC_ENDPOINT
 );
-*/
+
 //export const GOVERNANCE_RPC_ENDPOINT = process.env.REACT_APP_API_GOVERNANCE_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 export const GOVERNANCE_RPC_ENDPOINT = process.env.REACT_APP_API_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 export const BONFIDA_TWITTER_REGISTRAR_URL = process.env.REACT_APP_API_BONFIDA_TWITTER_REGISTRAR_SERVER_URL || null;
