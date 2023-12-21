@@ -67,7 +67,7 @@ export const WalletView = (props:any) => {
     const { publicKey, wallet, disconnect } = useWallet();
     const rpclimit = 100;
     const MD_PUBKEY = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
-    const ggoconnection = RPC_CONNECTION;
+    const connection = RPC_CONNECTION;
     
     function getConnected(){
         let servers = session && session.servers;
@@ -110,7 +110,7 @@ export const WalletView = (props:any) => {
 
             //console.log("pushed pdas: "+JSON.stringify(mintsPDAs));
             const final_meta = new Array();
-            const metadata = await ggoconnection.getMultipleAccountsInfo(mintsPDAs);
+            const metadata = await connection.getMultipleAccountsInfo(mintsPDAs);
             //console.log("returned: "+JSON.stringify(metadata));
             // LOOP ALL METADATA WE HAVE
             /*
@@ -218,7 +218,7 @@ export const WalletView = (props:any) => {
 
   const fetchSolanaTokens = async () => {
     setLoadingPosition('Tokens');
-    //const response = await ggoconnection.getTokenAccountsByOwner(new PublicKey(pubkey), {programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")});
+    //const response = await connection.getTokenAccountsByOwner(new PublicKey(pubkey), {programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")});
     /*
         let meta_final = JSON.parse(item.account.data);
         let buf = Buffer.from(JSON.stringify(item.account.data), 'base64');
