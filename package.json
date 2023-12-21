@@ -132,7 +132,7 @@
     "tweetnacl": "^1.0.3",
     "web-vitals": "^1.1.2",
     "weighted": "^1.0.0",
-    "xlsx": "^0.19.3",
+    "xlsx": "^0.18.5",
     "zustand": "^3.6.8"
   },
   "devDependencies": {
