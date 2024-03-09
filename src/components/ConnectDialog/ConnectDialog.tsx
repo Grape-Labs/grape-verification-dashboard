@@ -3,13 +3,13 @@ import { styled } from '@mui/material/styles';
 import {
   Box,
   Typography,
-
   Button,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   IconButton,
+  ButtonGroup,
   List,
   ListItemAvatar,
   ListItemIcon,
@@ -19,7 +19,8 @@ import {
   TextField,
   Grid,
   Backdrop,
-  CircularProgress
+  CircularProgress,
+  Tooltip
 } from '@mui/material';
 
 const {prove} = require('@identity.com/prove-solana-wallet');
@@ -36,13 +37,16 @@ import { useSession } from "../../contexts/session";
 import Session from '../../models/Session';
 import { PublicKey, SystemProgram, Transaction, TransactionInstruction, Signer } from '@solana/web3.js';
 import { useConnection, ConnectionProvider, WalletProvider, useWallet } from '@solana/wallet-adapter-react';
-import { WalletDialogProvider, WalletDisconnectButton, WalletMultiButton } from '../WalletAdapterMui';
+//import { WalletDialogProvider, WalletDisconnectButton, WalletMultiButton, WalletConnectButton } from '../WalletAdapterMui';
+import { WalletDialogProvider, WalletDisconnectButton, WalletMultiButton, WalletConnectButton } from "@solana/wallet-adapter-material-ui";
 //import { WalletDialogProvider, WalletDisconnectButton, WalletMultiButton } from '@solana/wallet-adapter-material-ui';
 import { WalletAdapterNetwork, WalletError, WalletNotConnectedError } from '@solana/wallet-adapter-base';
 import { propsToClassKey } from '@mui/styles';
 
 import { confirmDialog } from '../ConfirmDialog/ConfirmDialog';
 import { GRAPE_APP_API_URL } from '../Tools/constants';
+
+import LinkOffIcon from '@mui/icons-material/LinkOff';
 
 // Default styles
 require('@solana/wallet-adapter-react-ui/styles.css');
@@ -86,12 +90,12 @@ const BootstrapDialogTitle = (props: DialogTitleProps) => {
   );
 };
 
-const WalletNavigation: FC = (props:any) => {
+const WalletNavigation = (props:any) => {
   //const { connection } = useConnection();
   const { userId, discordId, token, login } = props;
   const { session, setSession } = useSession();
   const { connection } = useConnection();
-  const { publicKey, wallet, disconnect, sendTransaction, signMessage, signTransaction } = useWallet();
+  const { publicKey, wallet, disconnect, sendTransaction, signMessage, signTransaction, connect } = useWallet();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const message  = '$GRAPE';
   //session: Object;
@@ -135,7 +139,6 @@ const WalletNavigation: FC = (props:any) => {
       transaction.recentBlockhash = blockhash;
 
       console.log("transaction: "+JSON.stringify(transaction));
-
       const sm_signature = await signTransaction(transaction);
       
       console.log('sm_signature: '+JSON.stringify(sm_signature));
@@ -453,6 +456,10 @@ const WalletNavigation: FC = (props:any) => {
   }, [signMessage]);
 //};
 
+  const handleDisconnectWallet = async() => {
+    await disconnect().catch(() => { /* catch any errors */ });
+  }
+
   //console.log('Pre call: '+publicKey);
 
   const [callstopk, setCallToPk] = React.useState(0);
@@ -469,19 +476,47 @@ const WalletNavigation: FC = (props:any) => {
         VerifyWallet(publicKey);
       }
     }
-  }, [signMessage]);
+  }, [signMessage, publicKey]);
 
   // <WalletDisconnectButton startIcon={<DisconnectIcon />} style={{ marginLeft: 8 }} />
   return(
     <React.Fragment>
-      <WalletMultiButton />
+      <Grid container justifyContent={'center'} justifyItems={'center'} alignContent={'center'}>
+        {/*publicKey ? <>
+          <Grid item xs={12} alignItems="center" style={{ display: "flex" }}>
+            <Box textAlign="center">
+            <Typography variant="caption">Connected with {publicKey.toBase58()}</Typography>
+            </Box>
+          </Grid>
+        </> 
+        : <></>*/}
+        <Grid item xs={12} alignItems="center" style={{ display: "flex" }}>
+          <Box textAlign="center">
+            
+            <ButtonGroup>
+              <WalletMultiButton />
+
+              {/*
+              <WalletDisconnectButton />
+              */}
+              <Tooltip title="Disconnect/Retry">
+                <Button
+                  onClick={handleDisconnectWallet}
+                >
+                  <LinkOffIcon />
+                </Button>
+              </Tooltip>
+            </ButtonGroup>
+          </Box>
+        </Grid>
+      </Grid>
     </React.Fragment>
   );
 }
 
-const WalletButton: FC = (props:any) => {
+const VerifyWalletButton = (props:any) => {
   const [open, setOpen] = React.useState(false);
-  const { publicKey, wallet, disconnect, sendTransaction, signMessage, signTransaction } = useWallet();
+  //const { publicKey, wallet, disconnect, sendTransaction, signMessage, signTransaction } = useWallet();
   
   function trimAddress(addr: string) {
     let start = addr.substring(0, 5);
@@ -606,8 +641,8 @@ export default function ConnectDialog(props: any) {
 
   return (
     <>
-      <WalletDialogProvider>    
-        <WalletButton {...props}/>
+      <WalletDialogProvider> 
+        <VerifyWalletButton {...props}/>
         {wallet_connect_body}
       </WalletDialogProvider>
     </>
