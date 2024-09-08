@@ -549,6 +549,7 @@ export default function ConnectDialog(props: any) {
   const { isConnected, menuId, handleProfileMenuOpen, handleClickOpen, buttonText, nakedWallet, userId, discordId, token, login } = props;
   const [open, setOpen] = React.useState(false);
   const { session, setSession } = useSession();
+  //const { disconnect } = useWallet();
   
   function trimAddress(addr: string) {
     let start = addr.substring(0, 5);
@@ -621,6 +622,15 @@ export default function ConnectDialog(props: any) {
     );
   }
 
+  const handleDisconnectWallet = async() => {
+    await disconnect().catch(() => { /* catch any errors */ });
+  }
+
+  /*
+  React.useEffect(() => {
+    handleDisconnectWallet
+  }, [useWallet]);
+  */
   const handleOpen = () => {
     setOpen(true);
   };
