@@ -458,6 +458,7 @@ const WalletNavigation = (props:any) => {
 
   const handleDisconnectWallet = async() => {
     await disconnect().catch(() => { /* catch any errors */ });
+    disconnectSession(false);
   }
 
   //console.log('Pre call: '+publicKey);
@@ -622,9 +623,10 @@ export default function ConnectDialog(props: any) {
     );
   }
 
-  const handleDisconnectWallet = async() => {
-    await disconnect().catch(() => { /* catch any errors */ });
-  }
+  
+  //const handleDisconnectWallet = async() => {
+  //  await disconnect().catch(() => { /* catch any errors */ });
+  //}
 
   /*
   React.useEffect(() => {
