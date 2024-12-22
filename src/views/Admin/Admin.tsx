@@ -43,7 +43,7 @@ import {
     RPC_CONNECTION } from '../../components/Tools/constants';
 
 const GAN_REQUIREMENT = 1;//0.0001;//1; // 0.0001
-const GRAPE_TO_GAN_REQUIRED = 10527;//10;//10527; //10
+const GRAPE_TO_GAN_REQUIRED = 50000;//10527;//10;//10527; //10
 const GAN_TOKEN = '4BF5sVW5wRR56cy9XR8NFDQGDy5oaNEFrCHMuwA9sBPd';
 //const GAN_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
 const GRAPE_TOKEN = '8upjSpvjcdpuzhfR1zriwg5NXkwDruejqNE9WNbPRtyA';
@@ -52,7 +52,6 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
 
  const steps = [
     'Get Grape',
-    'Get GAN',
     'Associate Discord',
   ];
 
@@ -215,11 +214,10 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                         Setup Discord Verification with Grape
                                     </Typography>
                                     <Typography variant='caption'>
-                                        You need to get the GAN Token to proceed, to get GAN
+                                        You need to hold GRAPE to proceed
                                             <ul>
-                                                <li>You can swap Grape to GAN using this wizard</li>
-                                                <li>If you do not hold Grape you can swap USDC or SOL to GRAPE using our tool below (powered by Jupiter Swap)</li>
-                                                <li>Once you have the required Grape ({GRAPE_TO_GAN_REQUIRED}) to swap to GAN you can then proceed to the next step to get your GAN Token</li>
+                                                <li>You can swap Grape using this wizard</li>
+                                                <li>Once you have the required Grape ({GRAPE_TO_GAN_REQUIRED}) send it to the designated address</li>
                                             </ul>
                                     </Typography>
 
@@ -231,14 +229,14 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                         <Typography variant='body2'>
                                             <ul>
                                                 <li>You currently have <strong>{grapePosition.tokenAmount.amount /(10 ** grapePosition.tokenAmount.decimals) } {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint}</strong></li>
-                                                <li>You need <strong>{GRAPE_TO_GAN_REQUIRED - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))}</strong> more Grape to swap for {GAN_REQUIREMENT} GAN</li>
+                                                <li>You need <strong>{GRAPE_TO_GAN_REQUIRED} Grape</strong>{/* - +(Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).fixed()))}</strong> more Grape to swap for {GAN_REQUIREMENT} GAN*/}</li>
                                                 <li>First swap SOL or USDC for Grape below</li>
                                             </ul>
                                         </Typography>
                                     :
                                         <Typography variant='body2'>
                                             <ul>
-                                                <li>You can proceed to the next step and swap Grape to GAN<br/>
+                                                <li>You can proceed to the next step<br/>
                                                     <Typography variant='caption'>
                                                         *{Number(new TokenAmount(grapePosition.tokenAmount.amount, grapePosition.tokenAmount.decimals).format())} {tokenMap.get(grapePosition.mint)?.name || grapePosition.mint} tokens held in Wallet
                                                     </Typography>
@@ -308,10 +306,9 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                 </Typography>
             }
 
-            {activeStep+1 === 2 &&
+            {/*activeStep+1 === 2 &&
                 <Typography sx={{ mt: 2, mb: 1 }}>
-                    {/*Step {activeStep + 1}<br/><br/>*/}
-
+                    
                     <Grid container
                         textAlign='center'
                         alignContent='center'
@@ -375,11 +372,11 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
 
                     </Grid>
                 </Typography>
-            }
+            */}
             
-            {activeStep+1 === 3 &&
+            {activeStep+1 === 2 &&
                 <Typography sx={{ mt: 2, mb: 1 }}>
-                    {/*Step {activeStep + 1}<br/><br/>*/}
+                    
                     <Grid container
                         textAlign='center'
                         alignContent='center'
@@ -401,7 +398,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                     target='_blank'
                                     sx={{borderRadius:'17px'}}
                                 >
-                                Grape GAN Discord
+                                Grape Discord
                                 </Button>
                             </Alert>
 
