@@ -237,6 +237,10 @@ export default function Page() {
   const [advancedMode, setAdvancedMode] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
+  const [discordConnected, setDiscordConnected] = useState(false);
+  const [discordLabel, setDiscordLabel] = useState<string | null>(null);
+  const [discordProof, setDiscordProof] = useState<string | null>(null);
+
   useEffect(() => {
     const adv = modeFromLocalStorage();
     setAdvancedMode(adv);
@@ -400,6 +404,55 @@ export default function Page() {
     };
   }, [connection, spacePda, spaceSalt, platform, platformUserId, publicKey]);
 
+
+  async function loadDiscordSession() {
+    try {
+      const me = await fetch("/api/discord/me", { cache: "no-store" }).then((r) => r.json());
+      setDiscordConnected(!!me?.connected);
+      setDiscordLabel(me?.label || null);
+
+      if (me?.connected && me?.id && platform === "discord") {
+        // ✅ Auto-fill platformUserId for Discord
+        setPlatformUserId(String(me.id));
+      }
+    } catch {
+      setDiscordConnected(false);
+      setDiscordLabel(null);
+    }
+  }
+
+  async function loadDiscordProof() {
+    try {
+      const r = await fetch("/api/discord/proof", { cache: "no-store" });
+      const j = await r.json();
+      if (j?.connected && j?.proof) setDiscordProof(j.proof);
+      else setDiscordProof(null);
+    } catch {
+      setDiscordProof(null);
+    }
+  }
+
+  function startDiscordConnect() {
+    const returnTo =
+      typeof window !== "undefined" ? window.location.pathname + window.location.search : "/";
+    window.location.href = `/api/discord/start?returnTo=${encodeURIComponent(returnTo)}`;
+  }
+
+  async function disconnectDiscord() {
+    await fetch("/api/discord/disconnect", { method: "POST" }).catch(() => {});
+    setDiscordConnected(false);
+    setDiscordLabel(null);
+    setDiscordProof(null);
+    if (platform === "discord") setPlatformUserId("");
+  }
+
+  useEffect(() => {
+    if (platform !== "discord") return;
+    loadDiscordSession();
+    loadDiscordProof();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform]);
+
   const identityStatus = useMemo(() => {
     if (identityExists === false) return "Not found";
     if (!identityInfo) return identityExists ? "Unknown" : "—";
@@ -512,14 +565,20 @@ export default function Page() {
     if (!idHashBytes) setIdHashBytes(idh);
     if (!walletHashBytes) setWalletHashBytes(wh);
 
+    const platformProofValue =
+      platform === "discord" ? (discordProof || null) : null;
+
     const payload = {
       daoId: daoPk.toBase58(),
       platform,
       platformSeed: platformSeed(platform),
+      platformUserId: platformUserId.trim(),
+      platformProof: platformProofValue,
       idHashHex: bytesToHex(idh),
       wallet: publicKey.toBase58(),
       walletHashHex: bytesToHex(wh),
       ts: Date.now(),
+      space: spacePda.toBase58(),
     };
 
     const message = new TextEncoder().encode(
@@ -766,6 +825,56 @@ export default function Page() {
                   <option value="twitter">Twitter</option>
                   <option value="email">Email</option>
                 </Box>
+                
+                {platform === "discord" && (
+                  <Paper
+                    sx={{
+                      p: 1.25,
+                      background: "rgba(255,255,255,0.05)",
+                      border: "2px solid rgba(255,255,255,0.10)",
+                      borderRadius: 3,
+                    }}
+                  >
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1}
+                      alignItems={{ xs: "stretch", sm: "center" }}
+                      justifyContent="space-between"
+                    >
+                      <Box>
+                        <Typography sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}>
+                          Discord
+                        </Typography>
+                        <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
+                          {discordConnected
+                            ? `Connected: ${discordLabel || "Discord"} • ID auto-filled`
+                            : "Not connected"}
+                        </Typography>
+                      </Box>
+
+                      <Stack direction="row" spacing={1}>
+                        {!discordConnected ? (
+                          <Button
+                            variant="contained"
+                            onClick={startDiscordConnect}
+                            sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
+                          >
+                            Connect Discord
+                          </Button>
+                        ) : (
+                          <>
+                            <Button variant="outlined" onClick={() => { loadDiscordSession(); loadDiscordProof(); }}>
+                              Refresh
+                            </Button>
+                            <Button variant="text" onClick={disconnectDiscord}>
+                              Disconnect
+                            </Button>
+                          </>
+                        )}
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                )}
 
                 <Typography
                   sx={{
