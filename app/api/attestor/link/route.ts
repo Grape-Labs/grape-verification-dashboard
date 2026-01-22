@@ -365,7 +365,12 @@ export async function POST(req: Request) {
       .instruction();
 
     const ix2 = await (program as any).methods
-      .linkWallet(daoPk, Array.from(wh))
+        .linkWallet(
+            daoPk,
+            platform_seed,        // u8
+            Array.from(idh),      // [u8;32]
+            Array.from(wh)        // [u8;32]
+        )
       .accounts({
         spaceAcct: spacePda,
         attestor: kp.publicKey,
