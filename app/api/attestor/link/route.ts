@@ -61,6 +61,16 @@ function mustHex32(v: any, msg: string): Uint8Array {
   return bytes;
 }
 
+function assertPubkey(label: string, v: any): PublicKey {
+  if (!v) throw new Error(`${label} is undefined/null`);
+  // Accept PublicKey instances or base58 strings.
+  if (v instanceof PublicKey) return v;
+  if (typeof v === "string") return mustPubkey(v, `${label} invalid`);
+  // Some libs pass { publicKey } shapes
+  if (v?.publicKey instanceof PublicKey) return v.publicKey;
+  throw new Error(`${label} invalid type: ${Object.prototype.toString.call(v)}`);
+}
+
 export async function POST(req: Request) {
   try {
     const anchorMod: any = await import("@coral-xyz/anchor");
@@ -174,6 +184,13 @@ export async function POST(req: Request) {
 
     const program = new (Program as any)(idl, programId, provider);
     if (!program) throw new Error("Program construction failed");
+    dbg("program_methods", {
+      hasAttestIdentity: !!(program as any)?.methods?.attestIdentity,
+      hasLinkWallet: !!(program as any)?.methods?.linkWallet,
+      idlInstructions: Array.isArray((idl as any)?.instructions)
+        ? (idl as any).instructions.map((ix: any) => ix?.name)
+        : null,
+    });
 
     const daoId = mustPubkey(daoIdStr, "payload.daoId missing/invalid");
 
@@ -199,6 +216,25 @@ export async function POST(req: Request) {
       linkPda: linkPda.toBase58(),
     });
 
+    // ✅ Ensure all accounts are concrete PublicKeys BEFORE calling Anchor.
+    const spaceAcctPk = assertPubkey("spacePda", spacePda);
+    const identityPk = assertPubkey("identityPda", identityPda);
+    const linkPk = assertPubkey("linkPda", linkPda);
+    const attestorPk = assertPubkey("attestor", kp.publicKey);
+    const payerPk = assertPubkey("payer", kp.publicKey);
+    const walletPk2 = assertPubkey("wallet", walletPk);
+    const systemProgramPk = assertPubkey("systemProgram", SystemProgram.programId);
+
+    dbg("accounts_preflight", {
+      spaceAcct: spaceAcctPk.toBase58(),
+      identity: identityPk.toBase58(),
+      link: linkPk.toBase58(),
+      attestor: attestorPk.toBase58(),
+      payer: payerPk.toBase58(),
+      wallet: walletPk2.toBase58(),
+      systemProgram: systemProgramPk.toBase58(),
+    });
+
     const expiresAt = new BN(0); // i64 => BN
     dbg("expiresAt", { expiresAtType: typeof expiresAt, hasWords: !!(expiresAt as any)?.words });
 
@@ -211,12 +247,12 @@ export async function POST(req: Request) {
           Array.from(idHash),
           expiresAt
         )
-        .accounts({
-          spaceAcct: spacePda,
-          attestor: kp.publicKey,
-          identity: identityPda,
-          payer: kp.publicKey,
-          systemProgram: SystemProgram.programId,
+        .accountsStrict({
+          spaceAcct: spaceAcctPk,
+          attestor: attestorPk,
+          identity: identityPk,
+          payer: payerPk,
+          systemProgram: systemProgramPk,
         })
         .signers([kp])
         .rpc();
@@ -228,14 +264,14 @@ export async function POST(req: Request) {
     try {
       await (program as any).methods
         .linkWallet(daoId, Array.from(walletHash))
-        .accounts({
-          spaceAcct: spacePda,
-          attestor: kp.publicKey,
-          identity: identityPda,
-          wallet: walletPk,
-          link: linkPda,
-          payer: kp.publicKey,
-          systemProgram: SystemProgram.programId,
+        .accountsStrict({
+          spaceAcct: spaceAcctPk,
+          attestor: attestorPk,
+          identity: identityPk,
+          wallet: walletPk2,
+          link: linkPk,
+          payer: payerPk,
+          systemProgram: systemProgramPk,
         })
         .signers([kp])
         .rpc();
