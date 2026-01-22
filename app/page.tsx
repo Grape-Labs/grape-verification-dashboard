@@ -594,7 +594,7 @@ export default function Page() {
     const sig = await signMessage(message);
     const sigB64 = btoa(String.fromCharCode(...sig));
 
-    const res = await fetch(`${base}/link`, {
+    const res = await fetch(`/api/attestor/link`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ payload, signatureBase64: sigB64 }),
