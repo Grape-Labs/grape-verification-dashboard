@@ -34,9 +34,13 @@ export async function POST(req: Request) {
 
     const RPC = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
     const PROGRAM_ID = process.env.VERIFICATION_PROGRAM_ID || "Ev4pb62pHYcFHLmV89JRcgQtS39ndBia51X9ne9NmBkH";
+    // AFTER
     const ATTESTOR_SK = process.env.ATTESTOR_SECRET_KEY;
-
     must(ATTESTOR_SK, "ATTESTOR_SECRET_KEY missing");
+
+    // ✅ re-bind after check so TS knows it’s a string
+    const attestorSk = ATTESTOR_SK as string;
+    const kp = Keypair.fromSecretKey(parseSecretKey(attestorSk));
 
     const { payload, signatureBase64 } = await req.json();
 
@@ -74,9 +78,6 @@ export async function POST(req: Request) {
 
     const connection = new Connection(RPC, "confirmed");
     const programId = new PublicKey(PROGRAM_ID);
-
-    // server signer (attestor)
-    const kp = Keypair.fromSecretKey(parseSecretKey(ATTESTOR_SK));
 
     // Minimal wallet shim for AnchorProvider
     const wallet = {
