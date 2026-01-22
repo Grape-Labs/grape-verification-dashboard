@@ -4,6 +4,13 @@ import { Connection, Keypair, PublicKey, Transaction, SystemProgram } from "@sol
 
 export const runtime = "nodejs";
 
+const DEBUG = process.env.GV_DEBUG_ATTESTOR === "1";
+function dbg(step: string, extra?: any) {
+  if (!DEBUG) return;
+  // eslint-disable-next-line no-console
+  console.log(`[attestor/link] ${step}`, extra ?? "");
+}
+
 function parseSecretKey(env: string): Uint8Array {
   const s = env.trim();
   if (s.startsWith("[")) return Uint8Array.from(JSON.parse(s));
@@ -61,15 +68,18 @@ export async function POST(req: Request) {
     // Anchor sometimes ends up under `.default` depending on bundler/runtime.
     const AnchorProvider = anchorMod.AnchorProvider ?? anchorMod.default?.AnchorProvider;
     const Program = anchorMod.Program ?? anchorMod.default?.Program;
-    const BN = anchorMod.BN ?? anchorMod.default?.BN;
+    const BNClass = anchorMod.BN ?? anchorMod.default?.BN;
 
-    if (!AnchorProvider || !Program || !BN) {
+    if (!AnchorProvider || !Program) {
       throw new Error(
-        "Anchor exports missing (AnchorProvider/Program/BN). " +
-          "This usually means the module was bundled differently. " +
-          "Try forcing runtime=nodejs and using dynamic import (already set)."
+        "Anchor exports missing (AnchorProvider/Program). " +
+          "Ensure this route runs in the Node.js runtime (runtime=nodejs) and that @coral-xyz/anchor is installed."
       );
     }
+
+    // BN is sometimes not exported as expected in some builds; fall back to dynamic bn.js import.
+    const BN: any = BNClass ?? (await import("bn.js").then((m: any) => m?.default ?? m));
+    if (!BN) throw new Error("BN not available (anchor.BN or bn.js)");
 
     const RPC = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
     const PROGRAM_ID = process.env.VERIFICATION_PROGRAM_ID || "Ev4pb62pHYcFHLmV89JRcgQtS39ndBia51X9ne9NmBkH";
@@ -94,6 +104,8 @@ export async function POST(req: Request) {
 
     const walletStr = mustString(payload?.wallet, "payload.wallet missing/invalid");
     const ts = mustString(String(payload?.ts ?? ""), "payload.ts missing/invalid");
+
+    dbg("payload", { daoIdStr, platform, platformSeed, wallet: walletStr, ts });
 
     // ✅ Build exactly the message your client signs (must match byte-for-byte)
     const msg =
@@ -123,6 +135,8 @@ export async function POST(req: Request) {
       );
     }
 
+    dbg("signature_ok", { wallet: walletPk.toBase58(), sigLen: sig.length });
+
     const connection = new Connection(RPC, "confirmed");
     const programId = mustPubkey(PROGRAM_ID, "VERIFICATION_PROGRAM_ID missing/invalid");
 
@@ -140,6 +154,7 @@ export async function POST(req: Request) {
 
     const provider = new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
     const program = await Program.at(programId, provider);
+    if (!program) throw new Error("Program.at returned null/undefined");
 
     const daoId = mustPubkey(daoIdStr, "payload.daoId missing/invalid");
 
@@ -158,39 +173,57 @@ export async function POST(req: Request) {
       programId
     );
 
+    dbg("pdas", {
+      programId: programId.toBase58(),
+      spacePda: spacePda.toBase58(),
+      identityPda: identityPda.toBase58(),
+      linkPda: linkPda.toBase58(),
+    });
+
     const expiresAt = new BN(0); // i64 => BN
+    dbg("expiresAt", { expiresAtType: typeof expiresAt, hasWords: !!(expiresAt as any)?.words });
 
-    await (program as any).methods
-      .attestIdentity(
-        daoId,
-        platformEnumObject(platform),
-        platformSeed,
-        Array.from(idHash),
-        expiresAt
-      )
-      .accounts({
-        spaceAcct: spacePda,
-        attestor: kp.publicKey,
-        identity: identityPda,
-        payer: kp.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([kp])
-      .rpc();
+    try {
+      await (program as any).methods
+        .attestIdentity(
+          daoId,
+          platformEnumObject(platform),
+          platformSeed,
+          Array.from(idHash),
+          expiresAt
+        )
+        .accounts({
+          spaceAcct: spacePda,
+          attestor: kp.publicKey,
+          identity: identityPda,
+          payer: kp.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([kp])
+        .rpc();
+    } catch (e: any) {
+      dbg("attestIdentity_failed", { message: String(e?.message || e), stack: e?.stack });
+      throw new Error(`attestIdentity failed: ${String(e?.message || e)}`);
+    }
 
-    await (program as any).methods
-      .linkWallet(daoId, Array.from(walletHash))
-      .accounts({
-        spaceAcct: spacePda,
-        attestor: kp.publicKey,
-        identity: identityPda,
-        wallet: walletPk,
-        link: linkPda,
-        payer: kp.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([kp])
-      .rpc();
+    try {
+      await (program as any).methods
+        .linkWallet(daoId, Array.from(walletHash))
+        .accounts({
+          spaceAcct: spacePda,
+          attestor: kp.publicKey,
+          identity: identityPda,
+          wallet: walletPk,
+          link: linkPda,
+          payer: kp.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([kp])
+        .rpc();
+    } catch (e: any) {
+      dbg("linkWallet_failed", { message: String(e?.message || e), stack: e?.stack });
+      throw new Error(`linkWallet failed: ${String(e?.message || e)}`);
+    }
 
     return NextResponse.json({
       ok: true,
@@ -201,13 +234,16 @@ export async function POST(req: Request) {
     });
   } catch (e: any) {
     const message = String(e?.message || e);
-    // Keep stack available for debugging, but don't always spam the UI.
-    const includeStack = process.env.NODE_ENV !== "production";
+    const stack = e?.stack ? String(e.stack) : undefined;
 
     return NextResponse.json(
       {
         error: message,
-        ...(includeStack && e?.stack ? { stack: String(e.stack) } : {}),
+        ...(stack ? { stack } : {}),
+        hint:
+          message.includes("_bn")
+            ? "A PublicKey/BN was undefined. Check that all env vars are set and that payload fields are valid; enable GV_DEBUG_ATTESTOR=1 to see step logs."
+            : undefined,
       },
       { status: 500 }
     );
