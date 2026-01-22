@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import nacl from "tweetnacl";
 import { Connection, Keypair, PublicKey, Transaction, SystemProgram } from "@solana/web3.js";
+import BN from "bn.js";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,8 @@ function must<T>(v: T | null | undefined, msg: string): T {
 
 export async function POST(req: Request) {
   try {
-    const anchor = await import("@coral-xyz/anchor");
+    const anchorMod = await import("@coral-xyz/anchor");
+    const { AnchorProvider, Program } = anchorMod as any;
 
     const RPC = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
     const PROGRAM_ID = process.env.VERIFICATION_PROGRAM_ID || "Ev4pb62pHYcFHLmV89JRcgQtS39ndBia51X9ne9NmBkH";
@@ -92,12 +94,12 @@ export async function POST(req: Request) {
       },
     };
 
-    const provider = new anchor.AnchorProvider(connection, wallet as any, {
+    const provider = new AnchorProvider(connection, wallet as any, {
       commitment: "confirmed",
     });
 
     // Fetch IDL from chain
-    const program = await anchor.Program.at(programId, provider);
+    const program = await Program.at(programId, provider);
 
     // Parse inputs
     const daoId = new PublicKey(payload.daoId);
@@ -130,7 +132,7 @@ export async function POST(req: Request) {
     );
 
     // IMPORTANT: i64 args should be BN
-    const expiresAt = new anchor.BN(0);
+    const expiresAt = new BN(0);
 
     // 1) Attest identity
     await (program as any).methods
@@ -174,6 +176,12 @@ export async function POST(req: Request) {
       attestor: kp.publicKey.toBase58(),
     });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: String(e?.message || e),
+        stack: e?.stack ? String(e.stack) : undefined,
+      },
+      { status: 500 }
+    );
   }
 }
