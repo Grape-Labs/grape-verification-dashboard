@@ -1,0 +1,8 @@
+html, body { height: 100%; }
+
+body {
+  background:
+    radial-gradient(circle at 12px 12px, rgba(0,0,0,0.08) 2px, transparent 2.5px) 0 0/18px 18px,
+    radial-gradient(circle at 9px 9px, rgba(0,179,255,0.10) 2px, transparent 2.5px) 0 0/24px 24px,
+    linear-gradient(180deg, #f9fbff, #f6f7fb);
+}
