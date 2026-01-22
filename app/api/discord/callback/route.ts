@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+function getOrigin(req: Request) {
+  return new URL(req.url).origin;
+}
+
 async function exchangeCodeForToken(code: string, redirectUri: string) {
   const clientId = process.env.DISCORD_CLIENT_ID!;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET!;
@@ -21,10 +25,16 @@ async function exchangeCodeForToken(code: string, redirectUri: string) {
 
   if (!resp.ok) {
     const t = await resp.text().catch(() => "");
-    throw new Error(`Token exchange failed (${resp.status}): ${t || resp.statusText}`);
+    throw new Error(
+      `Token exchange failed (${resp.status}): ${t || resp.statusText}`
+    );
   }
 
-  return resp.json() as Promise<{ access_token: string; token_type: string; expires_in: number }>;
+  return resp.json() as Promise<{
+    access_token: string;
+    token_type: string;
+    expires_in: number;
+  }>;
 }
 
 async function fetchDiscordMe(accessToken: string) {
@@ -34,29 +44,47 @@ async function fetchDiscordMe(accessToken: string) {
 
   if (!resp.ok) {
     const t = await resp.text().catch(() => "");
-    throw new Error(`Fetch /users/@me failed (${resp.status}): ${t || resp.statusText}`);
+    throw new Error(
+      `Fetch /users/@me failed (${resp.status}): ${t || resp.statusText}`
+    );
   }
 
-  return resp.json() as Promise<{ id: string; username: string; global_name?: string; avatar?: string }>;
+  return resp.json() as Promise<{
+    id: string;
+    username: string;
+    global_name?: string;
+    avatar?: string;
+  }>;
 }
 
 export async function GET(req: Request) {
   const reqUrl = new URL(req.url);
+  const origin = getOrigin(req);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
 
-  if (!appUrl) return NextResponse.json({ error: "NEXT_PUBLIC_APP_URL missing" }, { status: 500 });
-  if (!clientId) return NextResponse.json({ error: "DISCORD_CLIENT_ID missing" }, { status: 500 });
-  if (!clientSecret) return NextResponse.json({ error: "DISCORD_CLIENT_SECRET missing" }, { status: 500 });
+  if (!clientId)
+    return NextResponse.json(
+      { error: "DISCORD_CLIENT_ID missing" },
+      { status: 500 }
+    );
+  if (!clientSecret)
+    return NextResponse.json(
+      { error: "DISCORD_CLIENT_SECRET missing" },
+      { status: 500 }
+    );
 
   const code = reqUrl.searchParams.get("code");
   const state = reqUrl.searchParams.get("state");
 
-  if (!code || !state) return NextResponse.json({ error: "Missing code/state" }, { status: 400 });
+  if (!code || !state)
+    return NextResponse.json(
+      { error: "Missing code/state" },
+      { status: 400 }
+    );
 
-  // Validate state against cookie
+  // Parse cookies
   const cookieHeader = req.headers.get("cookie") || "";
   const cookies = Object.fromEntries(
     cookieHeader
@@ -76,40 +104,62 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Invalid state" }, { status: 400 });
   }
 
-  const redirectUri = `${appUrl.replace(/\/+$/, "")}/api/discord/callback`;
+  // 🔒 Ensure same redirect_uri used in /start
+  const redirectUri = `${origin}/api/discord/callback`;
 
   try {
     const tok = await exchangeCodeForToken(code, redirectUri);
     const me = await fetchDiscordMe(tok.access_token);
 
-    // Store only what you need (id + friendly label). No access token stored.
-    const isHttps = appUrl.startsWith("https://");
+    const isHttps = origin.startsWith("https://");
 
-    const res = NextResponse.redirect(new URL(returnTo, appUrl).toString());
+    // Prevent open redirects
+    const safeReturnTo =
+      returnTo.startsWith("/") && !returnTo.startsWith("//")
+        ? returnTo
+        : "/";
 
-    // Clear oauth cookies
-    res.cookies.set("gv_discord_oauth_state", "", { path: "/", maxAge: 0 });
-    res.cookies.set("gv_discord_return_to", "", { path: "/", maxAge: 0 });
+    const res = NextResponse.redirect(
+      new URL(safeReturnTo, origin).toString()
+    );
 
-    res.cookies.set("gv_discord_id", me.id, {
-      httpOnly: true,
-      secure: isHttps,
-      sameSite: "lax",
+    // Clear OAuth temp cookies
+    res.cookies.set("gv_discord_oauth_state", "", {
       path: "/",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 0,
+    });
+    res.cookies.set("gv_discord_return_to", "", {
+      path: "/",
+      maxAge: 0,
     });
 
-    // non-httpOnly “display” cookie for UI (optional)
-    res.cookies.set("gv_discord_label", me.global_name || me.username || "Discord", {
-      httpOnly: false,
+    // Store Discord ID (httpOnly)
+    res.cookies.set("gv_discord_id", me.id, {
+      httpOnly: true,
       secure: isHttps,
       sameSite: "lax",
       path: "/",
       maxAge: 7 * 24 * 60 * 60,
     });
 
+    // UI-friendly label (non-httpOnly)
+    res.cookies.set(
+      "gv_discord_label",
+      me.global_name || me.username || "Discord",
+      {
+        httpOnly: false,
+        secure: isHttps,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60,
+      }
+    );
+
     return res;
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json(
+      { error: String(e?.message || e) },
+      { status: 500 }
+    );
   }
 }
