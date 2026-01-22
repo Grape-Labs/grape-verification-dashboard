@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import nacl from "tweetnacl";
 import { Connection, Keypair, PublicKey, Transaction, SystemProgram } from "@solana/web3.js";
-import BN from "bn.js";
 
 export const runtime = "nodejs";
 
@@ -12,7 +11,6 @@ function parseSecretKey(env: string): Uint8Array {
 }
 
 function platformEnumObject(platform: string) {
-  // Anchor enum encoding for Rust enums in methods args
   switch ((platform || "").toLowerCase()) {
     case "discord": return { discord: {} };
     case "telegram": return { telegram: {} };
@@ -22,58 +20,66 @@ function platformEnumObject(platform: string) {
   }
 }
 
-function must<T>(v: T | null | undefined, msg: string): T {
-  if (v === null || v === undefined || (typeof v === "string" && !v.trim())) {
-    throw new Error(msg);
-  }
-  return v as T;
+function mustString(v: any, msg: string): string {
+  if (typeof v !== "string" || !v.trim()) throw new Error(msg);
+  return v.trim();
+}
+
+function mustNumber(v: any, msg: string): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) throw new Error(msg);
+  return n;
+}
+
+function mustHex32(v: any, msg: string): Uint8Array {
+  const s = mustString(v, msg);
+  const bytes = Uint8Array.from(Buffer.from(s, "hex"));
+  if (bytes.length !== 32) throw new Error(`${msg} (must be 32 bytes hex)`);
+  return bytes;
 }
 
 export async function POST(req: Request) {
   try {
     const anchorMod = await import("@coral-xyz/anchor");
-    const { AnchorProvider, Program } = anchorMod as any;
+    const { AnchorProvider, Program, BN } = anchorMod as any;
 
     const RPC = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
     const PROGRAM_ID = process.env.VERIFICATION_PROGRAM_ID || "Ev4pb62pHYcFHLmV89JRcgQtS39ndBia51X9ne9NmBkH";
-    // AFTER
-    const ATTESTOR_SK = process.env.ATTESTOR_SECRET_KEY;
-    must(ATTESTOR_SK, "ATTESTOR_SECRET_KEY missing");
 
-    // ✅ re-bind after check so TS knows it’s a string
-    const attestorSk = ATTESTOR_SK as string;
-    const kp = Keypair.fromSecretKey(parseSecretKey(attestorSk));
+    const ATTESTOR_SK = mustString(process.env.ATTESTOR_SECRET_KEY, "ATTESTOR_SECRET_KEY missing");
+    const kp = Keypair.fromSecretKey(parseSecretKey(ATTESTOR_SK));
 
-    const { payload, signatureBase64 } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body) throw new Error("Invalid JSON body");
 
-    must(payload, "Missing payload");
-    must(payload.daoId, "payload.daoId missing");
-    must(payload.platform, "payload.platform missing");
-    must(payload.platformSeed, "payload.platformSeed missing");
-    must(payload.idHashHex, "payload.idHashHex missing");
-    must(payload.wallet, "payload.wallet missing");
-    must(payload.walletHashHex, "payload.walletHashHex missing");
-    must(payload.ts, "payload.ts missing");
-    must(signatureBase64, "signatureBase64 missing");
+    const payload = body.payload;
+    const signatureBase64 = mustString(body.signatureBase64, "signatureBase64 missing");
 
-    // Verify wallet signature (your exact message format)
+    // ✅ strict payload guards (these prevent `_bn` undefined errors)
+    const daoIdStr = mustString(payload?.daoId, "payload.daoId missing/invalid");
+    const platform = mustString(payload?.platform, "payload.platform missing/invalid");
+    const platformSeed = mustNumber(payload?.platformSeed, "payload.platformSeed missing/invalid");
+
+    const idHash = mustHex32(payload?.idHashHex, "payload.idHashHex missing/invalid");
+    const walletHash = mustHex32(payload?.walletHashHex, "payload.walletHashHex missing/invalid");
+
+    const walletStr = mustString(payload?.wallet, "payload.wallet missing/invalid");
+    const ts = mustString(String(payload?.ts ?? ""), "payload.ts missing/invalid");
+
+    // ✅ Build exactly the message your client signs (must match byte-for-byte)
     const msg =
       `Grape Verification Link Request\n` +
-      `daoId=${payload.daoId}\n` +
-      `platform=${payload.platform}\n` +
-      `idHash=${payload.idHashHex}\n` +
-      `wallet=${payload.wallet}\n` +
-      `walletHash=${payload.walletHashHex}\n` +
-      `ts=${payload.ts}\n`;
+      `daoId=${daoIdStr}\n` +
+      `platform=${platform}\n` +
+      `idHash=${Buffer.from(idHash).toString("hex")}\n` +
+      `wallet=${walletStr}\n` +
+      `walletHash=${Buffer.from(walletHash).toString("hex")}\n` +
+      `ts=${ts}\n`;
 
     const sig = Buffer.from(signatureBase64, "base64");
-    const walletPk = new PublicKey(payload.wallet);
+    const walletPk = new PublicKey(walletStr);
 
-    const ok = nacl.sign.detached.verify(
-      Buffer.from(msg),
-      sig,
-      walletPk.toBytes()
-    );
+    const ok = nacl.sign.detached.verify(Buffer.from(msg), sig, walletPk.toBytes());
     if (!ok) {
       return NextResponse.json({ error: "Invalid wallet signature" }, { status: 400 });
     }
@@ -81,7 +87,6 @@ export async function POST(req: Request) {
     const connection = new Connection(RPC, "confirmed");
     const programId = new PublicKey(PROGRAM_ID);
 
-    // Minimal wallet shim for AnchorProvider
     const wallet = {
       publicKey: kp.publicKey,
       signTransaction: async (tx: Transaction) => {
@@ -94,35 +99,18 @@ export async function POST(req: Request) {
       },
     };
 
-    const provider = new AnchorProvider(connection, wallet as any, {
-      commitment: "confirmed",
-    });
-
-    // Fetch IDL from chain
+    const provider = new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
     const program = await Program.at(programId, provider);
 
-    // Parse inputs
-    const daoId = new PublicKey(payload.daoId);
-    const platformSeed = Number(payload.platformSeed);
-    const idHash = Uint8Array.from(Buffer.from(payload.idHashHex, "hex"));
-    const walletHash = Uint8Array.from(Buffer.from(payload.walletHashHex, "hex"));
+    const daoId = new PublicKey(daoIdStr);
 
-    if (idHash.length !== 32) throw new Error("idHashHex must be 32 bytes");
-    if (walletHash.length !== 32) throw new Error("walletHashHex must be 32 bytes");
-
-    // PDAs
     const [spacePda] = PublicKey.findProgramAddressSync(
       [Buffer.from("space"), daoId.toBuffer()],
       programId
     );
 
     const [identityPda] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("identity"),
-        spacePda.toBuffer(),
-        Buffer.from([platformSeed]),
-        Buffer.from(idHash),
-      ],
+      [Buffer.from("identity"), spacePda.toBuffer(), Buffer.from([platformSeed]), Buffer.from(idHash)],
       programId
     );
 
@@ -131,29 +119,26 @@ export async function POST(req: Request) {
       programId
     );
 
-    // IMPORTANT: i64 args should be BN
-    const expiresAt = new BN(0);
+    const expiresAt = new BN(0); // ✅ Anchor BN (no bn.js import)
 
-    // 1) Attest identity
     await (program as any).methods
       .attestIdentity(
         daoId,
-        platformEnumObject(payload.platform), // enum
-        platformSeed,                         // u8
-        Array.from(idHash),                   // [u8;32]
-        expiresAt                             // i64
+        platformEnumObject(platform),
+        platformSeed,
+        Array.from(idHash),
+        expiresAt
       )
       .accounts({
         spaceAcct: spacePda,
         attestor: kp.publicKey,
         identity: identityPda,
         payer: kp.publicKey,
-        systemProgram: SystemProgram.programId, // ✅ from web3.js (NOT anchor.web3)
+        systemProgram: SystemProgram.programId,
       })
       .signers([kp])
       .rpc();
 
-    // 2) Link wallet
     await (program as any).methods
       .linkWallet(daoId, Array.from(walletHash))
       .accounts({
@@ -177,10 +162,7 @@ export async function POST(req: Request) {
     });
   } catch (e: any) {
     return NextResponse.json(
-      {
-        error: String(e?.message || e),
-        stack: e?.stack ? String(e.stack) : undefined,
-      },
+      { error: String(e?.message || e), stack: e?.stack ? String(e.stack) : undefined },
       { status: 500 }
     );
   }
