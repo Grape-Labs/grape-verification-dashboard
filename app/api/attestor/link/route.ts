@@ -56,8 +56,20 @@ function mustHex32(v: any, msg: string): Uint8Array {
 
 export async function POST(req: Request) {
   try {
-    const anchorMod = await import("@coral-xyz/anchor");
-    const { AnchorProvider, Program, BN } = anchorMod as any;
+    const anchorMod: any = await import("@coral-xyz/anchor");
+
+    // Anchor sometimes ends up under `.default` depending on bundler/runtime.
+    const AnchorProvider = anchorMod.AnchorProvider ?? anchorMod.default?.AnchorProvider;
+    const Program = anchorMod.Program ?? anchorMod.default?.Program;
+    const BN = anchorMod.BN ?? anchorMod.default?.BN;
+
+    if (!AnchorProvider || !Program || !BN) {
+      throw new Error(
+        "Anchor exports missing (AnchorProvider/Program/BN). " +
+          "This usually means the module was bundled differently. " +
+          "Try forcing runtime=nodejs and using dynamic import (already set)."
+      );
+    }
 
     const RPC = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
     const PROGRAM_ID = process.env.VERIFICATION_PROGRAM_ID || "Ev4pb62pHYcFHLmV89JRcgQtS39ndBia51X9ne9NmBkH";
@@ -146,7 +158,7 @@ export async function POST(req: Request) {
       programId
     );
 
-    const expiresAt = new BN(0); // ✅ Anchor BN (no bn.js import)
+    const expiresAt = new BN(0); // i64 => BN
 
     await (program as any).methods
       .attestIdentity(
@@ -188,8 +200,15 @@ export async function POST(req: Request) {
       attestor: kp.publicKey.toBase58(),
     });
   } catch (e: any) {
+    const message = String(e?.message || e);
+    // Keep stack available for debugging, but don't always spam the UI.
+    const includeStack = process.env.NODE_ENV !== "production";
+
     return NextResponse.json(
-      { error: String(e?.message || e), stack: e?.stack ? String(e.stack) : undefined },
+      {
+        error: message,
+        ...(includeStack && e?.stack ? { stack: String(e.stack) } : {}),
+      },
       { status: 500 }
     );
   }
