@@ -153,8 +153,27 @@ export async function POST(req: Request) {
     };
 
     const provider = new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
-    const program = await Program.at(programId, provider);
-    if (!program) throw new Error("Program.at returned null/undefined");
+
+    // ✅ Avoid Program.at() here.
+    // In some Next.js/Turbopack runtimes, Program.at() can crash inside Anchor's translateAddress
+    // when it tries to translate an undefined address from IDL metadata.
+    // Fetch the IDL explicitly and construct the Program with an explicit programId.
+    dbg("fetch_idl_start", { programId: programId.toBase58() });
+    const idl = await (Program as any).fetchIdl(programId, provider);
+    if (!idl) {
+      throw new Error(
+        "IDL not found on-chain for this program. " +
+          "Ensure the program is deployed to the selected cluster and the IDL was uploaded."
+      );
+    }
+    dbg("fetch_idl_ok", {
+      hasMetadata: !!(idl as any)?.metadata,
+      name: (idl as any)?.name,
+      version: (idl as any)?.version,
+    });
+
+    const program = new (Program as any)(idl, programId, provider);
+    if (!program) throw new Error("Program construction failed");
 
     const daoId = mustPubkey(daoIdStr, "payload.daoId missing/invalid");
 
