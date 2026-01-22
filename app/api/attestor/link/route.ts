@@ -385,10 +385,32 @@ export async function POST(req: Request) {
     tx.partialSign(kp);
 
     // Sim first (best debugging)
-    const sim = await connection.simulateTransaction(tx, {
-      sigVerify: false,
-      commitment: "processed",
-    });
+    const sim = await connection.simulateTransaction(
+    tx,
+    [], // tx already partialSign(kp)
+    );
+
+    if (sim.value.err) {
+    return NextResponse.json(
+        {
+        error: "Simulation failed",
+        simErr: sim.value.err,
+        logs: sim.value.logs || [],
+        derived: {
+            spacePda: spacePda.toBase58(),
+            identityPda: identityPda.toBase58(),
+            linkPda: linkPda.toBase58(),
+            idHashHex,
+            walletHashHex,
+            platformUserId,
+            platform_seed,
+        },
+        hint:
+            "Common causes: (1) space.attestor != ATTESTOR pubkey, (2) wrong cluster/RPC (devnet vs mainnet), (3) using a different DAO/space than the one initialized.",
+        },
+        { status: 500 }
+    );
+    }
 
     if (sim.value.err) {
       return NextResponse.json(
