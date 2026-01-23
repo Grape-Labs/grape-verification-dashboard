@@ -4,18 +4,19 @@ import crypto from "crypto";
 import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
 
 import {
-    VerificationPlatform,
-    identityHash,
-    walletHash,
-    TAG_DISCORD,
-    TAG_TELEGRAM,
-    TAG_TWITTER,
-    TAG_EMAIL,
-    buildAttestIdentityIx,
-    buildLinkWalletIx,
-    deriveSpacePda,
-    deriveIdentityPda,
-    deriveLinkPda,
+  PROGRAM_ID as REGISTRY_PROGRAM_ID,
+  VerificationPlatform,
+  identityHash,
+  walletHash,
+  TAG_DISCORD,
+  TAG_TELEGRAM,
+  TAG_TWITTER,
+  TAG_EMAIL,
+  buildAttestIdentityIx,
+  buildLinkWalletIx,
+  deriveSpacePda,
+  deriveIdentityPda,
+  deriveLinkPda,
 } from "@grapenpm/grape-verification-registry";
 
 export const runtime = "nodejs";
@@ -169,41 +170,6 @@ function requireU8Array32(name: string, v: any): Uint8Array {
   return u8;
 }
 
-function deriveSpacePdaStrict(programId: PublicKey, daoPk: PublicKey) {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("space"), daoPk.toBuffer()],
-    programId
-  );
-}
-
-function deriveIdentityPdaStrict(
-  programId: PublicKey,
-  spacePda: PublicKey,
-  platformSeedU8: number,
-  idHash: Uint8Array
-) {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("identity"),
-      spacePda.toBuffer(),
-      Buffer.from([platformSeedU8 & 0xff]),
-      Buffer.from(idHash),
-    ],
-    programId
-  );
-}
-
-function deriveLinkPdaStrict(
-  programId: PublicKey,
-  identityPda: PublicKey,
-  walletHashBytes: Uint8Array
-) {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("link"), identityPda.toBuffer(), Buffer.from(walletHashBytes)],
-    programId
-  );
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null);
@@ -222,7 +188,6 @@ export async function POST(req: Request) {
     const attestorSk = process.env.ATTESTOR_SECRET_KEY;
     const discordProofSecret = process.env.DISCORD_PROOF_SECRET;
 
-    if (!programIdStr) return NextResponse.json({ error: "NEXT_PUBLIC_REGISTRY_PROGRAM_ID missing" }, { status: 500 });
     if (!rpc) return NextResponse.json({ error: "NEXT_PUBLIC_SOLANA_RPC missing" }, { status: 500 });
     if (!attestorSk) return NextResponse.json({ error: "ATTESTOR_SECRET_KEY missing" }, { status: 500 });
 
@@ -252,7 +217,22 @@ export async function POST(req: Request) {
 
     const daoPk = new PublicKey(daoId);
     const walletPk = new PublicKey(walletStr);
-    const programId = new PublicKey(programIdStr);
+
+    // Single source of truth: always use the program id baked into the registry package
+    const programId = REGISTRY_PROGRAM_ID;
+
+    // If you also set NEXT_PUBLIC_REGISTRY_PROGRAM_ID, ensure it matches the package.
+    if (programIdStr && programIdStr !== programId.toBase58()) {
+      return NextResponse.json(
+        {
+          error: "Program ID mismatch",
+          env: programIdStr,
+          package: programId.toBase58(),
+          hint: "NEXT_PUBLIC_REGISTRY_PROGRAM_ID must match the PROGRAM_ID inside @grapenpm/grape-verification-registry. Rebuild/publish the package with the deployed program id, or update env to match.",
+        },
+        { status: 500 }
+      );
+    }
 
     const connection = new Connection(rpc, { commitment: "confirmed" });
 
@@ -287,7 +267,7 @@ export async function POST(req: Request) {
     const platform_seed = platformSeed(platform);
 
     // PDAs (server truth)
-   const [identityPda] = deriveIdentityPda(spacePda, platform_seed, idh);
+    const [identityPda] = deriveIdentityPda(spacePda, platform_seed, idh);
     const [linkPda] = deriveLinkPda(identityPda, wh);
 
     const idHashHex = bytesToHex(idh);
