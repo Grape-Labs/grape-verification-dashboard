@@ -14,7 +14,7 @@
     "@emotion/styled": "^11.14.1",
     "@fontsource/bangers": "^5.2.8",
     "@fontsource/roboto-mono": "^5.2.8",
-    "@grapenpm/grape-verification-registry": "0.1.2",
+    "@grapenpm/grape-verification-registry": "0.1.3",
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
     "@solana/wallet-adapter-react": "^0.15.39",

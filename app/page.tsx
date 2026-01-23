@@ -714,12 +714,13 @@ export default function Page() {
           <Divider sx={{ my: 2 }} />
 
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {/*
             <Chip
               icon={<BoltIcon />}
               label="Comic Mode"
               color="secondary"
               sx={{ fontFamily: "system-ui" }}
-            />
+            */}
             <Chip
               icon={<VerifiedIcon />}
               label={`Identity: ${identityStatus}`}
