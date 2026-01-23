@@ -419,11 +419,10 @@ export async function POST(req: Request) {
     tx.recentBlockhash = blockhash;
     tx.partialSign(kp);
 
-    // Sim first (best debugging)
-    const sim = await connection.simulateTransaction(tx, {
-      commitment: "processed",
-      sigVerify: false,
-    });
+        const sim = await (connection as any).simulateTransaction(tx, {
+        commitment: "processed",
+        sigVerify: false,
+        });
 
     if (sim.value.err) {
       return NextResponse.json(
