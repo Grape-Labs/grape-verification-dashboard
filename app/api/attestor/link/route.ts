@@ -1,14 +1,8 @@
+// app/api/attestor/link/route.ts
 import { NextResponse } from "next/server";
 import nacl from "tweetnacl";
 import crypto from "crypto";
-import * as anchor from "@coral-xyz/anchor";
-import {
-  Connection,
-  Keypair,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-} from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
 
 import {
   VerificationPlatform,
@@ -18,6 +12,9 @@ import {
   TAG_TELEGRAM,
   TAG_TWITTER,
   TAG_EMAIL,
+  // ✅ use raw ix builders (no anchor Program.at / .methods)
+  buildAttestIdentityIx,
+  buildLinkWalletIx,
 } from "@grapenpm/grape-verification-registry";
 
 export const runtime = "nodejs";
@@ -54,7 +51,8 @@ function parseSecretKey(sk: string): Uint8Array {
   // JSON array string: "[1,2,3,...]"
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
     const arr = JSON.parse(trimmed);
-    if (!Array.isArray(arr)) throw new Error("ATTESTOR_SECRET_KEY must be a JSON array");
+    if (!Array.isArray(arr))
+      throw new Error("ATTESTOR_SECRET_KEY must be a JSON array");
     return Uint8Array.from(arr.map((n: any) => Number(n)));
   }
 
@@ -128,11 +126,13 @@ function verifyDiscordProof(proof: string, secret: string) {
   const payloadJson = b64urlToBuf(parts[1]).toString("utf8");
   const payload = JSON.parse(payloadJson);
 
-  if (payload?.aud !== "grape-verification") throw new Error("Invalid discord proof audience");
+  if (payload?.aud !== "grape-verification")
+    throw new Error("Invalid discord proof audience");
   if (!payload?.discordId) throw new Error("Missing discordId in proof");
 
   const now = Math.floor(Date.now() / 1000);
-  if (payload?.exp && now > Number(payload.exp)) throw new Error("Discord proof expired");
+  if (payload?.exp && now > Number(payload.exp))
+    throw new Error("Discord proof expired");
 
   return { discordId: String(payload.discordId) };
 }
@@ -158,7 +158,10 @@ function buildConsentMessage(p: {
 }
 
 function deriveSpacePdaStrict(programId: PublicKey, daoPk: PublicKey) {
-  return PublicKey.findProgramAddressSync([Buffer.from("space"), daoPk.toBuffer()], programId);
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("space"), daoPk.toBuffer()],
+    programId
+  );
 }
 
 function deriveIdentityPdaStrict(
@@ -168,12 +171,21 @@ function deriveIdentityPdaStrict(
   idHash: Uint8Array
 ) {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("identity"), spacePda.toBuffer(), Buffer.from([platformSeedU8 & 0xff]), Buffer.from(idHash)],
+    [
+      Buffer.from("identity"),
+      spacePda.toBuffer(),
+      Buffer.from([platformSeedU8 & 0xff]),
+      Buffer.from(idHash),
+    ],
     programId
   );
 }
 
-function deriveLinkPdaStrict(programId: PublicKey, identityPda: PublicKey, walletHashBytes: Uint8Array) {
+function deriveLinkPdaStrict(
+  programId: PublicKey,
+  identityPda: PublicKey,
+  walletHashBytes: Uint8Array
+) {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("link"), identityPda.toBuffer(), Buffer.from(walletHashBytes)],
     programId
@@ -190,28 +202,46 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing payload" }, { status: 400 });
     }
     if (!signatureBase64 || typeof signatureBase64 !== "string") {
-      return NextResponse.json({ error: "Missing signatureBase64" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing signatureBase64" },
+        { status: 400 }
+      );
     }
 
     const programIdStr = process.env.NEXT_PUBLIC_REGISTRY_PROGRAM_ID;
-    const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC || process.env.REACT_APP_RPC_ENDPOINT;
+    const rpc =
+      process.env.NEXT_PUBLIC_SOLANA_RPC || process.env.REACT_APP_RPC_ENDPOINT;
     const attestorSk = process.env.ATTESTOR_SECRET_KEY;
     const discordProofSecret = process.env.DISCORD_PROOF_SECRET;
 
     if (!programIdStr)
-      return NextResponse.json({ error: "NEXT_PUBLIC_REGISTRY_PROGRAM_ID missing" }, { status: 500 });
+      return NextResponse.json(
+        { error: "NEXT_PUBLIC_REGISTRY_PROGRAM_ID missing" },
+        { status: 500 }
+      );
     if (!rpc)
-      return NextResponse.json({ error: "NEXT_PUBLIC_SOLANA_RPC missing" }, { status: 500 });
+      return NextResponse.json(
+        { error: "NEXT_PUBLIC_SOLANA_RPC missing" },
+        { status: 500 }
+      );
     if (!attestorSk)
-      return NextResponse.json({ error: "ATTESTOR_SECRET_KEY missing" }, { status: 500 });
+      return NextResponse.json(
+        { error: "ATTESTOR_SECRET_KEY missing" },
+        { status: 500 }
+      );
 
     const daoId = String(payload.daoId || payload.daoIdStr || "").trim();
     const platform = String(payload.platform || "discord").trim();
     const walletStr = String(payload.wallet || "").trim();
     const ts = payload.ts;
 
-    if (!daoId) return NextResponse.json({ error: "payload.daoId missing" }, { status: 400 });
-    if (!walletStr) return NextResponse.json({ error: "payload.wallet missing" }, { status: 400 });
+    if (!daoId)
+      return NextResponse.json({ error: "payload.daoId missing" }, { status: 400 });
+    if (!walletStr)
+      return NextResponse.json(
+        { error: "payload.wallet missing" },
+        { status: 400 }
+      );
 
     const platformProof = payload.platformProof ? String(payload.platformProof) : "";
     if (platform === "discord") {
@@ -225,7 +255,8 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             error: "payload.platformProof missing (connect Discord first)",
-            hint: "Call /api/discord/proof after OAuth connect and include the returned `proof` as payload.platformProof.",
+            hint:
+              "Call /api/discord/proof after OAuth connect and include the returned `proof` as payload.platformProof.",
           },
           { status: 400 }
         );
@@ -256,7 +287,10 @@ export async function POST(req: Request) {
       platformUserId = proof.discordId;
     }
     if (!platformUserId) {
-      return NextResponse.json({ error: "platformUserId missing" }, { status: 400 });
+      return NextResponse.json(
+        { error: "platformUserId missing" },
+        { status: 400 }
+      );
     }
 
     // Derive id_hash, wallet_hash, PDAs from salt (server truth)
@@ -264,7 +298,12 @@ export async function POST(req: Request) {
     const wh = walletHash(salt, walletPk);
 
     const platform_seed = platformSeed(platform);
-    const [identityPda] = deriveIdentityPdaStrict(programId, spacePda, platform_seed, idh);
+    const [identityPda] = deriveIdentityPdaStrict(
+      programId,
+      spacePda,
+      platform_seed,
+      idh
+    );
     const [linkPda] = deriveLinkPdaStrict(programId, identityPda, wh);
 
     const idHashHex = bytesToHex(idh);
@@ -296,11 +335,23 @@ export async function POST(req: Request) {
     });
 
     const sigBytes = Buffer.from(signatureBase64, "base64");
-    if (sigBytes.length !== 64)
-      return NextResponse.json({ error: "signatureBase64 must decode to 64 bytes" }, { status: 400 });
+    if (sigBytes.length !== 64) {
+      return NextResponse.json(
+        { error: "signatureBase64 must decode to 64 bytes" },
+        { status: 400 }
+      );
+    }
 
-    const ok = nacl.sign.detached.verify(message, new Uint8Array(sigBytes), walletPk.toBytes());
-    if (!ok) return NextResponse.json({ error: "Invalid wallet signature" }, { status: 400 });
+    const ok = nacl.sign.detached.verify(
+      message,
+      new Uint8Array(sigBytes),
+      walletPk.toBytes()
+    );
+    if (!ok)
+      return NextResponse.json(
+        { error: "Invalid wallet signature" },
+        { status: 400 }
+      );
 
     dbg("signature_ok", { wallet: walletPk.toBase58(), sigLen: sigBytes.length });
 
@@ -316,106 +367,63 @@ export async function POST(req: Request) {
           error: "Attestor fee-payer has insufficient SOL",
           feePayer: kp.publicKey.toBase58(),
           lamports: bal,
-          hint: "Fund ATTESTOR_SECRET_KEY's pubkey on the same cluster as NEXT_PUBLIC_SOLANA_RPC (devnet vs mainnet).",
+          hint:
+            "Fund ATTESTOR_SECRET_KEY's pubkey on the same cluster as NEXT_PUBLIC_SOLANA_RPC (devnet vs mainnet).",
         },
         { status: 500 }
       );
     }
 
-    const walletShim = {
-      publicKey: kp.publicKey,
-      signTransaction: async (tx: Transaction) => {
-        tx.partialSign(kp);
-        return tx;
-      },
-      signAllTransactions: async (txs: Transaction[]) => {
-        for (const tx of txs) tx.partialSign(kp);
-        return txs;
-      },
-    } as any;
-
-    const provider = new anchor.AnchorProvider(connection as any, walletShim, {
-      commitment: "confirmed",
-    });
-
-    // IMPORTANT: Program.at fetches the IDL from chain. Keep this pattern.
-    const program = await anchor.Program.at(programId, provider);
+    // -----------------------------
+    // ✅ Build instructions (NO anchor methods)
+    // -----------------------------
 
     const platformEnum =
       platform === "telegram"
-        ? ({ telegram: {} } as any)
+        ? VerificationPlatform.Telegram
         : platform === "twitter"
-        ? ({ twitter: {} } as any)
+        ? VerificationPlatform.Twitter
         : platform === "email"
-        ? ({ email: {} } as any)
-        : ({ discord: {} } as any);
+        ? VerificationPlatform.Email
+        : VerificationPlatform.Discord;
 
-    const expiresAt = new anchor.BN(0);
+    const expiresAt = 0n;
 
-    // Build instructions
-    const ix1 = await (program as any).methods
-      .attestIdentity(daoPk, platformEnum, platform_seed, Array.from(idh), expiresAt)
-      .accounts({
-        spaceAcct: spacePda,
-        attestor: kp.publicKey,
-        identity: identityPda,
-        payer: kp.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .instruction();
+    const ix1 = buildAttestIdentityIx({
+      daoId: daoPk,
+      platform: platformEnum,
+      platformSeed: platform_seed,
+      idHash: idh, // Uint8Array(32)
+      expiresAt, // bigint (i64)
+      attestor: kp.publicKey,
+      payer: kp.publicKey,
+      programId,
+    }).ix;
 
-    const ix2 = await (program as any).methods
-        .linkWallet(
-            daoPk,
-            platform_seed,        // u8
-            Array.from(idh),      // [u8;32]
-            Array.from(wh)        // [u8;32]
-        )
-      .accounts({
-        spaceAcct: spacePda,
-        attestor: kp.publicKey,
-        identity: identityPda,
-        wallet: walletPk,
-        link: linkPda,
-        payer: kp.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .instruction();
+    const ix2 = buildLinkWalletIx({
+      daoId: daoPk,
+      platformSeed: platform_seed,
+      idHash: idh, // Uint8Array(32)
+      wallet: walletPk, // CHECK
+      walletHash: wh, // Uint8Array(32)
+      attestor: kp.publicKey,
+      payer: kp.publicKey,
+      programId,
+    }).ix;
 
     const tx = new Transaction().add(ix1, ix2);
     tx.feePayer = kp.publicKey;
 
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash("confirmed");
     tx.recentBlockhash = blockhash;
     tx.partialSign(kp);
 
     // Sim first (best debugging)
-    const sim = await connection.simulateTransaction(
-    tx,
-    [], // tx already partialSign(kp)
-    );
-
-    if (sim.value.err) {
-    return NextResponse.json(
-        {
-        error: "Simulation failed",
-        simErr: sim.value.err,
-        logs: sim.value.logs || [],
-        derived: {
-            spacePda: spacePda.toBase58(),
-            identityPda: identityPda.toBase58(),
-            linkPda: linkPda.toBase58(),
-            idHashHex,
-            walletHashHex,
-            platformUserId,
-            platform_seed,
-        },
-        hint:
-            "Common causes: (1) space.attestor != ATTESTOR pubkey, (2) wrong cluster/RPC (devnet vs mainnet), (3) using a different DAO/space than the one initialized.",
-        },
-        { status: 500 }
-    );
-    }
+    const sim = await connection.simulateTransaction(tx, {
+      commitment: "processed",
+      sigVerify: false,
+    });
 
     if (sim.value.err) {
       return NextResponse.json(
@@ -444,7 +452,10 @@ export async function POST(req: Request) {
       maxRetries: 3,
     });
 
-    await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+    await connection.confirmTransaction(
+      { signature: sig, blockhash, lastValidBlockHeight },
+      "confirmed"
+    );
 
     return NextResponse.json({
       ok: true,
@@ -456,7 +467,8 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error: String(e?.message || e),
-        stack: process.env.GV_DEBUG_ATTESTOR === "1" ? String(e?.stack || "") : undefined,
+        stack:
+          process.env.GV_DEBUG_ATTESTOR === "1" ? String(e?.stack || "") : undefined,
       },
       { status: 500 }
     );
