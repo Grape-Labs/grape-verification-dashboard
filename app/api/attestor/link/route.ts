@@ -4,15 +4,18 @@ import crypto from "crypto";
 import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
 
 import {
-  VerificationPlatform,
-  identityHash,
-  walletHash,
-  TAG_DISCORD,
-  TAG_TELEGRAM,
-  TAG_TWITTER,
-  TAG_EMAIL,
-  buildAttestIdentityIx,
-  buildLinkWalletIx,
+    VerificationPlatform,
+    identityHash,
+    walletHash,
+    TAG_DISCORD,
+    TAG_TELEGRAM,
+    TAG_TWITTER,
+    TAG_EMAIL,
+    buildAttestIdentityIx,
+    buildLinkWalletIx,
+    deriveSpacePda,
+    deriveIdentityPda,
+    deriveLinkPda,
 } from "@grapenpm/grape-verification-registry";
 
 export const runtime = "nodejs";
@@ -156,9 +159,12 @@ function buildConsentMessage(p: {
 }
 
 function requireU8Array32(name: string, v: any): Uint8Array {
-  // Accept Buffer, Uint8Array
-  const u8 = v instanceof Uint8Array ? v : null;
-  if (!u8) throw new Error(`${name} must be Uint8Array (got ${typeof v})`);
+  const u8 =
+    v instanceof Uint8Array ? v :
+    Buffer.isBuffer(v) ? new Uint8Array(v) :
+    null;
+
+  if (!u8) throw new Error(`${name} must be Uint8Array/Buffer`);
   if (u8.length !== 32) throw new Error(`${name} must be 32 bytes (got ${u8.length})`);
   return u8;
 }
@@ -251,7 +257,7 @@ export async function POST(req: Request) {
     const connection = new Connection(rpc, { commitment: "confirmed" });
 
     // --- Space PDA + salt (server truth) ---
-    const [spacePda] = deriveSpacePdaStrict(programId, daoPk);
+    const [spacePda] = deriveSpacePda(daoPk);
     const spaceAcct = await connection.getAccountInfo(spacePda);
     if (!spaceAcct) {
       return NextResponse.json({ error: `Space account not found: ${spacePda.toBase58()}` }, { status: 400 });
@@ -281,8 +287,8 @@ export async function POST(req: Request) {
     const platform_seed = platformSeed(platform);
 
     // PDAs (server truth)
-    const [identityPda] = deriveIdentityPdaStrict(programId, spacePda, platform_seed, idh);
-    const [linkPda] = deriveLinkPdaStrict(programId, identityPda, wh);
+   const [identityPda] = deriveIdentityPda(spacePda, platform_seed, idh);
+    const [linkPda] = deriveLinkPda(identityPda, wh);
 
     const idHashHex = bytesToHex(idh);
     const walletHashHex = bytesToHex(wh);
@@ -409,7 +415,7 @@ export async function POST(req: Request) {
 
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
     tx.recentBlockhash = blockhash;
-    tx.partialSign(kp);
+    tx.sign(kp);
 
     // ✅ Sim first (debug)
     const sim = await (connection as any).simulateTransaction(tx, {
