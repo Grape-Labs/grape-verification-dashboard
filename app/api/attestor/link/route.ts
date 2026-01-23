@@ -387,7 +387,7 @@ export async function POST(req: Request) {
         ? VerificationPlatform.Email
         : VerificationPlatform.Discord;
 
-    const expiresAt = 0n;
+    const expiresAt = BigInt(0);
 
     const ix1 = buildAttestIdentityIx({
       daoId: daoPk,
