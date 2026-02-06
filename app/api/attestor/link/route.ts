@@ -242,6 +242,16 @@ export async function POST(req: Request) {
     if (salt.length !== 32) {
       return NextResponse.json({ error: `Parsed salt length invalid: ${salt.length}` }, { status: 500 });
     }
+    
+    // 🔍 PARSE SPACE ATTESTOR (check if it matches our signer)
+    // Space layout: disc(8) + version(1) + dao_id(32) + authority(32) + attestor(32) + ...
+    const ATTESTOR_OFFSET = 8 + 1 + 32 + 32; // = 73
+    const spaceAttestorBytes = spaceAcct.data.slice(ATTESTOR_OFFSET, ATTESTOR_OFFSET + 32);
+    const spaceAttestor = new PublicKey(spaceAttestorBytes);
+    
+    console.log("🔍 Space account check:");
+    console.log("  - Space PDA:", spacePda.toBase58());
+    console.log("  - Space.attestor (on-chain):", spaceAttestor.toBase58());
 
     let platformUserId = String(payload.platformUserId || "").trim();
     if (platform === "discord") {
@@ -294,6 +304,22 @@ export async function POST(req: Request) {
     const bal = await connection.getBalance(kp.publicKey, "confirmed");
     
     console.log("💰 Attestor balance:", bal, "lamports");
+    console.log("🔑 Our attestor key:", kp.publicKey.toBase58());
+    
+    // 🔍 CRITICAL: Check if our attestor matches the on-chain attestor
+    if (!spaceAttestor.equals(kp.publicKey)) {
+      console.log("❌ ATTESTOR MISMATCH!");
+      console.log("  - Expected (from ATTESTOR_SECRET_KEY):", kp.publicKey.toBase58());
+      console.log("  - Actual (from Space account):", spaceAttestor.toBase58());
+      return NextResponse.json({
+        error: "Attestor key mismatch",
+        expected: kp.publicKey.toBase58(),
+        actual: spaceAttestor.toBase58(),
+        hint: "The ATTESTOR_SECRET_KEY doesn't match the attestor set in the Space account. Either update the Space.attestor on-chain, or use the correct secret key.",
+      }, { status: 403 });
+    }
+    
+    console.log("✅ Attestor key matches!");
     
     if (bal < 5000) {
       return NextResponse.json(
@@ -403,16 +429,27 @@ export async function POST(req: Request) {
     tx.sign(kp);
 
     console.log("🔍 Running simulation...");
+    console.log("🔍 Transaction details:");
+    console.log("  - Instructions:", tx.instructions.length);
+    console.log("  - Fee payer:", tx.feePayer?.toBase58());
+    console.log("  - Signers:", tx.signatures.map(s => s.publicKey.toBase58()));
     
     const sim = await (connection as any).simulateTransaction(tx, {
       commitment: "processed",
       sigVerify: false,
     });
 
+    console.log("🔍 Simulation result:", sim?.value?.err ? "FAILED ❌" : "SUCCESS ✅");
+    
     if (sim?.value?.err) {
-      console.log("❌ Simulation failed:", JSON.stringify(sim.value.err, null, 2));
-      console.log("📋 Logs:");
+      console.log("❌ Simulation error object:", JSON.stringify(sim.value.err, null, 2));
+      console.log("📋 Program logs:");
       (sim.value.logs || []).forEach((log: string) => console.log("  ", log));
+      console.log("📋 Accounts involved:");
+      console.log("  - Space:", spacePda.toBase58());
+      console.log("  - Identity:", identityPda.toBase58());
+      console.log("  - Link:", linkPda.toBase58());
+      console.log("  - Attestor (signer):", kp.publicKey.toBase58());
       
       return NextResponse.json(
         {
