@@ -173,7 +173,7 @@ function requireU8Array32(name: string, v: any): Uint8Array {
 export async function POST(req: Request) {
   try {
 
-    alert("got link request");
+    console.log("got link request");
     const body = await req.json().catch(() => null);
     const payload = body?.payload;
     const signatureBase64 = body?.signatureBase64;
