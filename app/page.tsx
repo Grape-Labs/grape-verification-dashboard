@@ -668,7 +668,7 @@ export default function Page() {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/apple-grape-touch-icon.png"
+                  src="/grape-touch.png"
                   alt="Grape OG"
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
