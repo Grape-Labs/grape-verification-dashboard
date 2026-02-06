@@ -434,15 +434,25 @@ export async function POST(req: Request) {
     console.log("  - Fee payer:", tx.feePayer?.toBase58());
     console.log("  - Signers:", tx.signatures.map(s => s.publicKey.toBase58()));
     
-    const sim = await (connection as any).simulateTransaction(tx, {
-      commitment: "processed",
-      sigVerify: false,
-    });
+    let sim;
+    try {
+      // The transaction is already signed, just simulate it
+      sim = await connection.simulateTransaction(tx);
+    } catch (simError: any) {
+      console.log("❌ Simulation call failed:", simError.message);
+      console.log("Stack:", simError.stack);
+      return NextResponse.json({
+        error: "Simulation call failed",
+        detail: simError.message,
+        hint: "This is a client-side error calling simulateTransaction. Check the transaction format.",
+      }, { status: 500 });
+    }
 
     console.log("🔍 Simulation result:", sim?.value?.err ? "FAILED ❌" : "SUCCESS ✅");
     
     if (sim?.value?.err) {
-      console.log("❌ Simulation error object:", JSON.stringify(sim.value.err, null, 2));
+      console.log("❌ Program simulation failed!");
+      console.log("Error object:", JSON.stringify(sim.value.err, null, 2));
       console.log("📋 Program logs:");
       (sim.value.logs || []).forEach((log: string) => console.log("  ", log));
       console.log("📋 Accounts involved:");
