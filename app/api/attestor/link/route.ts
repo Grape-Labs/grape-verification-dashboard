@@ -365,6 +365,52 @@ export async function POST(req: Request) {
       );
     }
 
+    // Add this RIGHT AFTER building ix1 in your existing route.ts
+
+try {
+  const result1 = buildAttestIdentityIx({
+    daoId: daoPk,
+    platform: platformEnum,
+    platformSeed: platform_seed,
+    idHash: idh,
+    expiresAt,
+    attestor: kp.publicKey,
+    payer: kp.publicKey,
+    programId,
+  });
+  ix1 = result1.ix;
+
+  // 🔍 ADD THESE DEBUG LINES:
+  console.log("🔍 INSTRUCTION DATA DEBUG:");
+  console.log("📦 Package version in package.json: 0.1.5");
+  console.log("📏 attest_identity data length:", ix1.data.length);
+  console.log("✅ Expected length: 82 bytes");
+  console.log("🎯 Match:", ix1.data.length === 82 ? "YES ✅" : "NO ❌");
+  
+  if (ix1.data.length !== 82) {
+    console.log("❌ PROBLEM: Version 0.1.5 still has BUGGY code!");
+    console.log("You need to:");
+    console.log("1. Publish a NEW version (0.1.6) with the fixed ix.ts");
+    console.log("2. Update package.json to use 0.1.6");
+    console.log("3. Redeploy");
+    
+    return NextResponse.json({
+      error: "Invalid arguments",
+      debug: {
+        packageVersion: "0.1.5",
+        instructionDataLength: ix1.data.length,
+        expected: 82,
+        issue: "Version 0.1.5 contains buggy code. Need to publish 0.1.6 with fixed ix.ts",
+      }
+    }, { status: 500 });
+  }
+  
+  console.log("✅ Instruction data is CORRECT! Package has the fix.");
+
+} catch (e: any) {
+  // ... rest of your code
+}
+
     try {
       ix2 = buildLinkWalletIx({
         daoId: daoPk,
