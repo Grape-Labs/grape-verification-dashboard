@@ -22,10 +22,8 @@ import {
 export const runtime = "nodejs";
 
 function dbg(...args: any[]) {
-  if (process.env.GV_DEBUG_ATTESTOR === "1") {
-    // eslint-disable-next-line no-console
-    console.log("[attestor/link]", ...args);
-  }
+  // Always log for debugging
+  console.log("[attestor/link]", ...args);
 }
 
 function b64url(buf: Buffer) {
@@ -50,7 +48,6 @@ function parseSecretKey(sk: string): Uint8Array {
   const trimmed = (sk || "").trim();
   if (!trimmed) throw new Error("ATTESTOR_SECRET_KEY missing");
 
-  // JSON array string: "[1,2,3,...]"
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
     const arr = JSON.parse(trimmed);
     if (!Array.isArray(arr)) {
@@ -59,7 +56,6 @@ function parseSecretKey(sk: string): Uint8Array {
     return Uint8Array.from(arr.map((n: any) => Number(n)));
   }
 
-  // base64/base64url fallback
   try {
     const buf =
       trimmed.includes("-") || trimmed.includes("_")
@@ -111,9 +107,7 @@ function bytesToHex(u8: Uint8Array) {
     .join("");
 }
 
-// Space struct offsets per your lib.rs
 function parseSpaceSalt(data: Uint8Array): Uint8Array {
-  // discriminator(8) + version(1) + dao(32) + authority(32) + attestor(32) + is_frozen(1) + bump(1) = 107
   const SALT_OFFSET = 8 + 1 + 32 + 32 + 32 + 1 + 1;
   return data.slice(SALT_OFFSET, SALT_OFFSET + 32);
 }
@@ -172,8 +166,10 @@ function requireU8Array32(name: string, v: any): Uint8Array {
 
 export async function POST(req: Request) {
   try {
-
-    console.log("got link request");
+    console.log("🚀 ========================================");
+    console.log("🚀 [ATTESTOR] Link request received");
+    console.log("🚀 ========================================");
+    
     const body = await req.json().catch(() => null);
     const payload = body?.payload;
     const signatureBase64 = body?.signatureBase64;
@@ -219,18 +215,17 @@ export async function POST(req: Request) {
 
     const daoPk = new PublicKey(daoId);
     const walletPk = new PublicKey(walletStr);
-
-    // Single source of truth: always use the program id baked into the registry package
     const programId = REGISTRY_PROGRAM_ID;
 
-    // If you also set NEXT_PUBLIC_REGISTRY_PROGRAM_ID, ensure it matches the package.
+    console.log("📦 Program ID:", programId.toBase58());
+
     if (programIdStr && programIdStr !== programId.toBase58()) {
       return NextResponse.json(
         {
           error: "Program ID mismatch",
           env: programIdStr,
           package: programId.toBase58(),
-          hint: "NEXT_PUBLIC_REGISTRY_PROGRAM_ID must match the PROGRAM_ID inside @grapenpm/grape-verification-registry. Rebuild/publish the package with the deployed program id, or update env to match.",
+          hint: "NEXT_PUBLIC_REGISTRY_PROGRAM_ID must match the PROGRAM_ID inside @grapenpm/grape-verification-registry.",
         },
         { status: 500 }
       );
@@ -238,7 +233,6 @@ export async function POST(req: Request) {
 
     const connection = new Connection(rpc, { commitment: "confirmed" });
 
-    // --- Space PDA + salt (server truth) ---
     const [spacePda] = deriveSpacePda(daoPk);
     const spaceAcct = await connection.getAccountInfo(spacePda);
     if (!spaceAcct) {
@@ -249,7 +243,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Parsed salt length invalid: ${salt.length}` }, { status: 500 });
     }
 
-    // platformUserId: discordId from proof (server truth)
     let platformUserId = String(payload.platformUserId || "").trim();
     if (platform === "discord") {
       const proof = verifyDiscordProof(platformProof, discordProofSecret!);
@@ -259,7 +252,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "platformUserId missing" }, { status: 400 });
     }
 
-    // Derive hashes (server truth)
     const idhRaw = identityHash(salt, platformTag(platform), platformUserId);
     const whRaw = walletHash(salt, walletPk);
 
@@ -267,30 +259,18 @@ export async function POST(req: Request) {
     const wh = requireU8Array32("walletHash(wh)", whRaw);
 
     const platform_seed = platformSeed(platform);
-
-    // PDAs (server truth)
     const [identityPda] = deriveIdentityPda(spacePda, platform_seed, idh);
     const [linkPda] = deriveLinkPda(identityPda, wh);
 
     const idHashHex = bytesToHex(idh);
     const walletHashHex = bytesToHex(wh);
 
-    dbg("payload", {
-      daoId,
-      platform,
-      platform_seed,
-      platformUserId,
-      wallet: walletPk.toBase58(),
-      ts: String(ts ?? ""),
-    });
-    dbg("pdas", {
-      programId: programId.toBase58(),
-      spacePda: spacePda.toBase58(),
-      identityPda: identityPda.toBase58(),
-      linkPda: linkPda.toBase58(),
+    dbg("PDAs:", {
+      space: spacePda.toBase58(),
+      identity: identityPda.toBase58(),
+      link: linkPda.toBase58(),
     });
 
-    // Verify wallet consent signature (off-chain)
     const message = buildConsentMessage({
       daoId,
       platform,
@@ -310,25 +290,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid wallet signature" }, { status: 400 });
     }
 
-    // Attestor (server) signs + pays
     const kp = Keypair.fromSecretKey(parseSecretKey(attestorSk));
-
-    // Helpful early error if unfunded
     const bal = await connection.getBalance(kp.publicKey, "confirmed");
-    dbg("attestor_balance", { feePayer: kp.publicKey.toBase58(), lamports: bal });
+    
+    console.log("💰 Attestor balance:", bal, "lamports");
+    
     if (bal < 5000) {
       return NextResponse.json(
         {
           error: "Attestor fee-payer has insufficient SOL",
           feePayer: kp.publicKey.toBase58(),
           lamports: bal,
-          hint: "Fund ATTESTOR_SECRET_KEY pubkey on the same cluster as NEXT_PUBLIC_SOLANA_RPC (devnet vs mainnet).",
         },
         { status: 500 }
       );
     }
 
-    // ✅ platform enum for attest_identity builder
     const platformEnum =
       platform === "telegram"
         ? VerificationPlatform.Telegram
@@ -338,15 +315,12 @@ export async function POST(req: Request) {
         ? VerificationPlatform.Email
         : VerificationPlatform.Discord;
 
-    // No BigInt literal (0n) to avoid TS target issues
     const expiresAt = BigInt(0);
 
-    // -----------------------------
-    // ✅ Build instructions (raw builders)
-    // -----------------------------
+    // 🔍 CRITICAL DEBUG: Build and check instructions
     let ix1, ix2;
     try {
-      ix1 = buildAttestIdentityIx({
+      const result1 = buildAttestIdentityIx({
         daoId: daoPk,
         platform: platformEnum,
         platformSeed: platform_seed,
@@ -355,20 +329,44 @@ export async function POST(req: Request) {
         attestor: kp.publicKey,
         payer: kp.publicKey,
         programId,
-      }).ix;
+      });
+      ix1 = result1.ix;
+
+      console.log("🔍 ========================================");
+      console.log("🔍 INSTRUCTION DATA CHECK");
+      console.log("🔍 ========================================");
+      console.log("📦 Package version: 0.1.5");
+      console.log("📏 attest_identity data length:", ix1.data.length);
+      console.log("✅ Expected: 82 bytes");
+      console.log("🎯 Match:", ix1.data.length === 82 ? "YES ✅" : "NO ❌");
+      console.log("🔍 First 50 bytes (hex):", Buffer.from(ix1.data.slice(0, 50)).toString("hex"));
+      
+      if (ix1.data.length !== 82) {
+        console.log("❌ WRONG LENGTH! Version 0.1.5 has BUGGY code!");
+        return NextResponse.json({
+          error: "Invalid arguments",
+          debug: {
+            packageVersion: "0.1.5",
+            instructionDataLength: ix1.data.length,
+            expected: 82,
+            issue: "Version 0.1.5 contains buggy code. Publish 0.1.6 with fixed ix.ts, then update and redeploy.",
+          }
+        }, { status: 500 });
+      }
+
     } catch (e: any) {
+      console.log("❌ buildAttestIdentityIx error:", e);
       return NextResponse.json(
         {
           error: "buildAttestIdentityIx failed",
           detail: String(e?.message || e),
-          debug: process.env.GV_DEBUG_ATTESTOR === "1" ? { platformEnum, platform_seed, idhLen: idh.length } : undefined,
         },
         { status: 500 }
       );
     }
 
     try {
-      ix2 = buildLinkWalletIx({
+      const result2 = buildLinkWalletIx({
         daoId: daoPk,
         platformSeed: platform_seed,
         idHash: idh,
@@ -377,20 +375,25 @@ export async function POST(req: Request) {
         attestor: kp.publicKey,
         payer: kp.publicKey,
         programId,
-      }).ix;
+      });
+      ix2 = result2.ix;
+
+      console.log("📏 link_wallet data length:", ix2.data.length);
+      console.log("✅ Expected: 105 bytes");
+      console.log("🎯 Match:", ix2.data.length === 105 ? "YES ✅" : "NO ❌");
+
     } catch (e: any) {
+      console.log("❌ buildLinkWalletIx error:", e);
       return NextResponse.json(
         {
           error: "buildLinkWalletIx failed",
           detail: String(e?.message || e),
-          debug:
-            process.env.GV_DEBUG_ATTESTOR === "1"
-              ? { platform_seed, idhLen: idh.length, whLen: wh.length, wallet: walletPk.toBase58() }
-              : undefined,
         },
         { status: 500 }
       );
     }
+
+    console.log("✅ Both instructions built successfully");
 
     const tx = new Transaction().add(ix1, ix2);
     tx.feePayer = kp.publicKey;
@@ -399,13 +402,18 @@ export async function POST(req: Request) {
     tx.recentBlockhash = blockhash;
     tx.sign(kp);
 
-    // ✅ Sim first (debug)
+    console.log("🔍 Running simulation...");
+    
     const sim = await (connection as any).simulateTransaction(tx, {
       commitment: "processed",
       sigVerify: false,
     });
 
     if (sim?.value?.err) {
+      console.log("❌ Simulation failed:", JSON.stringify(sim.value.err, null, 2));
+      console.log("📋 Logs:");
+      (sim.value.logs || []).forEach((log: string) => console.log("  ", log));
+      
       return NextResponse.json(
         {
           error: "Simulation failed",
@@ -420,19 +428,24 @@ export async function POST(req: Request) {
             platformUserId,
             platform_seed,
           },
-          hint:
-            "Common causes: (1) space.attestor != ATTESTOR pubkey, (2) wrong cluster/RPC, (3) space not initialized / wrong DAO.",
+          hint: "Check logs above for details",
         },
         { status: 500 }
       );
     }
+
+    console.log("✅ Simulation passed!");
 
     const sig = await connection.sendRawTransaction(tx.serialize(), {
       skipPreflight: false,
       maxRetries: 3,
     });
 
+    console.log("✅ Transaction sent:", sig);
+
     await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+
+    console.log("✅ Transaction confirmed!");
 
     return NextResponse.json({
       ok: true,
@@ -441,10 +454,11 @@ export async function POST(req: Request) {
       linkPda: linkPda.toBase58(),
     });
   } catch (e: any) {
+    console.log("❌ ERROR:", e);
     return NextResponse.json(
       {
         error: String(e?.message || e),
-        stack: process.env.GV_DEBUG_ATTESTOR === "1" ? String(e?.stack || "") : undefined,
+        stack: String(e?.stack || ""),
       },
       { status: 500 }
     );
