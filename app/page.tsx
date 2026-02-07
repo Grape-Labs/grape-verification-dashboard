@@ -12,7 +12,6 @@ import {
   Typography,
 } from "@mui/material";
 
-import BoltIcon from "@mui/icons-material/Bolt";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import LinkIcon from "@mui/icons-material/Link";
 import TravelExploreIcon from "@mui/icons-material/TravelExplore";
@@ -290,6 +289,123 @@ export default function Page() {
   const [error, setError] = useState("");
 
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
+
+  // Add to state
+const [emailConnected, setEmailConnected] = useState(false);
+const [emailAddress, setEmailAddress] = useState<string | null>(null);
+const [emailProof, setEmailProof] = useState<string | null>(null);
+
+// Add email verification state
+const [emailInput, setEmailInput] = useState("");
+const [emailCodeSent, setEmailCodeSent] = useState(false);
+const [emailCode, setEmailCode] = useState("");
+const [emailSending, setEmailSending] = useState(false);
+const [emailVerifying, setEmailVerifying] = useState(false);
+
+// Load email session
+async function loadEmailSession() {
+  try {
+    const me = await fetch("/api/email/me", { cache: "no-store" }).then((r) => r.json());
+    setEmailConnected(!!me?.connected);
+    setEmailAddress(me?.email || null);
+
+    if (me?.connected && me?.id && platform === "email") {
+      setPlatformUserId(String(me.id));
+    }
+  } catch {
+    setEmailConnected(false);
+    setEmailAddress(null);
+  }
+}
+
+async function loadEmailProof() {
+  try {
+    const r = await fetch("/api/email/proof", { cache: "no-store" });
+    const j = await r.json();
+    if (j?.connected && j?.proof) setEmailProof(j.proof);
+    else setEmailProof(null);
+  } catch {
+    setEmailProof(null);
+  }
+}
+
+async function sendEmailCode() {
+  setError("");
+  setEmailSending(true);
+
+  try {
+    // Start session first
+    await fetch(`/api/email/start?returnTo=${encodeURIComponent(window.location.pathname)}`);
+
+    // Send code
+    const res = await fetch("/api/email/send-code", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailInput }),
+    });
+
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || "Failed to send code");
+    }
+
+    setEmailCodeSent(true);
+  } catch (e: any) {
+    setError(String(e?.message || e));
+  } finally {
+    setEmailSending(false);
+  }
+}
+
+async function verifyEmailCode() {
+  setError("");
+  setEmailVerifying(true);
+
+  try {
+    const res = await fetch("/api/email/verify-code", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: emailCode }),
+    });
+
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || "Invalid code");
+    }
+
+    const data = await res.json();
+    setEmailConnected(true);
+    setEmailAddress(data.email);
+    setPlatformUserId(data.userId);
+    setEmailCodeSent(false);
+    setEmailCode("");
+    setEmailInput("");
+
+    await loadEmailProof();
+  } catch (e: any) {
+    setError(String(e?.message || e));
+  } finally {
+    setEmailVerifying(false);
+  }
+}
+
+async function disconnectEmail() {
+  await fetch("/api/email/disconnect", { method: "POST" }).catch(() => {});
+  setEmailConnected(false);
+  setEmailAddress(null);
+  setEmailProof(null);
+  setEmailCodeSent(false);
+  setEmailCode("");
+  if (platform === "email") setPlatformUserId("");
+}
+
+// Add effect to load email session
+useEffect(() => {
+  if (platform !== "email") return;
+  loadEmailSession();
+  loadEmailProof();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [platform]);
 
   const daoPk = useMemo(() => {
     try {
@@ -873,6 +989,117 @@ export default function Page() {
                           </>
                         )}
                       </Stack>
+                    </Stack>
+                  </Paper>
+                )}
+
+                {platform === "email" && (
+                  <Paper
+                    sx={{
+                      p: 1.25,
+                      background: "rgba(255,255,255,0.05)",
+                      border: "2px solid rgba(255,255,255,0.10)",
+                      borderRadius: 3,
+                    }}
+                  >
+                    <Stack spacing={1.5}>
+                      <Box>
+                        <Typography sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}>
+                          Email Verification
+                        </Typography>
+                        <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
+                          {emailConnected
+                            ? `Verified: ${emailAddress}`
+                            : "Enter your email to receive a verification code"}
+                        </Typography>
+                      </Box>
+
+                      {!emailConnected ? (
+                        !emailCodeSent ? (
+                          <Stack direction="row" spacing={1}>
+                            <Box
+                              component="input"
+                              type="email"
+                              value={emailInput}
+                              onChange={(e: any) => setEmailInput(e.target.value)}
+                              placeholder="your@email.com"
+                              style={{
+                                flex: 1,
+                                padding: "10px 12px",
+                                borderRadius: 12,
+                                border: "2px solid #0b1220",
+                                outline: "none",
+                                fontFamily: "system-ui",
+                                background: "rgba(255,255,255,0.06)",
+                                color: "rgba(255,255,255,0.92)",
+                              }}
+                            />
+                            <Button
+                              variant="contained"
+                              onClick={sendEmailCode}
+                              disabled={!emailInput.trim() || emailSending}
+                              sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
+                            >
+                              {emailSending ? "Sending..." : "Send Code"}
+                            </Button>
+                          </Stack>
+                        ) : (
+                          <Stack spacing={1}>
+                            <Typography sx={{ fontFamily: "system-ui", fontSize: 13 }}>
+                              Code sent to <strong>{emailInput}</strong>
+                            </Typography>
+                            <Stack direction="row" spacing={1}>
+                              <Box
+                                component="input"
+                                type="text"
+                                value={emailCode}
+                                onChange={(e: any) => setEmailCode(e.target.value)}
+                                placeholder="6-digit code"
+                                maxLength={6}
+                                style={{
+                                  flex: 1,
+                                  padding: "10px 12px",
+                                  borderRadius: 12,
+                                  border: "2px solid #0b1220",
+                                  outline: "none",
+                                  fontFamily: "system-ui",
+                                  background: "rgba(255,255,255,0.06)",
+                                  color: "rgba(255,255,255,0.92)",
+                                  letterSpacing: 2,
+                                  textAlign: "center",
+                                }}
+                              />
+                              <Button
+                                variant="contained"
+                                onClick={verifyEmailCode}
+                                disabled={emailCode.length !== 6 || emailVerifying}
+                                sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
+                              >
+                                {emailVerifying ? "Verifying..." : "Verify"}
+                              </Button>
+                            </Stack>
+                            <Button
+                              variant="text"
+                              size="small"
+                              onClick={() => {
+                                setEmailCodeSent(false);
+                                setEmailCode("");
+                              }}
+                            >
+                              Change email
+                            </Button>
+                          </Stack>
+                        )
+                      ) : (
+                        <Stack direction="row" spacing={1}>
+                          <Button variant="outlined" onClick={() => { loadEmailSession(); loadEmailProof(); }}>
+                            Refresh
+                          </Button>
+                          <Button variant="text" onClick={disconnectEmail}>
+                            Disconnect
+                          </Button>
+                        </Stack>
+                      )}
                     </Stack>
                   </Paper>
                 )}
