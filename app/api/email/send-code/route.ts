@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { Resend } from "resend";
 
 export const runtime = "nodejs";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ✅ Use global to share state between routes in Next.js
 declare global {
@@ -31,9 +34,34 @@ function generateCode(): string {
 }
 
 async function sendVerificationEmail(email: string, code: string) {
-  // TODO: Integrate with your email service (SendGrid, Resend, etc.)
-  // For now, log to console (REMOVE IN PRODUCTION)
-  console.log(`[EMAIL VERIFICATION] Email: ${email}, Code: ${code}`);
+  try {
+    const { data, error } = await resend.emails.send({
+      from: "Grape Verification <noreply@verification.governance.so>", // ✅ Must use verified domain
+      to: email,
+      subject: "Your Verification Code",
+      html: `
+        <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #7c4dff;">Grape Verification</h1>
+          <p>Your verification code is:</p>
+          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #333;">
+            ${code}
+          </div>
+          <p style="color: #666; margin-top: 20px;">This code will expire in 10 minutes.</p>
+          <p style="color: #999; font-size: 12px; margin-top: 40px;">If you didn't request this code, please ignore this email.</p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error("[EMAIL] Resend error:", error);
+      throw new Error(`Failed to send email: ${error.message}`);
+    }
+
+    console.log("[EMAIL] Sent successfully:", data);
+  } catch (e: any) {
+    console.error("[EMAIL] Send failed:", e);
+    throw e;
+  }
 }
 
 export async function POST(req: Request) {

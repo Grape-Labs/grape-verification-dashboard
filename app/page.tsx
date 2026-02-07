@@ -949,7 +949,7 @@ useEffect(() => {
                       p: 1.25,
                       background: "rgba(255,255,255,0.05)",
                       border: "2px solid rgba(255,255,255,0.10)",
-                      borderRadius: 3,
+                      borderRadius: 1,
                     }}
                   >
                     <Stack
@@ -999,7 +999,7 @@ useEffect(() => {
                       p: 1.25,
                       background: "rgba(255,255,255,0.05)",
                       border: "2px solid rgba(255,255,255,0.10)",
-                      borderRadius: 3,
+                      borderRadius: 1,
                     }}
                   >
                     <Stack spacing={1.5}>
