@@ -957,75 +957,79 @@ export default function Page() {
     setError("");
     setMsg("");
 
-    if (!signMessage) {
-      setError("Wallet does not support signMessage.");
-      return;
-    }
-    if (!daoPk || !spacePda || !spaceSalt || !publicKey) {
-      setError("Missing DAO/space/wallet. Ensure Space exists and wallet connected.");
-      return;
-    }
-    if (!platformUserId.trim()) {
-      setError("Enter a platform user id.");
-      return;
-    }
+    try {
+      if (!signMessage) throw new Error("Wallet does not support signMessage.");
+      if (!daoPk || !spacePda || !spaceSalt || !publicKey) {
+        throw new Error("Missing DAO/space/wallet. Ensure Space exists and wallet connected.");
+      }
+      if (!platformUserId.trim()) throw new Error("Enter a platform user id.");
 
-    const idh =
-      idHashBytes ??
-      identityHash(spaceSalt, platformTag(platform), platformUserId.trim());
-    const wh = walletHashBytes ?? walletHash(spaceSalt, publicKey);
+      const idh =
+        idHashBytes ??
+        identityHash(spaceSalt, platformTag(platform), platformUserId.trim());
+      const wh = walletHashBytes ?? walletHash(spaceSalt, publicKey);
 
-    if (!idHashBytes) setIdHashBytes(idh);
-    if (!walletHashBytes) setWalletHashBytes(wh);
+      if (!idHashBytes) setIdHashBytes(idh);
+      if (!walletHashBytes) setWalletHashBytes(wh);
 
-    const platformProofValue =
-      platform === "discord"
-        ? discordProof || null
-        : platform === "email"
-        ? emailProof || null
-        : platform === "telegram"
-        ? telegramProof || null
-        : null;
+      const platformProofValue =
+        platform === "discord"
+          ? discordProof || null
+          : platform === "email"
+          ? emailProof || null
+          : platform === "telegram"
+          ? telegramProof || null
+          : null;
 
-    const payload = {
-      daoId: daoPk.toBase58(),
-      platform,
-      platformSeed: platformSeed(platform),
-      platformUserId: platformUserId.trim(),
-      platformProof: platformProofValue,
-      idHashHex: bytesToHex(idh),
-      wallet: publicKey.toBase58(),
-      walletHashHex: bytesToHex(wh),
-      ts: Date.now(),
-      space: spacePda.toBase58(),
-    };
+      const payload = {
+        daoId: daoPk.toBase58(),
+        platform,
+        platformSeed: platformSeed(platform),
+        platformUserId: platformUserId.trim(),
+        platformProof: platformProofValue,
+        idHashHex: bytesToHex(idh),
+        wallet: publicKey.toBase58(),
+        walletHashHex: bytesToHex(wh),
+        ts: Date.now(),
+        space: spacePda.toBase58(),
+      };
 
-    const message = new TextEncoder().encode(
-      `Grape Verification Link Request\n` +
-        `daoId=${payload.daoId}\n` +
+      // ✅ MUST MATCH SERVER CANONICAL FORMAT EXACTLY
+      const messageText =
+        `Grape Verification Link Request\n` +
         `platform=${payload.platform}\n` +
-        `idHash=${payload.idHashHex}\n` +
         `wallet=${payload.wallet}\n` +
-        `walletHash=${payload.walletHashHex}\n` +
-        `ts=${payload.ts}\n`
-    );
+        `ts=${payload.ts}`;
 
-    const sig = await signMessage(message);
-    const sigB64 = btoa(String.fromCharCode(...sig));
+      const messageBytes = new TextEncoder().encode(messageText);
 
-    const res = await fetch(`/api/attestor/link`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ payload, signatureBase64: sigB64 }),
-    });
+      const sig = await signMessage(messageBytes);
 
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      throw new Error(`Attestor error (${res.status}): ${t || res.statusText}`);
+      // ✅ safer base64 conversion than btoa(String.fromCharCode(...sig))
+      const sigB64 = Buffer.from(sig).toString("base64");
+
+      const res = await fetch(`/api/attestor/link`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          payload,
+          signatureBase64: sigB64,
+          // optional but nice for debugging / future-proofing:
+          message: messageText,
+        }),
+      });
+
+      const text = await res.text().catch(() => "");
+      if (!res.ok) {
+        throw new Error(`Attestor error (${res.status}): ${text || res.statusText}`);
+      }
+
+      setMsg(`✅ Submitted to attestor.\n\nResponse:\n${text}`);
+      await refresh();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setMsg("");
     }
-
-    setMsg(`✅ Submitted to attestor.\n\nResponse:\n${await res.text()}`);
-    await refresh();
   }
 
   const linkChipLabel =
