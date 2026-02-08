@@ -1110,7 +1110,8 @@ export default function Page() {
 
             {/* Step 2: Link Wallet (Only shows when platform connected) */}
             {((platform === "discord" && discordConnected) ||
-              (platform === "email" && emailConnected)) && (
+              (platform === "email" && emailConnected) ||
+              (platform === "telegram" && telegramConnected)) && (
               <Box
                 sx={{
                   p: 2,
