@@ -913,7 +913,7 @@ export default function Page() {
                   variant="body2"
                   sx={{ opacity: 0.75, fontFamily: "system-ui" }}
                 >
-                  Devnet • Privacy-preserving identity ↔ wallet linking
+                  Mainnet • Privacy-preserving identity ↔ wallet linking
                 </Typography>
               </Box>
             </Stack>
