@@ -466,10 +466,10 @@
     "@solana/wallet-adapter-base" "^0.9.17"
     bs58 "^5.0.0"
 
-"@grapenpm/grape-verification-registry@0.1.5":
-  version "0.1.5"
-  resolved "https://registry.yarnpkg.com/@grapenpm/grape-verification-registry/-/grape-verification-registry-0.1.5.tgz#d539800f9cfe74313a64663fff075af8acd7a777"
-  integrity sha512-67DiyU5j14mV1UI9BwKIIX7LrCS26rREidz9GEcS9b0D0oRNLPykcx6o/cJvWBx7vA05isxWcW2lWJBVODOrdg==
+"@grapenpm/grape-verification-registry@0.1.6":
+  version "0.1.6"
+  resolved "https://registry.yarnpkg.com/@grapenpm/grape-verification-registry/-/grape-verification-registry-0.1.6.tgz#8c1962b8caf9c099650198cfce32bcfb744fb42e"
+  integrity sha512-bzhg+SAMgrZXJDO4OnRKXf28Q2mzYiYag7vmgFdBtVBfY1vUzGhfwabFvlMv6jFKs3B04nARRAo8K/vKMnSiiQ==
   dependencies:
     "@noble/hashes" "^2.0.1"
     "@solana/web3.js" "^1.95.0"

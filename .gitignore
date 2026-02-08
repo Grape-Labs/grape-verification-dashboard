@@ -39,3 +39,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/VrFyyRxPoyWxpABpBXU4YUCCF9p8giDSJUv2oXfDr5q.json
