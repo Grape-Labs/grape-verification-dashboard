@@ -1420,7 +1420,7 @@ export default function Page() {
                       p: 1.5,
                       background: "rgba(124,77,255,0.08)",
                       border: "2px solid rgba(124,77,255,0.2)",
-                      borderRadius: 2,
+                      borderRadius: 1,
                     }}
                   >
                     <Stack
