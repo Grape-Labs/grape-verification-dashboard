@@ -24,7 +24,6 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import CreateSpaceDialog from "./components/CreateSpaceDialog";
 import WalletComicButton from "./components/WalletComicButton";
 
-// ✅ Your published client helpers
 import {
   VerificationPlatform,
   deriveIdentityPda,
@@ -87,36 +86,11 @@ function bytesToHex(u8: Uint8Array | null) {
     .join("");
 }
 
-/**
- * Space.salt layout:
- * discriminator(8)
- * version(1)
- * dao_id(32)
- * authority(32)
- * attestor(32)
- * is_frozen(1)
- * bump(1)
- * salt(32)
- */
 function parseSpaceSalt(data: Uint8Array): Uint8Array {
   const SALT_OFFSET = 8 + 1 + 32 + 32 + 32 + 1 + 1; // 107
   return data.slice(SALT_OFFSET, SALT_OFFSET + 32);
 }
 
-/**
- * Identity layout:
- * disc(8)
- * version u8
- * space Pubkey (32)
- * platform u8
- * id_hash [32]
- * verified bool(u8)
- * verified_at i64
- * expires_at i64
- * attested_by Pubkey (32)
- * bump u8
- * padding [4]
- */
 function parseIdentity(data: Uint8Array) {
   const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let o = 8;
@@ -160,16 +134,6 @@ function parseIdentity(data: Uint8Array) {
   };
 }
 
-/**
- * Link layout:
- * disc(8)
- * version u8
- * identity Pubkey (32)
- * wallet_hash [32]
- * linked_at i64
- * bump u8
- * padding [6]
- */
 function parseLink(data: Uint8Array) {
   const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let o = 8;
@@ -230,34 +194,26 @@ export default function Page() {
   const { connection } = useConnection();
   const { publicKey, signMessage } = useWallet();
 
-  // -------------------------------
-  // Mode: SIMPLE (default) vs ADVANCED
-  // -------------------------------
+  // Mode state
   const [advancedMode, setAdvancedMode] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
+  // Discord state
   const [discordConnected, setDiscordConnected] = useState(false);
   const [discordLabel, setDiscordLabel] = useState<string | null>(null);
   const [discordProof, setDiscordProof] = useState<string | null>(null);
 
-  useEffect(() => {
-    const adv = modeFromLocalStorage();
-    setAdvancedMode(adv);
-    setAdvancedOpen(adv);
-  }, []);
+  // Email state
+  const [emailConnected, setEmailConnected] = useState(false);
+  const [emailAddress, setEmailAddress] = useState<string | null>(null);
+  const [emailProof, setEmailProof] = useState<string | null>(null);
+  const [emailInput, setEmailInput] = useState("");
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [emailCode, setEmailCode] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailVerifying, setEmailVerifying] = useState(false);
 
-  const toggleMode = () => {
-    setAdvancedMode((v) => {
-      const next = !v;
-      setModeToLocalStorage(next);
-      setAdvancedOpen(next);
-      return next;
-    });
-  };
-
-  // -------------------------------
-  // Existing state
-  // -------------------------------
+  // Core state
   const [daoIdStr, setDaoIdStr] = useState(
     process.env.NEXT_PUBLIC_DEFAULT_DAO_ID || ""
   );
@@ -276,136 +232,188 @@ export default function Page() {
     ReturnType<typeof parseIdentity> | null
   >(null);
 
-  const [walletHashBytes, setWalletHashBytes] = useState<Uint8Array | null>(
-    null
-  );
+  const [walletHashBytes, setWalletHashBytes] = useState<Uint8Array | null>(null);
   const [linkPda, setLinkPda] = useState<PublicKey | null>(null);
   const [linkExists, setLinkExists] = useState<boolean | null>(null);
-  const [linkInfo, setLinkInfo] = useState<ReturnType<typeof parseLink> | null>(
-    null
-  );
+  const [linkInfo, setLinkInfo] = useState<ReturnType<typeof parseLink> | null>(null);
 
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
-
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
 
-  // Add to state
-const [emailConnected, setEmailConnected] = useState(false);
-const [emailAddress, setEmailAddress] = useState<string | null>(null);
-const [emailProof, setEmailProof] = useState<string | null>(null);
+  // Load mode from localStorage
+  useEffect(() => {
+    const adv = modeFromLocalStorage();
+    setAdvancedMode(adv);
+    setAdvancedOpen(adv);
+  }, []);
 
-// Add email verification state
-const [emailInput, setEmailInput] = useState("");
-const [emailCodeSent, setEmailCodeSent] = useState(false);
-const [emailCode, setEmailCode] = useState("");
-const [emailSending, setEmailSending] = useState(false);
-const [emailVerifying, setEmailVerifying] = useState(false);
+  const toggleMode = () => {
+    setAdvancedMode((v) => {
+      const next = !v;
+      setModeToLocalStorage(next);
+      setAdvancedOpen(next);
+      return next;
+    });
+  };
 
-// Load email session
-async function loadEmailSession() {
-  try {
-    const me = await fetch("/api/email/me", { cache: "no-store" }).then((r) => r.json());
-    setEmailConnected(!!me?.connected);
-    setEmailAddress(me?.email || null);
+  // Discord functions
+  async function loadDiscordSession() {
+    try {
+      const me = await fetch("/api/discord/me", { cache: "no-store" }).then((r) =>
+        r.json()
+      );
+      setDiscordConnected(!!me?.connected);
+      setDiscordLabel(me?.label || null);
 
-    if (me?.connected && me?.id && platform === "email") {
-      setPlatformUserId(String(me.id));
+      if (me?.connected && me?.id && platform === "discord") {
+        setPlatformUserId(String(me.id));
+      }
+    } catch {
+      setDiscordConnected(false);
+      setDiscordLabel(null);
     }
-  } catch {
+  }
+
+  async function loadDiscordProof() {
+    try {
+      const r = await fetch("/api/discord/proof", { cache: "no-store" });
+      const j = await r.json();
+      if (j?.connected && j?.proof) setDiscordProof(j.proof);
+      else setDiscordProof(null);
+    } catch {
+      setDiscordProof(null);
+    }
+  }
+
+  function startDiscordConnect() {
+    const returnTo =
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/";
+    window.location.href = `/api/discord/start?returnTo=${encodeURIComponent(
+      returnTo
+    )}`;
+  }
+
+  async function disconnectDiscord() {
+    await fetch("/api/discord/disconnect", { method: "POST" }).catch(() => {});
+    setDiscordConnected(false);
+    setDiscordLabel(null);
+    setDiscordProof(null);
+    if (platform === "discord") setPlatformUserId("");
+  }
+
+  // Email functions
+  async function loadEmailSession() {
+    try {
+      const me = await fetch("/api/email/me", { cache: "no-store" }).then((r) =>
+        r.json()
+      );
+      setEmailConnected(!!me?.connected);
+      setEmailAddress(me?.email || null);
+
+      if (me?.connected && me?.id && platform === "email") {
+        setPlatformUserId(String(me.id));
+      }
+    } catch {
+      setEmailConnected(false);
+      setEmailAddress(null);
+    }
+  }
+
+  async function loadEmailProof() {
+    try {
+      const r = await fetch("/api/email/proof", { cache: "no-store" });
+      const j = await r.json();
+      if (j?.connected && j?.proof) setEmailProof(j.proof);
+      else setEmailProof(null);
+    } catch {
+      setEmailProof(null);
+    }
+  }
+
+  async function sendEmailCode() {
+    setError("");
+    setEmailSending(true);
+
+    try {
+      await fetch(
+        `/api/email/start?returnTo=${encodeURIComponent(window.location.pathname)}`
+      );
+
+      const res = await fetch("/api/email/send-code", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: emailInput }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Failed to send code");
+      }
+
+      setEmailCodeSent(true);
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setEmailSending(false);
+    }
+  }
+
+  async function verifyEmailCode() {
+    setError("");
+    setEmailVerifying(true);
+
+    try {
+      const res = await fetch("/api/email/verify-code", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: emailCode }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Invalid code");
+      }
+
+      const data = await res.json();
+      setEmailConnected(true);
+      setEmailAddress(data.email);
+      setPlatformUserId(data.userId);
+      setEmailCodeSent(false);
+      setEmailCode("");
+      setEmailInput("");
+
+      await loadEmailProof();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    } finally {
+      setEmailVerifying(false);
+    }
+  }
+
+  async function disconnectEmail() {
+    await fetch("/api/email/disconnect", { method: "POST" }).catch(() => {});
     setEmailConnected(false);
     setEmailAddress(null);
-  }
-}
-
-async function loadEmailProof() {
-  try {
-    const r = await fetch("/api/email/proof", { cache: "no-store" });
-    const j = await r.json();
-    if (j?.connected && j?.proof) setEmailProof(j.proof);
-    else setEmailProof(null);
-  } catch {
     setEmailProof(null);
-  }
-}
-
-async function sendEmailCode() {
-  setError("");
-  setEmailSending(true);
-
-  try {
-    // Start session first
-    await fetch(`/api/email/start?returnTo=${encodeURIComponent(window.location.pathname)}`);
-
-    // Send code
-    const res = await fetch("/api/email/send-code", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: emailInput }),
-    });
-
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      throw new Error(j.error || "Failed to send code");
-    }
-
-    setEmailCodeSent(true);
-  } catch (e: any) {
-    setError(String(e?.message || e));
-  } finally {
-    setEmailSending(false);
-  }
-}
-
-async function verifyEmailCode() {
-  setError("");
-  setEmailVerifying(true);
-
-  try {
-    const res = await fetch("/api/email/verify-code", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code: emailCode }),
-    });
-
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      throw new Error(j.error || "Invalid code");
-    }
-
-    const data = await res.json();
-    setEmailConnected(true);
-    setEmailAddress(data.email);
-    setPlatformUserId(data.userId);
     setEmailCodeSent(false);
     setEmailCode("");
-    setEmailInput("");
-
-    await loadEmailProof();
-  } catch (e: any) {
-    setError(String(e?.message || e));
-  } finally {
-    setEmailVerifying(false);
+    if (platform === "email") setPlatformUserId("");
   }
-}
 
-async function disconnectEmail() {
-  await fetch("/api/email/disconnect", { method: "POST" }).catch(() => {});
-  setEmailConnected(false);
-  setEmailAddress(null);
-  setEmailProof(null);
-  setEmailCodeSent(false);
-  setEmailCode("");
-  if (platform === "email") setPlatformUserId("");
-}
-
-// Add effect to load email session
-useEffect(() => {
-  if (platform !== "email") return;
-  loadEmailSession();
-  loadEmailProof();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [platform]);
+  // Load platform sessions
+  useEffect(() => {
+    if (platform === "discord") {
+      loadDiscordSession();
+      loadDiscordProof();
+    } else if (platform === "email") {
+      loadEmailSession();
+      loadEmailProof();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform]);
 
   const daoPk = useMemo(() => {
     try {
@@ -417,7 +425,7 @@ useEffect(() => {
     }
   }, [daoIdStr]);
 
-  // --- Load Space PDA + account ---
+  // Load Space PDA + account
   useEffect(() => {
     let cancelled = false;
 
@@ -462,7 +470,7 @@ useEffect(() => {
     };
   }, [connection, daoPk]);
 
-  // --- Derive Identity + Link and load accounts ---
+  // Derive Identity + Link and load accounts
   useEffect(() => {
     let cancelled = false;
 
@@ -520,55 +528,6 @@ useEffect(() => {
     };
   }, [connection, spacePda, spaceSalt, platform, platformUserId, publicKey]);
 
-
-  async function loadDiscordSession() {
-    try {
-      const me = await fetch("/api/discord/me", { cache: "no-store" }).then((r) => r.json());
-      setDiscordConnected(!!me?.connected);
-      setDiscordLabel(me?.label || null);
-
-      if (me?.connected && me?.id && platform === "discord") {
-        // ✅ Auto-fill platformUserId for Discord
-        setPlatformUserId(String(me.id));
-      }
-    } catch {
-      setDiscordConnected(false);
-      setDiscordLabel(null);
-    }
-  }
-
-  async function loadDiscordProof() {
-    try {
-      const r = await fetch("/api/discord/proof", { cache: "no-store" });
-      const j = await r.json();
-      if (j?.connected && j?.proof) setDiscordProof(j.proof);
-      else setDiscordProof(null);
-    } catch {
-      setDiscordProof(null);
-    }
-  }
-
-  function startDiscordConnect() {
-    const returnTo =
-      typeof window !== "undefined" ? window.location.pathname + window.location.search : "/";
-    window.location.href = `/api/discord/start?returnTo=${encodeURIComponent(returnTo)}`;
-  }
-
-  async function disconnectDiscord() {
-    await fetch("/api/discord/disconnect", { method: "POST" }).catch(() => {});
-    setDiscordConnected(false);
-    setDiscordLabel(null);
-    setDiscordProof(null);
-    if (platform === "discord") setPlatformUserId("");
-  }
-
-  useEffect(() => {
-    if (platform !== "discord") return;
-    loadDiscordSession();
-    loadDiscordProof();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [platform]);
-
   const identityStatus = useMemo(() => {
     if (identityExists === false) return "Not found";
     if (!identityInfo) return identityExists ? "Unknown" : "—";
@@ -582,11 +541,92 @@ useEffect(() => {
   }, [identityExists, identityInfo]);
 
   async function refresh() {
-    // triggers effects without hacks
     setDaoIdStr((v) => v);
     setPlatformUserId((v) => v);
   }
 
+  // ✅ NEW: One-click link function
+  async function linkWalletOneClick() {
+    setError("");
+    setMsg("Processing...");
+
+    try {
+      if (!signMessage) {
+        throw new Error("Wallet does not support signMessage (try Phantom/Solflare)");
+      }
+      if (!daoPk || !spacePda || !spaceSalt) {
+        throw new Error("Missing DAO/space. Ensure Space exists on-chain.");
+      }
+      if (!publicKey) {
+        throw new Error("Connect wallet first");
+      }
+      if (!platformUserId.trim()) {
+        throw new Error("Platform ID required");
+      }
+
+      const idh =
+        idHashBytes ??
+        identityHash(spaceSalt, platformTag(platform), platformUserId.trim());
+      const wh = walletHashBytes ?? walletHash(spaceSalt, publicKey);
+
+      if (!idHashBytes) setIdHashBytes(idh);
+      if (!walletHashBytes) setWalletHashBytes(wh);
+
+      // Get platform proof automatically
+      let platformProofValue = null;
+      if (platform === "discord" && discordProof) {
+        platformProofValue = discordProof;
+      } else if (platform === "email" && emailProof) {
+        platformProofValue = emailProof;
+      }
+
+      const payload = {
+        daoId: daoPk.toBase58(),
+        platform,
+        platformSeed: platformSeed(platform),
+        platformUserId: platformUserId.trim(),
+        platformProof: platformProofValue,
+        idHashHex: bytesToHex(idh),
+        wallet: publicKey.toBase58(),
+        walletHashHex: bytesToHex(wh),
+        ts: Date.now(),
+        space: spacePda.toBase58(),
+      };
+
+      const message = new TextEncoder().encode(
+        `Grape Verification Link Request\n` +
+          `platform=${payload.platform}\n` +
+          `wallet=${payload.wallet}\n` +
+          `ts=${payload.ts}`
+      );
+
+      const sig = await signMessage(message);
+      const sigB64 = btoa(String.fromCharCode(...sig));
+
+      const res = await fetch(`/api/attestor/link`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ payload, signatureBase64: sigB64 }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `Error: ${res.status}`);
+      }
+
+      const result = await res.json();
+
+      setMsg(`✅ Successfully linked! Transaction: ${result.signature || "complete"}`);
+
+      // Auto-refresh
+      setTimeout(() => refresh(), 1500);
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setMsg("");
+    }
+  }
+
+  // Legacy functions (kept for advanced mode)
   async function signLinkRequest() {
     setError("");
     setMsg("");
@@ -604,15 +644,13 @@ useEffect(() => {
       return;
     }
     if (!platformUserId.trim()) {
-      setError("Enter a platform user id (temporary for MVP).");
+      setError("Enter a platform user id.");
       return;
     }
 
-    // Ensure hashes exist (effects should set them, but this keeps UX resilient)
     const idh =
       idHashBytes ??
       identityHash(spaceSalt, platformTag(platform), platformUserId.trim());
-
     const wh = walletHashBytes ?? walletHash(spaceSalt, publicKey);
 
     if (!idHashBytes) setIdHashBytes(idh);
@@ -645,7 +683,7 @@ useEffect(() => {
 
     setMsg(
       `✅ Signed consent message.\n\n` +
-        `Payload (send to attestor):\n${JSON.stringify(payload, null, 2)}\n\n` +
+        `Payload:\n${JSON.stringify(payload, null, 2)}\n\n` +
         `Signature (base64):\n${sigB64}`
     );
   }
@@ -653,12 +691,6 @@ useEffect(() => {
   async function postToAttestor() {
     setError("");
     setMsg("");
-
-    const base = process.env.NEXT_PUBLIC_ATTESTOR_API_BASE;
-    if (!base) {
-      setError("NEXT_PUBLIC_ATTESTOR_API_BASE is not set.");
-      return;
-    }
 
     if (!signMessage) {
       setError("Wallet does not support signMessage.");
@@ -669,7 +701,7 @@ useEffect(() => {
       return;
     }
     if (!platformUserId.trim()) {
-      setError("Enter a platform user id (temporary for MVP).");
+      setError("Enter a platform user id.");
       return;
     }
 
@@ -682,7 +714,11 @@ useEffect(() => {
     if (!walletHashBytes) setWalletHashBytes(wh);
 
     const platformProofValue =
-      platform === "discord" ? (discordProof || null) : null;
+      platform === "discord"
+        ? discordProof || null
+        : platform === "email"
+        ? emailProof || null
+        : null;
 
     const payload = {
       daoId: daoPk.toBase58(),
@@ -726,27 +762,29 @@ useEffect(() => {
   }
 
   const linkChipLabel =
-    linkExists == null
-      ? "Link: —"
-      : linkExists
-      ? "Link: exists"
-      : "Link: missing";
+    linkExists == null ? "Link: —" : linkExists ? "Link: exists" : "Link: missing";
 
-  // -------------------------------
-  // SIMPLE MODE: human-friendly status
-  // -------------------------------
   const simpleSteps = useMemo(() => {
     const walletOk = !!publicKey;
     const spaceOk = spaceExists === true;
-
-    // keep your behavior: treat "Verified (expired)" as verifiedOk too
+    const platformOk =
+      (platform === "discord" && discordConnected) ||
+      (platform === "email" && emailConnected);
     const verifiedOk =
       identityInfo?.verified === true && identityStatus.startsWith("Verified");
-
     const linkOk = linkExists === true;
 
-    return { walletOk, spaceOk, verifiedOk, linkOk };
-  }, [publicKey, spaceExists, identityInfo, identityStatus, linkExists]);
+    return { walletOk, spaceOk, platformOk, verifiedOk, linkOk };
+  }, [
+    publicKey,
+    spaceExists,
+    platform,
+    discordConnected,
+    emailConnected,
+    identityInfo,
+    identityStatus,
+    linkExists,
+  ]);
 
   return (
     <Box
@@ -830,13 +868,6 @@ useEffect(() => {
           <Divider sx={{ my: 2 }} />
 
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            {/*
-            <Chip
-              icon={<BoltIcon />}
-              label="Comic Mode"
-              color="secondary"
-              sx={{ fontFamily: "system-ui" }}
-            */}
             <Chip
               icon={<VerifiedIcon />}
               label={`Identity: ${identityStatus}`}
@@ -865,350 +896,283 @@ useEffect(() => {
             </Typography>
             <Typography
               variant="body2"
-              sx={{ opacity: 0.78, fontFamily: "system-ui" }}
+              sx={{ opacity: 0.78, fontFamily: "system-ui", mb: 2 }}
             >
-              Connect your wallet, verify your identity, then link. (Advanced
-              details are hidden.)
+              Choose your platform, connect, then link your wallet in one click.
             </Typography>
 
-            <Divider sx={{ my: 2 }} />
+            {/* Step 1: Platform Selection & Connection */}
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                background: "rgba(255,255,255,0.04)",
+                border: "2px solid rgba(255,255,255,0.08)",
+                mb: 2,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontFamily: '"Bangers", system-ui',
+                  letterSpacing: 0.6,
+                  mb: 1.5,
+                  fontSize: 16,
+                }}
+              >
+                Step 1: Connect Platform
+              </Typography>
 
-            <Stack spacing={1.25}>
-              <SimpleStep
-                n={1}
-                title="Connect wallet"
-                ok={simpleSteps.walletOk}
-                detail={
-                  publicKey ? `Connected: ${shortB58(publicKey)}` : "Not connected"
-                }
-              />
+              {/* Platform Tabs */}
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ mb: 2 }}
+                flexWrap="wrap"
+                useFlexGap
+              >
+                {(["discord", "email", "telegram", "twitter"] as const).map((p) => (
+                  <Button
+                    key={p}
+                    onClick={() => setPlatform(p)}
+                    variant={platform === p ? "contained" : "outlined"}
+                    sx={{
+                      fontFamily: '"Bangers", system-ui',
+                      letterSpacing: 0.6,
+                      textTransform: "capitalize",
+                      minWidth: 100,
+                    }}
+                  >
+                    {p}
+                  </Button>
+                ))}
+              </Stack>
 
-              <SimpleStep
-                n={2}
-                title="Community ready"
-                ok={simpleSteps.spaceOk}
-                detail={
-                  spaceExists === true
-                    ? "Ready"
-                    : spaceExists === false
-                    ? "Not enabled (ask an admin)"
-                    : "Checking…"
-                }
-              />
+              {/* Platform-Specific Connection UI */}
+              {platform === "discord" && (
+                <PlatformConnectionCard
+                  platform="Discord"
+                  connected={discordConnected}
+                  label={discordLabel}
+                  onConnect={startDiscordConnect}
+                  onDisconnect={disconnectDiscord}
+                  onRefresh={() => {
+                    loadDiscordSession();
+                    loadDiscordProof();
+                  }}
+                />
+              )}
 
-              <SimpleStep
-                n={3}
-                title="Identity verified"
-                ok={simpleSteps.verifiedOk}
-                detail={identityStatus === "—" ? "Enter your platform ID to check" : identityStatus}
-              />
+              {platform === "email" && (
+                <EmailConnectionCard
+                  connected={emailConnected}
+                  email={emailAddress}
+                  emailInput={emailInput}
+                  setEmailInput={setEmailInput}
+                  emailCodeSent={emailCodeSent}
+                  emailCode={emailCode}
+                  setEmailCode={setEmailCode}
+                  emailSending={emailSending}
+                  emailVerifying={emailVerifying}
+                  sendCode={sendEmailCode}
+                  verifyCode={verifyEmailCode}
+                  disconnect={disconnectEmail}
+                  onRefresh={() => {
+                    loadEmailSession();
+                    loadEmailProof();
+                  }}
+                  onCancel={() => {
+                    setEmailCodeSent(false);
+                    setEmailCode("");
+                  }}
+                />
+              )}
 
-              <SimpleStep
-                n={4}
-                title="Wallet linked"
-                ok={simpleSteps.linkOk}
-                detail={
-                  linkExists == null ? "—" : linkExists ? "Linked ✅" : "Not linked yet"
-                }
-              />
-
-              <Divider sx={{ my: 1.5, borderColor: "rgba(255,255,255,0.10)" }} />
-
-              {/* Minimal inputs (still MVP: platformUserId manual) */}
-              <Stack spacing={1}>
-                <Typography
-                  sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
-                >
-                  Platform
-                </Typography>
-
-                <Box
-                  component="select"
-                  value={platform}
-                  onChange={(e: any) => setPlatform(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 12px",
-                    borderRadius: 16,
-                    border: "3px solid #0b1220",
-                    outline: "none",
-                    fontFamily: "system-ui",
+              {(platform === "telegram" || platform === "twitter") && (
+                <Paper
+                  sx={{
+                    p: 2,
                     background: "rgba(255,255,255,0.06)",
-                    color: "rgba(255,255,255,0.92)",
+                    border: "2px solid rgba(255,255,255,0.10)",
                   }}
                 >
-                  <option value="discord">Discord</option>
-                  <option value="telegram">Telegram</option>
-                  <option value="twitter">Twitter</option>
-                  <option value="email">Email</option>
-                </Box>
-                
-                {platform === "discord" && (
-                  <Paper
+                  <Typography
+                    sx={{ fontFamily: "system-ui", fontSize: 14, opacity: 0.9 }}
+                  >
+                    {platform === "telegram" ? "Telegram" : "Twitter"} verification
+                    coming soon!
+                  </Typography>
+                  <Typography
                     sx={{
-                      p: 1.25,
-                      background: "rgba(255,255,255,0.05)",
-                      border: "2px solid rgba(255,255,255,0.10)",
-                      borderRadius: 1,
+                      fontFamily: "system-ui",
+                      fontSize: 13,
+                      opacity: 0.7,
+                      mt: 0.5,
                     }}
                   >
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      spacing={1}
-                      alignItems={{ xs: "stretch", sm: "center" }}
-                      justifyContent="space-between"
-                    >
-                      <Box>
-                        <Typography sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}>
-                          Discord
-                        </Typography>
-                        <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
-                          {discordConnected
-                            ? `Connected: ${discordLabel || "Discord"} • ID auto-filled`
-                            : "Not connected"}
-                        </Typography>
-                      </Box>
+                    For now, you can test with Discord or Email.
+                  </Typography>
+                </Paper>
+              )}
+            </Box>
 
-                      <Stack direction="row" spacing={1}>
-                        {!discordConnected ? (
-                          <Button
-                            variant="contained"
-                            onClick={startDiscordConnect}
-                            sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
-                          >
-                            Connect Discord
-                          </Button>
-                        ) : (
-                          <>
-                            <Button variant="outlined" onClick={() => { loadDiscordSession(); loadDiscordProof(); }}>
-                              Refresh
-                            </Button>
-                            <Button variant="text" onClick={disconnectDiscord}>
-                              Disconnect
-                            </Button>
-                          </>
-                        )}
-                      </Stack>
-                    </Stack>
-                  </Paper>
-                )}
-
-                {platform === "email" && (
-                  <Paper
-                    sx={{
-                      p: 1.25,
-                      background: "rgba(255,255,255,0.05)",
-                      border: "2px solid rgba(255,255,255,0.10)",
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Stack spacing={1.5}>
-                      <Box>
-                        <Typography sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}>
-                          Email Verification
-                        </Typography>
-                        <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
-                          {emailConnected
-                            ? `Verified: ${emailAddress}`
-                            : "Enter your email to receive a verification code"}
-                        </Typography>
-                      </Box>
-
-                      {!emailConnected ? (
-                        !emailCodeSent ? (
-                          <Stack direction="row" spacing={1}>
-                            <Box
-                              component="input"
-                              type="email"
-                              value={emailInput}
-                              onChange={(e: any) => setEmailInput(e.target.value)}
-                              placeholder="your@email.com"
-                              style={{
-                                flex: 1,
-                                padding: "10px 12px",
-                                borderRadius: 12,
-                                border: "2px solid #0b1220",
-                                outline: "none",
-                                fontFamily: "system-ui",
-                                background: "rgba(255,255,255,0.06)",
-                                color: "rgba(255,255,255,0.92)",
-                              }}
-                            />
-                            <Button
-                              variant="contained"
-                              onClick={sendEmailCode}
-                              disabled={!emailInput.trim() || emailSending}
-                              sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
-                            >
-                              {emailSending ? "Sending..." : "Send Code"}
-                            </Button>
-                          </Stack>
-                        ) : (
-                          <Stack spacing={1}>
-                            <Typography sx={{ fontFamily: "system-ui", fontSize: 13 }}>
-                              Code sent to <strong>{emailInput}</strong>
-                            </Typography>
-                            <Stack direction="row" spacing={1}>
-                              <Box
-                                component="input"
-                                type="text"
-                                value={emailCode}
-                                onChange={(e: any) => setEmailCode(e.target.value)}
-                                placeholder="6-digit code"
-                                maxLength={6}
-                                style={{
-                                  flex: 1,
-                                  padding: "10px 12px",
-                                  borderRadius: 12,
-                                  border: "2px solid #0b1220",
-                                  outline: "none",
-                                  fontFamily: "system-ui",
-                                  background: "rgba(255,255,255,0.06)",
-                                  color: "rgba(255,255,255,0.92)",
-                                  letterSpacing: 2,
-                                  textAlign: "center",
-                                }}
-                              />
-                              <Button
-                                variant="contained"
-                                onClick={verifyEmailCode}
-                                disabled={emailCode.length !== 6 || emailVerifying}
-                                sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
-                              >
-                                {emailVerifying ? "Verifying..." : "Verify"}
-                              </Button>
-                            </Stack>
-                            <Button
-                              variant="text"
-                              size="small"
-                              onClick={() => {
-                                setEmailCodeSent(false);
-                                setEmailCode("");
-                              }}
-                            >
-                              Change email
-                            </Button>
-                          </Stack>
-                        )
-                      ) : (
-                        <Stack direction="row" spacing={1}>
-                          <Button variant="outlined" onClick={() => { loadEmailSession(); loadEmailProof(); }}>
-                            Refresh
-                          </Button>
-                          <Button variant="text" onClick={disconnectEmail}>
-                            Disconnect
-                          </Button>
-                        </Stack>
-                      )}
-                    </Stack>
-                  </Paper>
-                )}
-
+            {/* Step 2: Link Wallet (Only shows when platform connected) */}
+            {((platform === "discord" && discordConnected) ||
+              (platform === "email" && emailConnected)) && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  background: "rgba(34,197,94,0.08)",
+                  border: "2px solid rgba(34,197,94,0.2)",
+                }}
+              >
                 <Typography
                   sx={{
                     fontFamily: '"Bangers", system-ui',
                     letterSpacing: 0.6,
-                    mt: 0.5,
+                    mb: 1.5,
+                    fontSize: 16,
                   }}
                 >
-                  Platform User ID
+                  Step 2: Link Your Wallet
                 </Typography>
 
-                <Box
-                  component="input"
-                  value={platformUserId}
-                  onChange={(e: any) => setPlatformUserId(e.target.value)}
-                  placeholder="Discord/Telegram/etc user id"
-                  style={{
-                    width: "100%",
-                    padding: "12px 12px",
-                    borderRadius: 16,
-                    border: "3px solid #0b1220",
-                    outline: "none",
-                    fontFamily: "system-ui",
-                    background: "rgba(255,255,255,0.06)",
-                    color: "rgba(255,255,255,0.92)",
+                {/* Status Summary */}
+                <Stack spacing={1} sx={{ mb: 2 }}>
+                  <StatusChip
+                    label={`Wallet: ${publicKey ? shortB58(publicKey) : "Not connected"}`}
+                    ok={!!publicKey}
+                  />
+                  <StatusChip
+                    label={`Community: ${
+                      spaceExists === true
+                        ? "Ready"
+                        : spaceExists === false
+                        ? "Not enabled"
+                        : "Checking..."
+                    }`}
+                    ok={spaceExists === true}
+                  />
+                  <StatusChip
+                    label={`Identity: ${identityStatus}`}
+                    ok={identityInfo?.verified === true}
+                  />
+                  <StatusChip
+                    label={`Link: ${linkExists ? "Already linked" : "Ready to link"}`}
+                    ok={linkExists === true}
+                  />
+                </Stack>
+
+                {/* Primary Action Button */}
+                <Button
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  onClick={() => linkWalletOneClick()}
+                  disabled={
+                    !publicKey ||
+                    !spaceSalt ||
+                    !platformUserId.trim() ||
+                    linkExists === true ||
+                    spaceExists === false
+                  }
+                  sx={{
+                    fontFamily: '"Bangers", system-ui',
+                    letterSpacing: 0.8,
+                    fontSize: 18,
+                    py: 1.5,
+                    background: linkExists
+                      ? "rgba(34,197,94,0.3)"
+                      : "linear-gradient(135deg, #7c4dff 0%, #26c6ff 100%)",
+                    "&:hover": {
+                      background: linkExists
+                        ? "rgba(34,197,94,0.3)"
+                        : "linear-gradient(135deg, #6a3de8 0%, #1fa8e8 100%)",
+                    },
+                    "&:disabled": {
+                      background: "rgba(255,255,255,0.1)",
+                      color: "rgba(255,255,255,0.3)",
+                    },
                   }}
-                />
+                >
+                  {linkExists
+                    ? "✅ Already Linked"
+                    : spaceExists === false
+                    ? "Community Not Enabled"
+                    : !publicKey
+                    ? "Connect Wallet First"
+                    : "🔗 Link Wallet Now"}
+                </Button>
+
+                {!publicKey && (
+                  <Typography
+                    sx={{
+                      mt: 1.5,
+                      textAlign: "center",
+                      fontFamily: "system-ui",
+                      fontSize: 13,
+                      opacity: 0.7,
+                    }}
+                  >
+                    ↑ Connect your wallet first (top right)
+                  </Typography>
+                )}
 
                 {spaceExists === false && (
                   <Paper
                     sx={{
+                      mt: 2,
                       p: 1.25,
                       background: "rgba(255,204,0,.12)",
                       borderStyle: "dashed",
                     }}
                   >
                     <Typography sx={{ fontFamily: "system-ui", fontSize: 13 }}>
-                      Verification isn’t enabled for this community yet. Please
+                      Verification isn't enabled for this community yet. Please
                       contact an admin.
                     </Typography>
                   </Paper>
                 )}
+              </Box>
+            )}
 
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1}
-                  sx={{ mt: 0.5 }}
-                >
-                  <Button
-                    variant="contained"
-                    onClick={() =>
-                      signLinkRequest().catch((e) =>
-                        setError(String(e?.message || e))
-                      )
-                    }
-                    disabled={!publicKey || !spaceSalt || !platformUserId.trim()}
-                    sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.8 }}
-                  >
-                    Sign consent
-                  </Button>
-
-                  <Button
-                    variant="outlined"
-                    onClick={() =>
-                      postToAttestor().catch((e) =>
-                        setError(String(e?.message || e))
-                      )
-                    }
-                    disabled={!publicKey || !spaceSalt || !platformUserId.trim()}
-                    sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
-                  >
-                    Submit
-                  </Button>
-
-                  <Button variant="text" onClick={() => refresh().catch(() => {})}>
-                    Refresh
-                  </Button>
-                </Stack>
-              </Stack>
-            </Stack>
-
+            {/* Errors & Messages */}
             {error && (
               <Paper
                 sx={{
                   mt: 2,
-                  p: 1.25,
+                  p: 1.5,
                   background: "rgba(255,0,0,.10)",
                   borderColor: "rgba(220,38,38,.7)",
                 }}
               >
-                <Typography sx={{ fontFamily: "system-ui", color: "#ff8fa3" }}>
-                  {error}
+                <Typography
+                  sx={{ fontFamily: "system-ui", color: "#ff8fa3", fontSize: 14 }}
+                >
+                  ❌ {error}
                 </Typography>
               </Paper>
             )}
 
             {msg && (
-              <Paper sx={{ mt: 2, p: 1.25, background: "rgba(0,0,0,.25)" }}>
+              <Paper
+                sx={{
+                  mt: 2,
+                  p: 1.5,
+                  background: msg.startsWith("✅")
+                    ? "rgba(34,197,94,.10)"
+                    : "rgba(0,0,0,.25)",
+                  borderColor: msg.startsWith("✅")
+                    ? "rgba(34,197,94,.5)"
+                    : "transparent",
+                }}
+              >
                 <Typography
-                  component="pre"
                   sx={{
+                    fontFamily: msg.startsWith("✅") ? "system-ui" : "monospace",
+                    color: msg.startsWith("✅") ? "#86efac" : "inherit",
+                    fontSize: 14,
                     whiteSpace: "pre-wrap",
-                    m: 0,
-                    fontFamily:
-                      '"Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
-                    fontSize: 12,
                   }}
                 >
                   {msg}
@@ -1245,9 +1209,7 @@ useEffect(() => {
                   endIcon={
                     <ExpandMoreIcon
                       sx={{
-                        transform: advancedOpen
-                          ? "rotate(180deg)"
-                          : "rotate(0deg)",
+                        transform: advancedOpen ? "rotate(180deg)" : "rotate(0deg)",
                       }}
                     />
                   }
@@ -1269,7 +1231,6 @@ useEffect(() => {
 
             {advancedOpen && (
               <>
-                {/* Layout (NO MUI Grid): CSS grid */}
                 <Box
                   sx={{
                     mt: 2.5,
@@ -1294,11 +1255,7 @@ useEffect(() => {
 
                     <Stack spacing={1.25}>
                       <Typography
-                        sx={{
-                          fontFamily: "system-ui",
-                          fontSize: 12,
-                          opacity: 0.7,
-                        }}
+                        sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}
                       >
                         DAO ID
                       </Typography>
@@ -1320,7 +1277,11 @@ useEffect(() => {
                         }}
                       />
 
-                      <InfoRow label="Space PDA" value={spacePda?.toBase58() || "—"} mono />
+                      <InfoRow
+                        label="Space PDA"
+                        value={spacePda?.toBase58() || "—"}
+                        mono
+                      />
                       <InfoRow
                         label="Account"
                         value={
@@ -1334,7 +1295,11 @@ useEffect(() => {
                       <InfoRow
                         label="Frozen"
                         value={
-                          spaceFrozen == null ? "—" : spaceFrozen ? "✅ yes" : "❌ no"
+                          spaceFrozen == null
+                            ? "—"
+                            : spaceFrozen
+                            ? "✅ yes"
+                            : "❌ no"
                         }
                       />
                       <InfoRow
@@ -1342,22 +1307,6 @@ useEffect(() => {
                         value={spaceSalt ? bytesToHex(spaceSalt) : "—"}
                         mono
                       />
-
-                      {!spaceExists && spacePda && (
-                        <Paper
-                          sx={{
-                            mt: 1,
-                            p: 1.25,
-                            background: "rgba(255,204,0,.16)",
-                            borderStyle: "dashed",
-                          }}
-                        >
-                          <Typography sx={{ fontFamily: "system-ui", fontSize: 13 }}>
-                            Space account not found. Initialize the Space on-chain
-                            for this DAO first.
-                          </Typography>
-                        </Paper>
-                      )}
 
                       {spaceExists === false && (
                         <Stack
@@ -1375,7 +1324,10 @@ useEffect(() => {
                           >
                             Create Space…
                           </Button>
-                          <Button variant="outlined" onClick={() => refresh().catch(() => {})}>
+                          <Button
+                            variant="outlined"
+                            onClick={() => refresh().catch(() => {})}
+                          >
                             Refresh
                           </Button>
                         </Stack>
@@ -1390,19 +1342,15 @@ useEffect(() => {
                       variant="body2"
                       sx={{ mt: 0.5, opacity: 0.75, fontFamily: "system-ui" }}
                     >
-                      Identity PDA: (space, platform, id_hash). Stores only hashed
-                      ID + attestation info.
+                      Identity PDA: (space, platform, id_hash). Stores only hashed ID
+                      + attestation info.
                     </Typography>
 
                     <Divider sx={{ my: 2 }} />
 
                     <Stack spacing={1.25}>
                       <Typography
-                        sx={{
-                          fontFamily: "system-ui",
-                          fontSize: 12,
-                          opacity: 0.7,
-                        }}
+                        sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}
                       >
                         Platform
                       </Typography>
@@ -1436,7 +1384,7 @@ useEffect(() => {
                           mt: 1,
                         }}
                       >
-                        Platform User ID (temporary for MVP)
+                        Platform User ID
                       </Typography>
 
                       <Box
@@ -1456,8 +1404,16 @@ useEffect(() => {
                         }}
                       />
 
-                      <InfoRow label="id_hash (hex)" value={bytesToHex(idHashBytes)} mono />
-                      <InfoRow label="Identity PDA" value={identityPda?.toBase58() || "—"} mono />
+                      <InfoRow
+                        label="id_hash (hex)"
+                        value={bytesToHex(idHashBytes)}
+                        mono
+                      />
+                      <InfoRow
+                        label="Identity PDA"
+                        value={identityPda?.toBase58() || "—"}
+                        mono
+                      />
                       <InfoRow
                         label="Account"
                         value={
@@ -1472,10 +1428,17 @@ useEffect(() => {
 
                       {identityInfo && (
                         <>
-                          <InfoRow label="Verified at" value={fmtTs(identityInfo.verifiedAt)} />
+                          <InfoRow
+                            label="Verified at"
+                            value={fmtTs(identityInfo.verifiedAt)}
+                          />
                           <InfoRow
                             label="Expires at"
-                            value={identityInfo.expiresAt ? fmtTs(identityInfo.expiresAt) : "No expiry"}
+                            value={
+                              identityInfo.expiresAt
+                                ? fmtTs(identityInfo.expiresAt)
+                                : "No expiry"
+                            }
                           />
                           <InfoRow
                             label="Attested by"
@@ -1520,10 +1483,16 @@ useEffect(() => {
                       <InfoRow
                         label="Link"
                         value={
-                          linkExists == null ? "—" : linkExists ? "✅ exists" : "❌ missing"
+                          linkExists == null
+                            ? "—"
+                            : linkExists
+                            ? "✅ exists"
+                            : "❌ missing"
                         }
                       />
-                      {linkInfo && <InfoRow label="Linked at" value={fmtTs(linkInfo.linkedAt)} />}
+                      {linkInfo && (
+                        <InfoRow label="Linked at" value={fmtTs(linkInfo.linkedAt)} />
+                      )}
                     </Stack>
 
                     <Stack spacing={1.25}>
@@ -1551,7 +1520,10 @@ useEffect(() => {
                         Submit to attestor API
                       </Button>
 
-                      <Button variant="text" onClick={() => refresh().catch(() => {})}>
+                      <Button
+                        variant="text"
+                        onClick={() => refresh().catch(() => {})}
+                      >
                         Refresh
                       </Button>
 
@@ -1579,7 +1551,9 @@ useEffect(() => {
                         borderColor: "rgba(220,38,38,.7)",
                       }}
                     >
-                      <Typography sx={{ fontFamily: "system-ui", color: "#ff8fa3" }}>
+                      <Typography
+                        sx={{ fontFamily: "system-ui", color: "#ff8fa3" }}
+                      >
                         {error}
                       </Typography>
                     </Paper>
@@ -1621,62 +1595,312 @@ useEffect(() => {
   );
 }
 
-function SimpleStep({
-  n,
-  title,
-  detail,
-  ok,
+// ===========================
+// Helper Components
+// ===========================
+
+function PlatformConnectionCard({
+  platform,
+  connected,
+  label,
+  onConnect,
+  onDisconnect,
+  onRefresh,
 }: {
-  n: number;
-  title: string;
-  detail: string;
-  ok: boolean;
+  platform: string;
+  connected: boolean;
+  label: string | null;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onRefresh: () => void;
 }) {
   return (
-    <Box
+    <Paper
       sx={{
-        display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "80px 1fr" },
-        gap: 1.25,
-        alignItems: "center",
-        p: 1.25,
-        borderRadius: 3,
-        background: "rgba(255,255,255,0.06)",
-        border: "2px solid rgba(255,255,255,0.10)",
+        p: 2,
+        background: connected
+          ? "rgba(34,197,94,0.10)"
+          : "rgba(255,255,255,0.06)",
+        border: `2px solid ${
+          connected ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.10)"
+        }`,
       }}
     >
-      <Box
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems="center"
+        justifyContent="space-between"
+      >
+        <Box>
+          <Typography
+            sx={{
+              fontFamily: '"Bangers", system-ui',
+              letterSpacing: 0.6,
+              fontSize: 16,
+            }}
+          >
+            {platform} {connected && "✅"}
+          </Typography>
+          <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
+            {connected ? `Connected: ${label || platform}` : `Not connected`}
+          </Typography>
+        </Box>
+
+        <Stack direction="row" spacing={1}>
+          {!connected ? (
+            <Button
+              variant="contained"
+              onClick={onConnect}
+              sx={{
+                fontFamily: '"Bangers", system-ui',
+                letterSpacing: 0.6,
+              }}
+            >
+              Connect {platform}
+            </Button>
+          ) : (
+            <>
+              <Button variant="outlined" size="small" onClick={onRefresh}>
+                Refresh
+              </Button>
+              <Button variant="text" size="small" onClick={onDisconnect}>
+                Disconnect
+              </Button>
+            </>
+          )}
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
+
+function EmailConnectionCard({
+  connected,
+  email,
+  emailInput,
+  setEmailInput,
+  emailCodeSent,
+  emailCode,
+  setEmailCode,
+  emailSending,
+  emailVerifying,
+  sendCode,
+  verifyCode,
+  disconnect,
+  onRefresh,
+  onCancel,
+}: {
+  connected: boolean;
+  email: string | null;
+  emailInput: string;
+  setEmailInput: (v: string) => void;
+  emailCodeSent: boolean;
+  emailCode: string;
+  setEmailCode: (v: string) => void;
+  emailSending: boolean;
+  emailVerifying: boolean;
+  sendCode: () => void;
+  verifyCode: () => void;
+  disconnect: () => void;
+  onRefresh: () => void;
+  onCancel: () => void;
+}) {
+  if (connected) {
+    return (
+      <Paper
         sx={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 54,
-          height: 54,
-          borderRadius: 999,
-          fontFamily: '"Bangers", system-ui',
-          letterSpacing: 0.6,
-          border: "3px solid #0b1220",
-          boxShadow: "4px 4px 0 #0b1220",
-          background: ok ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.06)",
+          p: 2,
+          background: "rgba(34,197,94,0.10)",
+          border: "2px solid rgba(34,197,94,0.3)",
         }}
       >
-        {n}
-      </Box>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Box>
+            <Typography
+              sx={{
+                fontFamily: '"Bangers", system-ui',
+                letterSpacing: 0.6,
+                fontSize: 16,
+              }}
+            >
+              Email ✅
+            </Typography>
+            <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
+              Verified: {email}
+            </Typography>
+          </Box>
 
-      <Box>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" size="small" onClick={onRefresh}>
+              Refresh
+            </Button>
+            <Button variant="text" size="small" onClick={disconnect}>
+              Disconnect
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  if (!emailCodeSent) {
+    return (
+      <Paper
+        sx={{
+          p: 2,
+          background: "rgba(255,255,255,0.06)",
+          border: "2px solid rgba(255,255,255,0.10)",
+        }}
+      >
         <Typography
           sx={{
             fontFamily: '"Bangers", system-ui',
             letterSpacing: 0.6,
-            fontSize: 18,
+            fontSize: 16,
+            mb: 1,
           }}
         >
-          {title} {ok ? "✅" : ""}
+          Email Verification
         </Typography>
-        <Typography sx={{ opacity: 0.78, fontFamily: "system-ui", fontSize: 13 }}>
-          {detail}
+        <Typography
+          sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8, mb: 2 }}
+        >
+          Enter your email to receive a verification code
         </Typography>
-      </Box>
+
+        <Stack direction="row" spacing={1}>
+          <Box
+            component="input"
+            type="email"
+            value={emailInput}
+            onChange={(e: any) => setEmailInput(e.target.value)}
+            placeholder="your@email.com"
+            onKeyDown={(e: any) => {
+              if (e.key === "Enter" && emailInput.trim()) sendCode();
+            }}
+            style={{
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "2px solid #0b1220",
+              outline: "none",
+              fontFamily: "system-ui",
+              background: "rgba(255,255,255,0.06)",
+              color: "rgba(255,255,255,0.92)",
+            }}
+          />
+          <Button
+            variant="contained"
+            onClick={sendCode}
+            disabled={!emailInput.trim() || emailSending}
+            sx={{
+              fontFamily: '"Bangers", system-ui',
+              letterSpacing: 0.6,
+              minWidth: 120,
+            }}
+          >
+            {emailSending ? "Sending..." : "Send Code"}
+          </Button>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  return (
+    <Paper
+      sx={{
+        p: 2,
+        background: "rgba(255,204,0,0.10)",
+        border: "2px solid rgba(255,204,0,0.3)",
+      }}
+    >
+      <Typography
+        sx={{
+          fontFamily: '"Bangers", system-ui',
+          letterSpacing: 0.6,
+          fontSize: 16,
+          mb: 1,
+        }}
+      >
+        Enter Verification Code
+      </Typography>
+      <Typography
+        sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8, mb: 2 }}
+      >
+        Code sent to <strong>{emailInput}</strong>
+      </Typography>
+
+      <Stack spacing={1.5}>
+        <Stack direction="row" spacing={1}>
+          <Box
+            component="input"
+            type="text"
+            value={emailCode}
+            onChange={(e: any) => setEmailCode(e.target.value)}
+            placeholder="6-digit code"
+            maxLength={6}
+            onKeyDown={(e: any) => {
+              if (e.key === "Enter" && emailCode.length === 6) verifyCode();
+            }}
+            style={{
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "2px solid #0b1220",
+              outline: "none",
+              fontFamily: "system-ui",
+              background: "rgba(255,255,255,0.06)",
+              color: "rgba(255,255,255,0.92)",
+              letterSpacing: 4,
+              textAlign: "center",
+              fontSize: 16,
+            }}
+          />
+          <Button
+            variant="contained"
+            onClick={verifyCode}
+            disabled={emailCode.length !== 6 || emailVerifying}
+            sx={{
+              fontFamily: '"Bangers", system-ui',
+              letterSpacing: 0.6,
+              minWidth: 120,
+            }}
+          >
+            {emailVerifying ? "Verifying..." : "Verify"}
+          </Button>
+        </Stack>
+        <Button variant="text" size="small" onClick={onCancel}>
+          Change email
+        </Button>
+      </Stack>
+    </Paper>
+  );
+}
+
+function StatusChip({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <Box
+      sx={{
+        px: 1.5,
+        py: 0.75,
+        borderRadius: 2,
+        background: ok ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)",
+        border: `2px solid ${
+          ok ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.10)"
+        }`,
+        display: "inline-flex",
+        alignItems: "center",
+      }}
+    >
+      <Typography sx={{ fontFamily: "system-ui", fontSize: 13 }}>
+        {ok ? "✅" : "⏳"} {label}
+      </Typography>
     </Box>
   );
 }
