@@ -1,22 +1,27 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
   Chip,
   Container,
   Divider,
+  IconButton,
   Paper,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import LinkIcon from "@mui/icons-material/Link";
+import LinkOffIcon from "@mui/icons-material/LinkOff";
 import TravelExploreIcon from "@mui/icons-material/TravelExplore";
 import TuneIcon from "@mui/icons-material/Tune";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import WalletIcon from "@mui/icons-material/AccountBalanceWallet";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Connection, PublicKey } from "@solana/web3.js";
@@ -25,6 +30,7 @@ import CreateSpaceDialog from "./components/CreateSpaceDialog";
 import WalletComicButton from "./components/WalletComicButton";
 
 import {
+  PROGRAM_ID,
   VerificationPlatform,
   deriveIdentityPda,
   deriveLinkPda,
@@ -39,6 +45,16 @@ import {
 import TelegramLoginButton from "./components/TelegramLoginButton";
 
 type PlatformKey = "discord" | "telegram" | "twitter" | "email";
+
+/* ---------- parsed Link account returned by getProgramAccounts ---------- */
+interface LinkedWallet {
+  pubkey: PublicKey; // the Link PDA
+  walletHashBytes: Uint8Array;
+  walletHashHex: string;
+  linkedAt: number;
+  identity: PublicKey;
+  isCurrentWallet: boolean; // true when walletHash matches the connected wallet
+}
 
 function platformSeed(platform: PlatformKey): number {
   switch (platform) {
@@ -85,6 +101,11 @@ function bytesToHex(u8: Uint8Array | null) {
   return Array.from(u8)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+function shortHex(hex: string) {
+  if (!hex || hex === "—" || hex.length < 12) return hex;
+  return `${hex.slice(0, 6)}…${hex.slice(-6)}`;
 }
 
 function parseSpaceSalt(data: Uint8Array): Uint8Array {
@@ -191,6 +212,63 @@ function setModeToLocalStorage(advanced: boolean) {
   }
 }
 
+/* =========================================================================
+ * LINK ACCOUNT DISCRIMINATOR
+ *
+ * Anchor accounts are prefixed with sha256("account:LinkAccount")[0..8].
+ * We use this to filter getProgramAccounts results.
+ * ========================================================================= */
+import { sha256 } from "@noble/hashes/sha256";
+import { utf8ToBytes } from "@noble/hashes/utils";
+
+const LINK_ACCOUNT_DISC = sha256(utf8ToBytes("account:LinkAccount")).slice(0, 8);
+
+/* =========================================================================
+ * Fetch ALL Link accounts for a given Identity PDA
+ *
+ * Link account layout (82 bytes):
+ *   [0..8]   discriminator
+ *   [8]      version (u8)
+ *   [9..41]  identity (Pubkey, 32 bytes)   ← we filter on this
+ *   [41..73] wallet_hash ([u8;32])
+ *   [73..81] linked_at (i64 LE)
+ *   [81]     bump (u8)
+ * ========================================================================= */
+async function fetchLinkedWallets(
+  connection: Connection,
+  identityPda: PublicKey,
+  currentWalletHash: Uint8Array | null
+): Promise<LinkedWallet[]> {
+  try {
+    const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
+      filters: [
+        { memcmp: { offset: 0, bytes: Buffer.from(LINK_ACCOUNT_DISC).toString("base64"), encoding: "base64" } },
+        { memcmp: { offset: 9, bytes: identityPda.toBase58() } },
+      ],
+    });
+
+    const currentHex = currentWalletHash ? bytesToHex(currentWalletHash) : null;
+
+    return accounts
+      .map((a) => {
+        const parsed = parseLink(a.account.data);
+        const whHex = bytesToHex(parsed.walletHashBytes);
+        return {
+          pubkey: a.pubkey,
+          walletHashBytes: parsed.walletHashBytes,
+          walletHashHex: whHex,
+          linkedAt: parsed.linkedAt,
+          identity: parsed.identity,
+          isCurrentWallet: currentHex !== null && whHex === currentHex,
+        };
+      })
+      .sort((a, b) => a.linkedAt - b.linkedAt);
+  } catch (e) {
+    console.error("fetchLinkedWallets error:", e);
+    return [];
+  }
+}
+
 export default function Page() {
   const { connection } = useConnection();
   const { publicKey, signMessage } = useWallet();
@@ -244,11 +322,15 @@ export default function Page() {
   const [linkExists, setLinkExists] = useState<boolean | null>(null);
   const [linkInfo, setLinkInfo] = useState<ReturnType<typeof parseLink> | null>(null);
 
+  // Multi-wallet state
+  const [linkedWallets, setLinkedWallets] = useState<LinkedWallet[]>([]);
+  const [linkedWalletsLoading, setLinkedWalletsLoading] = useState(false);
+  const [unlinkingWallet, setUnlinkingWallet] = useState<string | null>(null); // walletHashHex being unlinked
+
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
-
-
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   // Load mode from localStorage
   useEffect(() => {
@@ -412,7 +494,7 @@ export default function Page() {
     if (platform === "email") setPlatformUserId("");
   }
 
-  // ✅ ADD: Telegram functions
+  // Telegram functions
   async function loadTelegramSession() {
     try {
       const me = await fetch("/api/telegram/me", { cache: "no-store" }).then((r) =>
@@ -515,6 +597,7 @@ export default function Page() {
       setLinkPda(null);
       setLinkExists(null);
       setLinkInfo(null);
+      setLinkedWallets([]);
 
       if (!daoPk) return;
 
@@ -538,9 +621,9 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [connection, daoPk]);
+  }, [connection, daoPk, refreshCounter]);
 
-  // Derive Identity + Link and load accounts
+  // Derive Identity + Link and load accounts + all linked wallets
   useEffect(() => {
     let cancelled = false;
 
@@ -557,6 +640,7 @@ export default function Page() {
       setLinkPda(null);
       setLinkExists(null);
       setLinkInfo(null);
+      setLinkedWallets([]);
 
       if (!spacePda || !spaceSalt) return;
       if (!platformUserId.trim()) return;
@@ -577,26 +661,46 @@ export default function Page() {
       setIdentityExists(!!idAcct);
       setIdentityInfo(idAcct ? parseIdentity(idAcct.data) : null);
 
-      if (!publicKey) return;
+      // Compute current wallet hash (if wallet connected)
+      let wh: Uint8Array | null = null;
+      if (publicKey) {
+        wh = walletHash(spaceSalt, publicKey);
+        setWalletHashBytes(wh);
 
-      const wh = walletHash(spaceSalt, publicKey);
-      setWalletHashBytes(wh);
+        const [lPda] = deriveLinkPda(idPda, wh);
+        setLinkPda(lPda);
 
-      const [lPda] = deriveLinkPda(idPda, wh);
-      setLinkPda(lPda);
+        const lAcct = await safeGetAccountInfo(connection, lPda);
+        if (cancelled) return;
 
-      const lAcct = await safeGetAccountInfo(connection, lPda);
-      if (cancelled) return;
+        setLinkExists(!!lAcct);
+        setLinkInfo(lAcct ? parseLink(lAcct.data) : null);
+      }
 
-      setLinkExists(!!lAcct);
-      setLinkInfo(lAcct ? parseLink(lAcct.data) : null);
+      // Fetch ALL linked wallets for this identity
+      if (idAcct) {
+        setLinkedWalletsLoading(true);
+        const wallets = await fetchLinkedWallets(connection, idPda, wh);
+        if (!cancelled) {
+          setLinkedWallets(wallets);
+          setLinkedWalletsLoading(false);
+        }
+      }
     }
 
     run().catch((e) => setError(String(e?.message || e)));
     return () => {
       cancelled = true;
     };
-  }, [connection, spacePda, spaceSalt, platform, platformUserId, publicKey]);
+  }, [
+    connection,
+    spacePda,
+    spaceSalt,
+    platform,
+    platformUserId,
+    publicKey,
+    refreshCounter,
+  ]);
 
   const identityStatus = useMemo(() => {
     if (identityExists === false) return "Not found";
@@ -611,11 +715,12 @@ export default function Page() {
   }, [identityExists, identityInfo]);
 
   async function refresh() {
-    setDaoIdStr((v) => v);
-    setPlatformUserId((v) => v);
+    setRefreshCounter((c) => c + 1);
   }
 
-  // ✅ NEW: One-click link function
+  // ===========================
+  // One-click LINK
+  // ===========================
   async function linkWalletOneClick() {
     setError("");
     setMsg("Processing...");
@@ -651,7 +756,6 @@ export default function Page() {
       } else if (platform === "telegram" && telegramProof) {
         platformProofValue = telegramProof;
       }
-
 
       const payload = {
         daoId: daoPk.toBase58(),
@@ -689,13 +793,101 @@ export default function Page() {
 
       const result = await res.json();
 
-      setMsg(`✅ Successfully linked! Transaction: ${result.signature || "complete"}`);
+      setMsg(
+        `✅ Successfully linked! Transaction: ${result.signature || "complete"}`
+      );
 
-      // Auto-refresh
-      setTimeout(() => refresh(), 1500);
+      // Auto-refresh to pick up the new on-chain state
+      setTimeout(() => refresh(), 2000);
     } catch (e: any) {
       setError(String(e?.message || e));
       setMsg("");
+    }
+  }
+
+  // ===========================
+  // UNLINK wallet
+  // ===========================
+  async function unlinkWallet(targetWalletHashHex: string) {
+    setError("");
+    setMsg("Unlinking...");
+    setUnlinkingWallet(targetWalletHashHex);
+
+    try {
+      if (!signMessage) {
+        throw new Error("Wallet does not support signMessage (try Phantom/Solflare)");
+      }
+      if (!daoPk || !spacePda || !spaceSalt) {
+        throw new Error("Missing DAO/space.");
+      }
+      if (!publicKey) {
+        throw new Error("Connect wallet first");
+      }
+      if (!platformUserId.trim()) {
+        throw new Error("Platform ID required");
+      }
+
+      const idh =
+        idHashBytes ??
+        identityHash(spaceSalt, platformTag(platform), platformUserId.trim());
+
+      // Get platform proof
+      let platformProofValue = null;
+      if (platform === "discord" && discordProof) {
+        platformProofValue = discordProof;
+      } else if (platform === "email" && emailProof) {
+        platformProofValue = emailProof;
+      } else if (platform === "telegram" && telegramProof) {
+        platformProofValue = telegramProof;
+      }
+
+      const payload = {
+        daoId: daoPk.toBase58(),
+        platform,
+        platformSeed: platformSeed(platform),
+        platformUserId: platformUserId.trim(),
+        platformProof: platformProofValue,
+        idHashHex: bytesToHex(idh),
+        walletHashHex: targetWalletHashHex,
+        wallet: publicKey.toBase58(),
+        ts: Date.now(),
+        space: spacePda.toBase58(),
+      };
+
+      const message = new TextEncoder().encode(
+        `Grape Verification Unlink Request\n` +
+          `platform=${payload.platform}\n` +
+          `wallet=${payload.wallet}\n` +
+          `walletHash=${targetWalletHashHex}\n` +
+          `ts=${payload.ts}`
+      );
+
+      const sig = await signMessage(message);
+      const sigB64 = btoa(String.fromCharCode(...sig));
+
+      const res = await fetch(`/api/attestor/unlink`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ payload, signatureBase64: sigB64 }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `Error: ${res.status}`);
+      }
+
+      const result = await res.json();
+
+      setMsg(
+        `✅ Successfully unlinked! Transaction: ${result.signature || "complete"}`
+      );
+
+      setTimeout(() => refresh(), 2000);
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setMsg("");
+    } finally {
+      setUnlinkingWallet(null);
     }
   }
 
@@ -792,7 +984,7 @@ export default function Page() {
         : platform === "email"
         ? emailProof || null
         : platform === "telegram"
-        ? telegramProof || null 
+        ? telegramProof || null
         : null;
 
     const payload = {
@@ -837,7 +1029,11 @@ export default function Page() {
   }
 
   const linkChipLabel =
-    linkExists == null ? "Link: —" : linkExists ? "Link: exists" : "Link: missing";
+    linkExists == null
+      ? "Link: —"
+      : linkExists
+      ? `Link: exists (${linkedWallets.length} wallet${linkedWallets.length !== 1 ? "s" : ""})`
+      : "Link: missing";
 
   const simpleSteps = useMemo(() => {
     const walletOk = !!publicKey;
@@ -862,6 +1058,9 @@ export default function Page() {
     identityStatus,
     linkExists,
   ]);
+
+  // Current wallet already linked?
+  const currentWalletLinked = linkExists === true;
 
   return (
     <Box
@@ -975,7 +1174,8 @@ export default function Page() {
               variant="body2"
               sx={{ opacity: 0.78, fontFamily: "system-ui", mb: 2 }}
             >
-              Choose your platform, connect, then link your wallet in one click.
+              Choose your platform, connect, then link your wallet. You can link
+              multiple wallets to the same identity.
             </Typography>
 
             {/* Step 1: Platform Selection & Connection */}
@@ -1007,21 +1207,23 @@ export default function Page() {
                 flexWrap="wrap"
                 useFlexGap
               >
-                {(["discord", "email", "telegram", "twitter"] as const).map((p) => (
-                  <Button
-                    key={p}
-                    onClick={() => setPlatform(p)}
-                    variant={platform === p ? "contained" : "outlined"}
-                    sx={{
-                      fontFamily: '"Bangers", system-ui',
-                      letterSpacing: 0.6,
-                      textTransform: "capitalize",
-                      minWidth: 100,
-                    }}
-                  >
-                    {p}
-                  </Button>
-                ))}
+                {(["discord", "email", "telegram", "twitter"] as const).map(
+                  (p) => (
+                    <Button
+                      key={p}
+                      onClick={() => setPlatform(p)}
+                      variant={platform === p ? "contained" : "outlined"}
+                      sx={{
+                        fontFamily: '"Bangers", system-ui',
+                        letterSpacing: 0.6,
+                        textTransform: "capitalize",
+                        minWidth: 100,
+                      }}
+                    >
+                      {p}
+                    </Button>
+                  )
+                )}
               </Stack>
 
               {/* Platform-Specific Connection UI */}
@@ -1076,11 +1278,13 @@ export default function Page() {
                   }}
                   onAuth={handleTelegramAuth}
                   showWidget={showTelegramWidget}
-                  botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || ""}
+                  botUsername={
+                    process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || ""
+                  }
                 />
               )}
 
-              {(platform === "twitter") && (
+              {platform === "twitter" && (
                 <Paper
                   sx={{
                     p: 2,
@@ -1091,8 +1295,7 @@ export default function Page() {
                   <Typography
                     sx={{ fontFamily: "system-ui", fontSize: 14, opacity: 0.9 }}
                   >
-                    Twitter verification
-                    coming soon!
+                    Twitter verification coming soon!
                   </Typography>
                   <Typography
                     sx={{
@@ -1118,6 +1321,7 @@ export default function Page() {
                   borderRadius: 2,
                   background: "rgba(34,197,94,0.08)",
                   border: "2px solid rgba(34,197,94,0.2)",
+                  mb: 2,
                 }}
               >
                 <Typography
@@ -1134,7 +1338,9 @@ export default function Page() {
                 {/* Status Summary */}
                 <Stack spacing={1} sx={{ mb: 2 }}>
                   <StatusChip
-                    label={`Wallet: ${publicKey ? shortB58(publicKey) : "Not connected"}`}
+                    label={`Wallet: ${
+                      publicKey ? shortB58(publicKey) : "Not connected"
+                    }`}
                     ok={!!publicKey}
                   />
                   <StatusChip
@@ -1152,8 +1358,10 @@ export default function Page() {
                     ok={identityInfo?.verified === true}
                   />
                   <StatusChip
-                    label={`Link: ${linkExists ? "Already linked" : "Ready to link"}`}
-                    ok={linkExists === true}
+                    label={`This wallet: ${
+                      currentWalletLinked ? "Linked" : "Not linked"
+                    }`}
+                    ok={currentWalletLinked}
                   />
                 </Stack>
 
@@ -1167,7 +1375,7 @@ export default function Page() {
                     !publicKey ||
                     !spaceSalt ||
                     !platformUserId.trim() ||
-                    linkExists === true ||
+                    currentWalletLinked ||
                     spaceExists === false
                   }
                   sx={{
@@ -1175,11 +1383,11 @@ export default function Page() {
                     letterSpacing: 0.8,
                     fontSize: 18,
                     py: 1.5,
-                    background: linkExists
+                    background: currentWalletLinked
                       ? "rgba(34,197,94,0.3)"
                       : "linear-gradient(135deg, #7c4dff 0%, #26c6ff 100%)",
                     "&:hover": {
-                      background: linkExists
+                      background: currentWalletLinked
                         ? "rgba(34,197,94,0.3)"
                         : "linear-gradient(135deg, #6a3de8 0%, #1fa8e8 100%)",
                     },
@@ -1189,14 +1397,30 @@ export default function Page() {
                     },
                   }}
                 >
-                  {linkExists
-                    ? "✅ Already Linked"
+                  {currentWalletLinked
+                    ? "✅ This Wallet Linked"
                     : spaceExists === false
                     ? "Community Not Enabled"
                     : !publicKey
                     ? "Connect Wallet First"
+                    : linkedWallets.length > 0
+                    ? "🔗 Link Additional Wallet"
                     : "🔗 Link Wallet Now"}
                 </Button>
+
+                {currentWalletLinked && linkedWallets.length > 0 && (
+                  <Typography
+                    sx={{
+                      mt: 1,
+                      textAlign: "center",
+                      fontFamily: "system-ui",
+                      fontSize: 13,
+                      opacity: 0.7,
+                    }}
+                  >
+                    Switch to a different wallet to link another one.
+                  </Typography>
+                )}
 
                 {!publicKey && (
                   <Typography
@@ -1230,6 +1454,74 @@ export default function Page() {
               </Box>
             )}
 
+            {/* ===========================
+                Linked Wallets List
+               =========================== */}
+            {linkedWallets.length > 0 && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "2px solid rgba(255,255,255,0.08)",
+                  mb: 2,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ mb: 1.5 }}
+                >
+                  <Typography
+                    sx={{
+                      fontFamily: '"Bangers", system-ui',
+                      letterSpacing: 0.6,
+                      fontSize: 16,
+                    }}
+                  >
+                    <WalletIcon
+                      sx={{ fontSize: 18, mr: 0.75, verticalAlign: "text-bottom" }}
+                    />
+                    Linked Wallets ({linkedWallets.length})
+                  </Typography>
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={() => refresh()}
+                    sx={{ fontFamily: "system-ui", fontSize: 12 }}
+                  >
+                    Refresh
+                  </Button>
+                </Stack>
+
+                <Stack spacing={1}>
+                  {linkedWallets.map((lw) => (
+                    <LinkedWalletRow
+                      key={lw.walletHashHex}
+                      wallet={lw}
+                      onUnlink={() => unlinkWallet(lw.walletHashHex)}
+                      unlinking={unlinkingWallet === lw.walletHashHex}
+                      canUnlink={!!publicKey && !!signMessage}
+                    />
+                  ))}
+                </Stack>
+
+                {linkedWalletsLoading && (
+                  <Typography
+                    sx={{
+                      fontFamily: "system-ui",
+                      fontSize: 12,
+                      opacity: 0.6,
+                      mt: 1,
+                    }}
+                  >
+                    Loading linked wallets...
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             {/* Errors & Messages */}
             {error && (
               <Paper
@@ -1241,7 +1533,11 @@ export default function Page() {
                 }}
               >
                 <Typography
-                  sx={{ fontFamily: "system-ui", color: "#ff8fa3", fontSize: 14 }}
+                  sx={{
+                    fontFamily: "system-ui",
+                    color: "#ff8fa3",
+                    fontSize: 14,
+                  }}
                 >
                   ❌ {error}
                 </Typography>
@@ -1303,7 +1599,9 @@ export default function Page() {
                   endIcon={
                     <ExpandMoreIcon
                       sx={{
-                        transform: advancedOpen ? "rotate(180deg)" : "rotate(0deg)",
+                        transform: advancedOpen
+                          ? "rotate(180deg)"
+                          : "rotate(0deg)",
                       }}
                     />
                   }
@@ -1339,17 +1637,25 @@ export default function Page() {
                     <Typography variant="h3">Space</Typography>
                     <Typography
                       variant="body2"
-                      sx={{ mt: 0.5, opacity: 0.75, fontFamily: "system-ui" }}
+                      sx={{
+                        mt: 0.5,
+                        opacity: 0.75,
+                        fontFamily: "system-ui",
+                      }}
                     >
-                      Space config PDA (per DAO): contains salt + attestor + frozen
-                      flag.
+                      Space config PDA (per DAO): contains salt + attestor +
+                      frozen flag.
                     </Typography>
 
                     <Divider sx={{ my: 2 }} />
 
                     <Stack spacing={1.25}>
                       <Typography
-                        sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}
+                        sx={{
+                          fontFamily: "system-ui",
+                          fontSize: 12,
+                          opacity: 0.7,
+                        }}
                       >
                         DAO ID
                       </Typography>
@@ -1434,17 +1740,25 @@ export default function Page() {
                     <Typography variant="h3">Identity</Typography>
                     <Typography
                       variant="body2"
-                      sx={{ mt: 0.5, opacity: 0.75, fontFamily: "system-ui" }}
+                      sx={{
+                        mt: 0.5,
+                        opacity: 0.75,
+                        fontFamily: "system-ui",
+                      }}
                     >
-                      Identity PDA: (space, platform, id_hash). Stores only hashed ID
-                      + attestation info.
+                      Identity PDA: (space, platform, id_hash). Stores only
+                      hashed ID + attestation info.
                     </Typography>
 
                     <Divider sx={{ my: 2 }} />
 
                     <Stack spacing={1.25}>
                       <Typography
-                        sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}
+                        sx={{
+                          fontFamily: "system-ui",
+                          fontSize: 12,
+                          opacity: 0.7,
+                        }}
                       >
                         Platform
                       </Typography>
@@ -1484,7 +1798,9 @@ export default function Page() {
                       <Box
                         component="input"
                         value={platformUserId}
-                        onChange={(e: any) => setPlatformUserId(e.target.value)}
+                        onChange={(e: any) =>
+                          setPlatformUserId(e.target.value)
+                        }
                         placeholder="Discord/Telegram/etc user id"
                         style={{
                           width: "100%",
@@ -1553,7 +1869,8 @@ export default function Page() {
                     sx={{ mt: 0.5, opacity: 0.75, fontFamily: "system-ui" }}
                   >
                     Wallet signs consent → attestor verifies → attestor submits
-                    on-chain link.
+                    on-chain link. Multiple wallets can be linked to one
+                    identity.
                   </Typography>
 
                   <Divider sx={{ my: 2 }} />
@@ -1567,15 +1884,23 @@ export default function Page() {
                     }}
                   >
                     <Stack spacing={1.1}>
-                      <InfoRow label="Connected wallet" value={b58(publicKey)} mono />
+                      <InfoRow
+                        label="Connected wallet"
+                        value={b58(publicKey)}
+                        mono
+                      />
                       <InfoRow
                         label="wallet_hash (hex)"
                         value={bytesToHex(walletHashBytes)}
                         mono
                       />
-                      <InfoRow label="Link PDA" value={linkPda?.toBase58() || "—"} mono />
                       <InfoRow
-                        label="Link"
+                        label="Link PDA"
+                        value={linkPda?.toBase58() || "—"}
+                        mono
+                      />
+                      <InfoRow
+                        label="This wallet link"
                         value={
                           linkExists == null
                             ? "—"
@@ -1584,8 +1909,19 @@ export default function Page() {
                             : "❌ missing"
                         }
                       />
+                      <InfoRow
+                        label="Total linked"
+                        value={
+                          linkedWalletsLoading
+                            ? "Loading..."
+                            : `${linkedWallets.length} wallet(s)`
+                        }
+                      />
                       {linkInfo && (
-                        <InfoRow label="Linked at" value={fmtTs(linkInfo.linkedAt)} />
+                        <InfoRow
+                          label="Linked at"
+                          value={fmtTs(linkInfo.linkedAt)}
+                        />
                       )}
                     </Stack>
 
@@ -1597,7 +1933,9 @@ export default function Page() {
                             setError(String(e?.message || e))
                           )
                         }
-                        disabled={!publicKey || !spaceSalt || !platformUserId.trim()}
+                        disabled={
+                          !publicKey || !spaceSalt || !platformUserId.trim()
+                        }
                       >
                         Sign consent (wallet)
                       </Button>
@@ -1609,7 +1947,9 @@ export default function Page() {
                             setError(String(e?.message || e))
                           )
                         }
-                        disabled={!publicKey || !spaceSalt || !platformUserId.trim()}
+                        disabled={
+                          !publicKey || !spaceSalt || !platformUserId.trim()
+                        }
                       >
                         Submit to attestor API
                       </Button>
@@ -1628,13 +1968,48 @@ export default function Page() {
                           borderStyle: "dashed",
                         }}
                       >
-                        <Typography sx={{ fontFamily: "system-ui", fontSize: 12 }}>
-                          <b>Note:</b> Linking requires the on-chain <i>attestor</i>{" "}
-                          to sign txs. This UI prepares the signed consent payload.
+                        <Typography
+                          sx={{ fontFamily: "system-ui", fontSize: 12 }}
+                        >
+                          <b>Note:</b> Linking requires the on-chain{" "}
+                          <i>attestor</i> to sign txs. This UI prepares the
+                          signed consent payload.
                         </Typography>
                       </Paper>
                     </Stack>
                   </Box>
+
+                  {/* Linked Wallets Table (Advanced) */}
+                  {linkedWallets.length > 0 && (
+                    <>
+                      <Divider sx={{ my: 2 }} />
+                      <Typography
+                        sx={{
+                          fontFamily: '"Bangers", system-ui',
+                          letterSpacing: 0.6,
+                          fontSize: 16,
+                          mb: 1.5,
+                        }}
+                      >
+                        All Linked Wallets ({linkedWallets.length})
+                      </Typography>
+
+                      <Stack spacing={1}>
+                        {linkedWallets.map((lw) => (
+                          <LinkedWalletRow
+                            key={lw.walletHashHex}
+                            wallet={lw}
+                            onUnlink={() => unlinkWallet(lw.walletHashHex)}
+                            unlinking={
+                              unlinkingWallet === lw.walletHashHex
+                            }
+                            canUnlink={!!publicKey && !!signMessage}
+                            advanced
+                          />
+                        ))}
+                      </Stack>
+                    </>
+                  )}
 
                   {error && (
                     <Paper
@@ -1654,7 +2029,9 @@ export default function Page() {
                   )}
 
                   {msg && (
-                    <Paper sx={{ mt: 2, p: 1.25, background: "rgba(0,0,0,.25)" }}>
+                    <Paper
+                      sx={{ mt: 2, p: 1.25, background: "rgba(0,0,0,.25)" }}
+                    >
                       <Typography
                         component="pre"
                         sx={{
@@ -1692,6 +2069,106 @@ export default function Page() {
 // ===========================
 // Helper Components
 // ===========================
+
+function LinkedWalletRow({
+  wallet,
+  onUnlink,
+  unlinking,
+  canUnlink,
+  advanced,
+}: {
+  wallet: LinkedWallet;
+  onUnlink: () => void;
+  unlinking: boolean;
+  canUnlink: boolean;
+  advanced?: boolean;
+}) {
+  return (
+    <Box
+      sx={{
+        px: 1.5,
+        py: 1,
+        borderRadius: 2,
+        background: wallet.isCurrentWallet
+          ? "rgba(124,77,255,0.12)"
+          : "rgba(255,255,255,0.04)",
+        border: `2px solid ${
+          wallet.isCurrentWallet
+            ? "rgba(124,77,255,0.3)"
+            : "rgba(255,255,255,0.08)"
+        }`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 1,
+        flexWrap: "wrap",
+      }}
+    >
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+        <WalletIcon sx={{ fontSize: 16, opacity: 0.6, flexShrink: 0 }} />
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontFamily:
+                '"Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+              fontSize: 12,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {advanced ? wallet.walletHashHex : shortHex(wallet.walletHashHex)}
+            {wallet.isCurrentWallet && (
+              <Chip
+                label="current"
+                size="small"
+                sx={{
+                  ml: 1,
+                  height: 18,
+                  fontSize: 10,
+                  fontFamily: "system-ui",
+                  background: "rgba(124,77,255,0.25)",
+                  color: "#c4b5fd",
+                }}
+              />
+            )}
+          </Typography>
+          <Typography
+            sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.55 }}
+          >
+            Linked {fmtTs(wallet.linkedAt)}
+          </Typography>
+        </Box>
+      </Stack>
+
+      <Tooltip title={canUnlink ? "Unlink this wallet" : "Connect wallet to unlink"}>
+        <span>
+          <IconButton
+            size="small"
+            onClick={onUnlink}
+            disabled={!canUnlink || unlinking}
+            sx={{
+              color: "rgba(255,100,100,0.8)",
+              "&:hover": {
+                background: "rgba(255,100,100,0.15)",
+                color: "#ff6b6b",
+              },
+              "&:disabled": { opacity: 0.3 },
+            }}
+          >
+            {unlinking ? (
+              <Typography sx={{ fontSize: 11, fontFamily: "system-ui" }}>
+                …
+              </Typography>
+            ) : (
+              <LinkOffIcon sx={{ fontSize: 18 }} />
+            )}
+          </IconButton>
+        </span>
+      </Tooltip>
+    </Box>
+  );
+}
 
 function PlatformConnectionCard({
   platform,
@@ -1736,7 +2213,9 @@ function PlatformConnectionCard({
           >
             {platform} {connected && "✅"}
           </Typography>
-          <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
+          <Typography
+            sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}
+          >
             {connected ? `Connected: ${label || platform}` : `Not connected`}
           </Typography>
         </Box>
@@ -1788,14 +2267,6 @@ function TelegramConnectionCard({
   showWidget: boolean;
   botUsername: string;
 }) {
-
-  console.log("TelegramConnectionCard render:", {
-    connected,
-    showWidget,
-    botUsername,
-    hasBotUsername: !!botUsername,
-  });
-
   return (
     <Paper
       sx={{
@@ -1824,8 +2295,12 @@ function TelegramConnectionCard({
           >
             Telegram {connected && "✅"}
           </Typography>
-          <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
-            {connected ? `Connected: ${label || "Telegram"}` : "Not connected"}
+          <Typography
+            sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}
+          >
+            {connected
+              ? `Connected: ${label || "Telegram"}`
+              : "Not connected"}
           </Typography>
         </Box>
 
@@ -1922,7 +2397,9 @@ function EmailConnectionCard({
             >
               Email ✅
             </Typography>
-            <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
+            <Typography
+              sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}
+            >
               Verified: {email}
             </Typography>
           </Box>
@@ -1960,7 +2437,12 @@ function EmailConnectionCard({
           Email Verification
         </Typography>
         <Typography
-          sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8, mb: 2 }}
+          sx={{
+            fontFamily: "system-ui",
+            fontSize: 13,
+            opacity: 0.8,
+            mb: 2,
+          }}
         >
           Enter your email to receive a verification code
         </Typography>
@@ -2114,7 +2596,9 @@ function InfoRow({
         alignItems: "center",
       }}
     >
-      <Typography sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}>
+      <Typography
+        sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}
+      >
         {label}
       </Typography>
 
