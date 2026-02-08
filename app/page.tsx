@@ -1404,22 +1404,71 @@ export default function Page() {
                     : !publicKey
                     ? "Connect Wallet First"
                     : linkedWallets.length > 0
-                    ? "🔗 Link Additional Wallet"
+                    ? "🔗 Link This Wallet"
                     : "🔗 Link Wallet Now"}
                 </Button>
 
-                {currentWalletLinked && linkedWallets.length > 0 && (
-                  <Typography
+                {/* Add another wallet prompt — shows when current is linked */}
+                {currentWalletLinked && (
+                  <Paper
                     sx={{
-                      mt: 1,
-                      textAlign: "center",
-                      fontFamily: "system-ui",
-                      fontSize: 13,
-                      opacity: 0.7,
+                      mt: 2,
+                      p: 1.5,
+                      background: "rgba(124,77,255,0.08)",
+                      border: "2px solid rgba(124,77,255,0.2)",
+                      borderRadius: 2,
                     }}
                   >
-                    Switch to a different wallet to link another one.
-                  </Typography>
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1.5}
+                      alignItems="center"
+                      justifyContent="space-between"
+                    >
+                      <Box>
+                        <Typography
+                          sx={{
+                            fontFamily: '"Bangers", system-ui',
+                            letterSpacing: 0.6,
+                            fontSize: 15,
+                          }}
+                        >
+                          <WalletIcon
+                            sx={{
+                              fontSize: 16,
+                              mr: 0.75,
+                              verticalAlign: "text-bottom",
+                            }}
+                          />
+                          Want to link another wallet?
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontFamily: "system-ui",
+                            fontSize: 12,
+                            opacity: 0.7,
+                            mt: 0.25,
+                          }}
+                        >
+                          Disconnect this wallet using the button above, then
+                          connect a different one. Each wallet you connect can
+                          be linked to this same{" "}
+                          {platform.charAt(0).toUpperCase() + platform.slice(1)}{" "}
+                          identity.
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={`${linkedWallets.length} linked`}
+                        size="small"
+                        sx={{
+                          fontFamily: "system-ui",
+                          background: "rgba(124,77,255,0.2)",
+                          color: "#c4b5fd",
+                          flexShrink: 0,
+                        }}
+                      />
+                    </Stack>
+                  </Paper>
                 )}
 
                 {!publicKey && (
