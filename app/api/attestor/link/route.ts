@@ -179,7 +179,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing signatureBase64" }, { status: 400 });
     }
 
-    const programIdStr = process.env.NEXT_PUBLIC_REGISTRY_PROGRAM_ID;
+    const programIdStr = REGISTRY_PROGRAM_ID;
     const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC || process.env.REACT_APP_RPC_ENDPOINT;
     const attestorSk = process.env.ATTESTOR_SECRET_KEY;
     const discordProofSecret = process.env.DISCORD_PROOF_SECRET;
@@ -217,7 +217,7 @@ export async function POST(req: Request) {
 
     console.log("📦 Program ID:", programId.toBase58());
 
-    if (programIdStr && programIdStr !== programId.toBase58()) {
+    if (programIdStr && programIdStr.toBase58() !== programId.toBase58()) {
       return NextResponse.json(
         {
           error: "Program ID mismatch",

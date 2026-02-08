@@ -97,7 +97,7 @@ export default function CreateSpaceDialog({
   async function handleCreate() {
     setErr("");
     setBusy(true);
-
+    console.log("🚀 Creating space on PROGRAM ID:", PROGRAM_ID.toBase58());
     try {
       if (!wallet.publicKey) throw new Error("Connect a wallet first.");
       if (!wallet.sendTransaction)
@@ -120,6 +120,9 @@ export default function CreateSpaceDialog({
 
       const tx = new Transaction().add(ix);
       tx.feePayer = wallet.publicKey;
+
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
 
       const sig = await wallet.sendTransaction(tx, connection, {
         preflightCommitment: "confirmed",
@@ -154,7 +157,7 @@ export default function CreateSpaceDialog({
       maxWidth="md"
       PaperProps={{
         sx: {
-          borderRadius: 9,
+          borderRadius: 2,
           overflow: "hidden",
           border: "3px solid rgba(0,0,0,0.55)",
           boxShadow: "14px 14px 0 rgba(0,0,0,0.35)",
