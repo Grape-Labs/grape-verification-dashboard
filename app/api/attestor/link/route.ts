@@ -142,14 +142,12 @@ function buildConsentMessage(p: {
   walletHashHex: string;
   ts: number | string;
 }) {
+  // ✅ NEW: Match the simplified message format from linkWalletOneClick()
   return new TextEncoder().encode(
     `Grape Verification Link Request\n` +
-      `daoId=${p.daoId}\n` +
       `platform=${p.platform}\n` +
-      `idHash=${p.idHashHex}\n` +
       `wallet=${p.wallet}\n` +
-      `walletHash=${p.walletHashHex}\n` +
-      `ts=${p.ts}\n`
+      `ts=${p.ts}`
   );
 }
 

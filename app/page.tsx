@@ -36,6 +36,7 @@ import {
   TAG_TELEGRAM,
   TAG_TWITTER,
 } from "@grapenpm/grape-verification-registry";
+import TelegramLoginButton from "./components/TelegramLoginButton";
 
 type PlatformKey = "discord" | "telegram" | "twitter" | "email";
 
@@ -213,6 +214,12 @@ export default function Page() {
   const [emailSending, setEmailSending] = useState(false);
   const [emailVerifying, setEmailVerifying] = useState(false);
 
+  // Telegram state
+  const [telegramConnected, setTelegramConnected] = useState(false);
+  const [telegramLabel, setTelegramLabel] = useState<string | null>(null);
+  const [telegramProof, setTelegramProof] = useState<string | null>(null);
+  const [showTelegramWidget, setShowTelegramWidget] = useState(false);
+
   // Core state
   const [daoIdStr, setDaoIdStr] = useState(
     process.env.NEXT_PUBLIC_DEFAULT_DAO_ID || ""
@@ -240,6 +247,8 @@ export default function Page() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
+
+
 
   // Load mode from localStorage
   useEffect(() => {
@@ -403,6 +412,64 @@ export default function Page() {
     if (platform === "email") setPlatformUserId("");
   }
 
+  // ✅ ADD: Telegram functions
+  async function loadTelegramSession() {
+    try {
+      const me = await fetch("/api/telegram/me", { cache: "no-store" }).then((r) =>
+        r.json()
+      );
+      setTelegramConnected(!!me?.connected);
+      setTelegramLabel(me?.label || null);
+
+      if (me?.connected && me?.id && platform === "telegram") {
+        setPlatformUserId(String(me.id));
+      }
+    } catch {
+      setTelegramConnected(false);
+      setTelegramLabel(null);
+    }
+  }
+
+  async function loadTelegramProof() {
+    try {
+      const r = await fetch("/api/telegram/proof", { cache: "no-store" });
+      const j = await r.json();
+      if (j?.connected && j?.proof) setTelegramProof(j.proof);
+      else setTelegramProof(null);
+    } catch {
+      setTelegramProof(null);
+    }
+  }
+
+  async function handleTelegramAuth(user: any) {
+    try {
+      const res = await fetch("/api/telegram/callback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(user),
+      });
+
+      if (res.ok) {
+        await loadTelegramSession();
+        await loadTelegramProof();
+        setShowTelegramWidget(false);
+      } else {
+        const err = await res.json();
+        setError(err.error || "Telegram auth failed");
+      }
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    }
+  }
+
+  async function disconnectTelegram() {
+    await fetch("/api/telegram/disconnect", { method: "POST" }).catch(() => {});
+    setTelegramConnected(false);
+    setTelegramLabel(null);
+    setTelegramProof(null);
+    if (platform === "telegram") setPlatformUserId("");
+  }
+
   // Load platform sessions
   useEffect(() => {
     if (platform === "discord") {
@@ -411,6 +478,9 @@ export default function Page() {
     } else if (platform === "email") {
       loadEmailSession();
       loadEmailProof();
+    } else if (platform === "telegram") {
+      loadTelegramSession();
+      loadTelegramProof();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform]);
@@ -578,7 +648,10 @@ export default function Page() {
         platformProofValue = discordProof;
       } else if (platform === "email" && emailProof) {
         platformProofValue = emailProof;
+      } else if (platform === "telegram" && telegramProof) {
+        platformProofValue = telegramProof;
       }
+
 
       const payload = {
         daoId: daoPk.toBase58(),
@@ -718,6 +791,8 @@ export default function Page() {
         ? discordProof || null
         : platform === "email"
         ? emailProof || null
+        : platform === "telegram"
+        ? telegramProof || null 
         : null;
 
     const payload = {
@@ -769,7 +844,8 @@ export default function Page() {
     const spaceOk = spaceExists === true;
     const platformOk =
       (platform === "discord" && discordConnected) ||
-      (platform === "email" && emailConnected);
+      (platform === "email" && emailConnected) ||
+      (platform === "telegram" && telegramConnected);
     const verifiedOk =
       identityInfo?.verified === true && identityStatus.startsWith("Verified");
     const linkOk = linkExists === true;
@@ -781,6 +857,7 @@ export default function Page() {
     platform,
     discordConnected,
     emailConnected,
+    telegramConnected,
     identityInfo,
     identityStatus,
     linkExists,
@@ -987,7 +1064,23 @@ export default function Page() {
                 />
               )}
 
-              {(platform === "telegram" || platform === "twitter") && (
+              {platform === "telegram" && (
+                <TelegramConnectionCard
+                  connected={telegramConnected}
+                  label={telegramLabel}
+                  onConnect={() => setShowTelegramWidget(true)}
+                  onDisconnect={disconnectTelegram}
+                  onRefresh={() => {
+                    loadTelegramSession();
+                    loadTelegramProof();
+                  }}
+                  onAuth={handleTelegramAuth}
+                  showWidget={showTelegramWidget}
+                  botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || ""}
+                />
+              )}
+
+              {(platform === "twitter") && (
                 <Paper
                   sx={{
                     p: 2,
@@ -998,7 +1091,7 @@ export default function Page() {
                   <Typography
                     sx={{ fontFamily: "system-ui", fontSize: 14, opacity: 0.9 }}
                   >
-                    {platform === "telegram" ? "Telegram" : "Twitter"} verification
+                    Twitter verification
                     coming soon!
                   </Typography>
                   <Typography
@@ -1009,7 +1102,7 @@ export default function Page() {
                       mt: 0.5,
                     }}
                   >
-                    For now, you can test with Discord or Email.
+                    For now, you can test with Discord, Telegram or Email.
                   </Typography>
                 </Paper>
               )}
@@ -1659,6 +1752,103 @@ function PlatformConnectionCard({
             >
               Connect {platform}
             </Button>
+          ) : (
+            <>
+              <Button variant="outlined" size="small" onClick={onRefresh}>
+                Refresh
+              </Button>
+              <Button variant="text" size="small" onClick={onDisconnect}>
+                Disconnect
+              </Button>
+            </>
+          )}
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
+
+function TelegramConnectionCard({
+  connected,
+  label,
+  onConnect,
+  onDisconnect,
+  onRefresh,
+  onAuth,
+  showWidget,
+  botUsername,
+}: {
+  connected: boolean;
+  label: string | null;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onRefresh: () => void;
+  onAuth: (user: any) => void;
+  showWidget: boolean;
+  botUsername: string;
+}) {
+
+  console.log("TelegramConnectionCard render:", {
+    connected,
+    showWidget,
+    botUsername,
+    hasBotUsername: !!botUsername,
+  });
+
+  return (
+    <Paper
+      sx={{
+        p: 2,
+        background: connected
+          ? "rgba(34,197,94,0.10)"
+          : "rgba(255,255,255,0.06)",
+        border: `2px solid ${
+          connected ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.10)"
+        }`,
+      }}
+    >
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems="center"
+        justifyContent="space-between"
+      >
+        <Box>
+          <Typography
+            sx={{
+              fontFamily: '"Bangers", system-ui',
+              letterSpacing: 0.6,
+              fontSize: 16,
+            }}
+          >
+            Telegram {connected && "✅"}
+          </Typography>
+          <Typography sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8 }}>
+            {connected ? `Connected: ${label || "Telegram"}` : "Not connected"}
+          </Typography>
+        </Box>
+
+        <Stack direction="row" spacing={1}>
+          {!connected ? (
+            showWidget && botUsername ? (
+              <Box>
+                <TelegramLoginButton
+                  botUsername={botUsername}
+                  onAuth={onAuth}
+                />
+              </Box>
+            ) : (
+              <Button
+                variant="contained"
+                onClick={onConnect}
+                sx={{
+                  fontFamily: '"Bangers", system-ui',
+                  letterSpacing: 0.6,
+                }}
+              >
+                Connect Telegram
+              </Button>
+            )
           ) : (
             <>
               <Button variant="outlined" size="small" onClick={onRefresh}>
