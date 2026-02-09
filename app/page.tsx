@@ -30,7 +30,6 @@ import CreateSpaceDialog from "./components/CreateSpaceDialog";
 import WalletComicButton from "./components/WalletComicButton";
 
 import {
-  PROGRAM_ID,
   VerificationPlatform,
   deriveIdentityPda,
   deriveLinkPda,
@@ -41,20 +40,12 @@ import {
   TAG_EMAIL,
   TAG_TELEGRAM,
   TAG_TWITTER,
+  fetchLinkedWallets,        // ← ADD
+  type LinkedWallet,         // ← ADD
 } from "@grapenpm/grape-verification-registry";
 import TelegramLoginButton from "./components/TelegramLoginButton";
 
 type PlatformKey = "discord" | "telegram" | "twitter" | "email";
-
-/* ---------- parsed Link account returned by getProgramAccounts ---------- */
-interface LinkedWallet {
-  pubkey: PublicKey; // the Link PDA
-  walletHashBytes: Uint8Array;
-  walletHashHex: string;
-  linkedAt: number;
-  identity: PublicKey;
-  isCurrentWallet: boolean; // true when walletHash matches the connected wallet
-}
 
 function platformSeed(platform: PlatformKey): number {
   switch (platform) {
@@ -222,52 +213,6 @@ import { sha256 } from "@noble/hashes/sha256";
 import { utf8ToBytes } from "@noble/hashes/utils";
 
 const LINK_ACCOUNT_DISC = sha256(utf8ToBytes("account:LinkAccount")).slice(0, 8);
-
-/* =========================================================================
- * Fetch ALL Link accounts for a given Identity PDA
- *
- * Link account layout (82 bytes):
- *   [0..8]   discriminator
- *   [8]      version (u8)
- *   [9..41]  identity (Pubkey, 32 bytes)   ← we filter on this
- *   [41..73] wallet_hash ([u8;32])
- *   [73..81] linked_at (i64 LE)
- *   [81]     bump (u8)
- * ========================================================================= */
-async function fetchLinkedWallets(
-  connection: Connection,
-  identityPda: PublicKey,
-  currentWalletHash: Uint8Array | null
-): Promise<LinkedWallet[]> {
-  try {
-    const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
-      filters: [
-        { memcmp: { offset: 0, bytes: Buffer.from(LINK_ACCOUNT_DISC).toString("base64"), encoding: "base64" } },
-        { memcmp: { offset: 9, bytes: identityPda.toBase58() } },
-      ],
-    });
-
-    const currentHex = currentWalletHash ? bytesToHex(currentWalletHash) : null;
-
-    return accounts
-      .map((a) => {
-        const parsed = parseLink(a.account.data);
-        const whHex = bytesToHex(parsed.walletHashBytes);
-        return {
-          pubkey: a.pubkey,
-          walletHashBytes: parsed.walletHashBytes,
-          walletHashHex: whHex,
-          linkedAt: parsed.linkedAt,
-          identity: parsed.identity,
-          isCurrentWallet: currentHex !== null && whHex === currentHex,
-        };
-      })
-      .sort((a, b) => a.linkedAt - b.linkedAt);
-  } catch (e) {
-    console.error("fetchLinkedWallets error:", e);
-    return [];
-  }
-}
 
 export default function Page() {
   const { connection } = useConnection();
@@ -606,6 +551,8 @@ export default function Page() {
 
       const acct = await safeGetAccountInfo(connection, pda);
       if (cancelled) return;
+
+      console.log("Identity account exists?", !!acct);
 
       setSpaceExists(!!acct);
       if (!acct) return;
@@ -1964,11 +1911,13 @@ export default function Page() {
                       />
                       <InfoRow
                         label="Total linked"
-                        value={
-                          linkedWalletsLoading
-                            ? "Loading..."
-                            : `${linkedWallets.length} wallet(s)`
-                        }
+                          value={
+                            linkedWalletsLoading
+                              ? "Loading..."
+                              : linkedWallets.length === 0 && linkExists
+                              ? "⚠️ 0 (try refresh)"
+                              : `${linkedWallets.length} wallet(s)`
+                          }
                       />
                       {linkInfo && (
                         <InfoRow
