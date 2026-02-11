@@ -256,6 +256,7 @@ export default function Page() {
 
   // Discord state
   const [discordConnected, setDiscordConnected] = useState(false);
+  const [discordSessionReady, setDiscordSessionReady] = useState(false);
   const [discordLabel, setDiscordLabel] = useState<string | null>(null);
   const [discordProof, setDiscordProof] = useState<string | null>(null);
 
@@ -283,6 +284,10 @@ export default function Page() {
   const [platformUserId, setPlatformUserId] = useState("");
   const [deepLinkSource, setDeepLinkSource] = useState<string | null>(null);
   const [deepLinkGuildId, setDeepLinkGuildId] = useState<string | null>(null);
+  const [deepLinkPlatform, setDeepLinkPlatform] = useState<PlatformKey | null>(
+    null
+  );
+  const [deepLinkAutoStarted, setDeepLinkAutoStarted] = useState(false);
 
   const [spacePda, setSpacePda] = useState<PublicKey | null>(null);
   const [spaceSalt, setSpaceSalt] = useState<Uint8Array | null>(null);
@@ -325,6 +330,8 @@ export default function Page() {
     const params = new URLSearchParams(window.location.search);
     const sourceParam = (params.get("source") || "").trim().toLowerCase();
     const platformParam = toPlatformKey(params.get("platform"));
+    const sourceAsPlatform = toPlatformKey(sourceParam);
+    const targetPlatform = platformParam || sourceAsPlatform;
     const platformUserIdParam = (
       params.get("platform_user_id") ||
       params.get("platformUserId") ||
@@ -335,12 +342,9 @@ export default function Page() {
 
     if (sourceParam) setDeepLinkSource(sourceParam);
     if (guildIdParam) setDeepLinkGuildId(guildIdParam);
+    if (targetPlatform) setDeepLinkPlatform(targetPlatform);
 
-    if (platformParam) {
-      setPlatform(platformParam);
-    } else if (sourceParam === "discord") {
-      setPlatform("discord");
-    }
+    if (targetPlatform) setPlatform(targetPlatform);
 
     if (platformUserIdParam) {
       setPlatformUserId(platformUserIdParam);
@@ -360,6 +364,38 @@ export default function Page() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!deepLinkPlatform || deepLinkAutoStarted) return;
+
+    if (deepLinkPlatform === "discord") {
+      if (!discordSessionReady) return;
+      if (discordConnected) {
+        setDeepLinkAutoStarted(true);
+        return;
+      }
+      setDeepLinkAutoStarted(true);
+      startDiscordConnect();
+      return;
+    }
+
+    if (deepLinkPlatform === "telegram") {
+      if (!telegramConnected) setShowTelegramWidget(true);
+      setDeepLinkAutoStarted(true);
+      return;
+    }
+
+    if (deepLinkPlatform === "email") {
+      setDeepLinkAutoStarted(true);
+    }
+  }, [
+    deepLinkPlatform,
+    deepLinkAutoStarted,
+    discordSessionReady,
+    discordConnected,
+    telegramConnected,
+    startDiscordConnect,
+  ]);
+
   const toggleMode = () => {
     setAdvancedMode((v) => {
       const next = !v;
@@ -371,6 +407,7 @@ export default function Page() {
 
   // Discord functions
   async function loadDiscordSession() {
+    setDiscordSessionReady(false);
     try {
       const me = await fetch("/api/discord/me", { cache: "no-store" }).then((r) =>
         r.json()
@@ -384,6 +421,8 @@ export default function Page() {
     } catch {
       setDiscordConnected(false);
       setDiscordLabel(null);
+    } finally {
+      setDiscordSessionReady(true);
     }
   }
 
@@ -398,7 +437,7 @@ export default function Page() {
     }
   }
 
-  function startDiscordConnect() {
+  const startDiscordConnect = useCallback(() => {
     const returnTo =
       typeof window !== "undefined"
         ? window.location.pathname + window.location.search
@@ -406,7 +445,7 @@ export default function Page() {
     window.location.href = `/api/discord/start?returnTo=${encodeURIComponent(
       returnTo
     )}`;
-  }
+  }, []);
 
   async function disconnectDiscord() {
     await fetch("/api/discord/disconnect", { method: "POST" }).catch(() => {});
