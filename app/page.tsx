@@ -316,6 +316,16 @@ export default function Page() {
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
 
+  const startDiscordConnect = useCallback(() => {
+    const returnTo =
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/";
+    window.location.href = `/api/discord/start?returnTo=${encodeURIComponent(
+      returnTo
+    )}`;
+  }, []);
+
   // Load mode from localStorage
   useEffect(() => {
     const adv = modeFromLocalStorage();
@@ -436,16 +446,6 @@ export default function Page() {
       setDiscordProof(null);
     }
   }
-
-  const startDiscordConnect = useCallback(() => {
-    const returnTo =
-      typeof window !== "undefined"
-        ? window.location.pathname + window.location.search
-        : "/";
-    window.location.href = `/api/discord/start?returnTo=${encodeURIComponent(
-      returnTo
-    )}`;
-  }, []);
 
   async function disconnectDiscord() {
     await fetch("/api/discord/disconnect", { method: "POST" }).catch(() => {});
