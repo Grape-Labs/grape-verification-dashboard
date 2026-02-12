@@ -46,6 +46,13 @@ import {
 import TelegramLoginButton from "./components/TelegramLoginButton";
 
 type PlatformKey = "discord" | "telegram" | "twitter" | "email";
+type CommunityConfig = {
+  daoId: string;
+  name: string;
+  slug?: string;
+  guildId?: string;
+};
+
 const PLATFORM_KEYS = new Set<PlatformKey>([
   "discord",
   "telegram",
@@ -76,6 +83,101 @@ function parseGuildDaoMap(raw: string | undefined): Record<string, string> {
     return map;
   } catch {
     return {};
+  }
+}
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  return v as Record<string, unknown>;
+}
+
+function validPkString(value: string): boolean {
+  try {
+    new PublicKey(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function parseCommunityEntry(
+  sourceKey: string,
+  raw: unknown
+): CommunityConfig | null {
+  if (typeof raw === "string") {
+    const maybeDao = sourceKey.trim();
+    const maybeName = raw.trim();
+    if (validPkString(maybeDao) && maybeName) {
+      return { daoId: maybeDao, name: maybeName };
+    }
+    return null;
+  }
+
+  const obj = asRecord(raw);
+  if (!obj) return null;
+
+  const sourceKeyTrimmed = sourceKey.trim();
+  const daoIdCandidate =
+    typeof obj.daoId === "string"
+      ? obj.daoId.trim()
+      : validPkString(sourceKeyTrimmed)
+      ? sourceKeyTrimmed
+      : "";
+  if (!daoIdCandidate || !validPkString(daoIdCandidate)) return null;
+
+  const nameCandidate =
+    typeof obj.name === "string" && obj.name.trim()
+      ? obj.name.trim()
+      : typeof obj.communityName === "string" && obj.communityName.trim()
+      ? obj.communityName.trim()
+      : sourceKeyTrimmed && !validPkString(sourceKeyTrimmed)
+      ? sourceKeyTrimmed
+      : "";
+  if (!nameCandidate) return null;
+
+  const slug =
+    typeof obj.slug === "string" && obj.slug.trim()
+      ? obj.slug.trim().toLowerCase()
+      : undefined;
+  const guildId =
+    typeof obj.guildId === "string" && obj.guildId.trim()
+      ? obj.guildId.trim()
+      : typeof obj.discordGuildId === "string" && obj.discordGuildId.trim()
+      ? obj.discordGuildId.trim()
+      : undefined;
+
+  return { daoId: daoIdCandidate, name: nameCandidate, slug, guildId };
+}
+
+function parseCommunityRegistry(raw: string | undefined): CommunityConfig[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const out: CommunityConfig[] = [];
+    const seen = new Set<string>();
+
+    if (Array.isArray(parsed)) {
+      for (const entry of parsed) {
+        const normalized = parseCommunityEntry("", entry);
+        if (!normalized || seen.has(normalized.daoId)) continue;
+        seen.add(normalized.daoId);
+        out.push(normalized);
+      }
+      return out;
+    }
+
+    const obj = asRecord(parsed);
+    if (!obj) return [];
+
+    for (const [key, value] of Object.entries(obj)) {
+      const normalized = parseCommunityEntry(key, value);
+      if (!normalized || seen.has(normalized.daoId)) continue;
+      seen.add(normalized.daoId);
+      out.push(normalized);
+    }
+    return out;
+  } catch {
+    return [];
   }
 }
 
@@ -338,6 +440,59 @@ export default function Page() {
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
 
+  const communityRegistry = useMemo(
+    () =>
+      parseCommunityRegistry(
+        process.env.NEXT_PUBLIC_COMMUNITIES ||
+          process.env.NEXT_PUBLIC_COMMUNITY_REGISTRY
+      ),
+    []
+  );
+
+  const syncDaoIdInUrl = useCallback((nextDaoId: string) => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    const trimmed = nextDaoId.trim();
+    if (trimmed) url.searchParams.set("dao_id", trimmed);
+    else url.searchParams.delete("dao_id");
+
+    const query = url.searchParams.toString();
+    const nextUrl = `${url.pathname}${query ? `?${query}` : ""}${url.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, []);
+
+  const applyDaoContext = useCallback(
+    (nextDaoId: string, communityLabel?: string) => {
+      const trimmed = nextDaoId.trim();
+      if (!trimmed) return;
+      setDaoIdStr(trimmed);
+      setDeepLinkDaoId(trimmed);
+      if (communityLabel) setDeepLinkCommunityLabel(communityLabel);
+      syncDaoIdInUrl(trimmed);
+    },
+    [syncDaoIdInUrl]
+  );
+
+  const handleDaoIdInputChange = useCallback(
+    (nextValue: string) => {
+      setDaoIdStr(nextValue);
+      const trimmed = nextValue.trim();
+      if (!trimmed) {
+        setDeepLinkDaoId(null);
+        syncDaoIdInUrl("");
+        return;
+      }
+      if (!validPkString(trimmed)) return;
+
+      setDeepLinkDaoId(trimmed);
+      const known = communityRegistry.find((c) => c.daoId === trimmed);
+      if (known?.name) setDeepLinkCommunityLabel(known.name);
+      syncDaoIdInUrl(trimmed);
+    },
+    [communityRegistry, syncDaoIdInUrl]
+  );
+
   const startDiscordConnect = useCallback(() => {
     const returnTo =
       typeof window !== "undefined"
@@ -370,19 +525,45 @@ export default function Page() {
       ""
     ).trim();
     const guildIdParam = (params.get("guild_id") || params.get("guildId") || "").trim();
+    const communitySlugParam = (
+      params.get("community_slug") ||
+      params.get("communitySlug") ||
+      params.get("slug") ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+    const communityParamRaw = (params.get("community") || "").trim();
+    const communitySlugFromRaw = communityParamRaw.toLowerCase();
     const guildNameParam = (
       params.get("guild_name") ||
       params.get("guildName") ||
       params.get("community_name") ||
       params.get("communityName") ||
-      params.get("community") ||
       ""
     ).trim();
     const daoIdParam = (params.get("dao_id") || params.get("daoId") || "").trim();
 
+    const communityFromDao = daoIdParam
+      ? communityRegistry.find((c) => c.daoId === daoIdParam)
+      : null;
+    const communityFromSlug = communitySlugParam
+      ? communityRegistry.find((c) => c.slug === communitySlugParam)
+      : communitySlugFromRaw
+      ? communityRegistry.find((c) => c.slug === communitySlugFromRaw)
+      : null;
+    const communityFromGuild = guildIdParam
+      ? communityRegistry.find((c) => c.guildId === guildIdParam)
+      : null;
+
     if (sourceParam) setDeepLinkSource(sourceParam);
     if (guildIdParam) setDeepLinkGuildId(guildIdParam);
     if (guildNameParam) setDeepLinkCommunityLabel(guildNameParam);
+    else if (communityParamRaw && !communityFromSlug)
+      setDeepLinkCommunityLabel(communityParamRaw);
+    else if (communityFromDao?.name) setDeepLinkCommunityLabel(communityFromDao.name);
+    else if (communityFromSlug?.name) setDeepLinkCommunityLabel(communityFromSlug.name);
+    else if (communityFromGuild?.name) setDeepLinkCommunityLabel(communityFromGuild.name);
     if (targetPlatform) setDeepLinkPlatform(targetPlatform);
 
     if (targetPlatform) setPlatform(targetPlatform);
@@ -392,8 +573,17 @@ export default function Page() {
     }
 
     if (daoIdParam) {
-      setDaoIdStr(daoIdParam);
-      setDeepLinkDaoId(daoIdParam);
+      applyDaoContext(daoIdParam, communityFromDao?.name);
+      return;
+    }
+
+    if (communityFromSlug) {
+      applyDaoContext(communityFromSlug.daoId, communityFromSlug.name);
+      return;
+    }
+
+    if (communityFromGuild) {
+      applyDaoContext(communityFromGuild.daoId, communityFromGuild.name);
       return;
     }
 
@@ -403,15 +593,14 @@ export default function Page() {
       );
       const mappedDaoId = guildMap[guildIdParam];
       if (mappedDaoId) {
-        setDaoIdStr(mappedDaoId);
-        setDeepLinkDaoId(mappedDaoId);
+        applyDaoContext(mappedDaoId);
       }
     }
 
     if (!guildNameParam && guildIdParam) {
       setDeepLinkCommunityLabel(`Discord guild ${guildIdParam}`);
     }
-  }, []);
+  }, [communityRegistry, applyDaoContext]);
 
   useEffect(() => {
     if (!deepLinkPlatform || deepLinkAutoStarted) return;
@@ -1208,6 +1397,50 @@ export default function Page() {
     !currentWalletLinked &&
     spaceExists !== false;
 
+  const shortDaoId = useMemo(() => {
+    const s = daoIdStr.trim();
+    if (!s) return "—";
+    return s.length > 12 ? `${s.slice(0, 4)}…${s.slice(-4)}` : s;
+  }, [daoIdStr]);
+
+  const communityOptions = useMemo(() => {
+    const unique = new Map<string, { daoId: string; label: string }>();
+    for (const c of communityRegistry) {
+      if (!c.daoId || !c.name) continue;
+      unique.set(c.daoId, { daoId: c.daoId, label: c.name });
+    }
+
+    const currentDao = daoIdStr.trim();
+    if (currentDao && !unique.has(currentDao)) {
+      unique.set(currentDao, {
+        daoId: currentDao,
+        label: deepLinkCommunityLabel || `DAO ${shortDaoId}`,
+      });
+    }
+    return Array.from(unique.values());
+  }, [communityRegistry, daoIdStr, deepLinkCommunityLabel, shortDaoId]);
+
+  const activeCommunityLabel = useMemo(() => {
+    const currentDao = daoIdStr.trim();
+    if (!currentDao) return "No community selected";
+    const known = communityOptions.find((c) => c.daoId === currentDao);
+    if (known?.label) return known.label;
+    if (deepLinkCommunityLabel) return deepLinkCommunityLabel;
+    return `DAO ${shortDaoId}`;
+  }, [communityOptions, daoIdStr, deepLinkCommunityLabel, shortDaoId]);
+
+  const switchCommunity = useCallback(
+    (nextDaoId: string) => {
+      const trimmed = nextDaoId.trim();
+      if (!trimmed) return;
+      const known = communityOptions.find((c) => c.daoId === trimmed);
+      applyDaoContext(trimmed, known?.label);
+      setMsg("");
+      setError("");
+    },
+    [communityOptions, applyDaoContext]
+  );
+
   return (
     <Box
       sx={{
@@ -1291,6 +1524,11 @@ export default function Page() {
 
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip
+              icon={<TravelExploreIcon />}
+              label={`Community: ${activeCommunityLabel}`}
+              sx={{ fontFamily: "system-ui" }}
+            />
+            <Chip
               icon={<VerifiedIcon />}
               label={`Identity: ${identityStatus}`}
               sx={{ fontFamily: "system-ui" }}
@@ -1323,6 +1561,60 @@ export default function Page() {
               Choose your platform, connect, then link your wallet. You can link
               multiple wallets to the same identity.
             </Typography>
+
+            <Paper
+              sx={{
+                p: 1.25,
+                mb: 2,
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.14)",
+              }}
+            >
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={1.5}
+                alignItems={{ xs: "flex-start", md: "center" }}
+                justifyContent="space-between"
+              >
+                <Box>
+                  <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
+                    Active Community
+                  </Typography>
+                  <Typography sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.82 }}>
+                    {`${activeCommunityLabel} (${shortDaoId})`}
+                  </Typography>
+                </Box>
+
+                {communityOptions.length > 1 && (
+                  <Box
+                    component="select"
+                    value={daoIdStr.trim()}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      switchCommunity(e.target.value || "")
+                    }
+                    style={{
+                      minWidth: 260,
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: "2px solid rgba(255,255,255,0.18)",
+                      outline: "none",
+                      fontFamily: "system-ui",
+                      background: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.92)",
+                    }}
+                  >
+                    {communityOptions.map((community) => (
+                      <option key={community.daoId} value={community.daoId}>
+                        {community.label}
+                      </option>
+                    ))}
+                  </Box>
+                )}
+              </Stack>
+              <Typography sx={{ mt: 0.75, fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}>
+                Verification and wallet links are scoped per community (DAO).
+              </Typography>
+            </Paper>
 
             {(deepLinkSource || deepLinkGuildId || deepLinkCommunityLabel) && (
               <Paper
@@ -1950,7 +2242,9 @@ export default function Page() {
                       <Box
                         component="input"
                         value={daoIdStr}
-                        onChange={(e: any) => setDaoIdStr(e.target.value)}
+                        onChange={(e: any) =>
+                          handleDaoIdInputChange(String(e.target.value || ""))
+                        }
                         placeholder="DAO pubkey"
                         style={{
                           width: "100%",
