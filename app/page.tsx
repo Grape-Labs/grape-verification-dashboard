@@ -470,9 +470,15 @@ function parseCommunityMetadataForUi(metadata: string | null) {
   const raw = metadata?.trim();
   if (!raw) return null;
 
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return { raw };
+  const cleaned = normalizeCommunityMetadataInput(
+    raw.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+  ).trim();
+
+  function parseJsonCandidate(candidate: string) {
+    const parsed = JSON.parse(candidate) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { raw: candidate } as const;
+    }
 
     const obj = parsed as Record<string, unknown>;
     const name =
@@ -483,10 +489,49 @@ function parseCommunityMetadataForUi(metadata: string | null) {
       typeof obj.guildId === "string" && obj.guildId.trim()
         ? obj.guildId.trim()
         : null;
+    return { raw: candidate, name, slug, guildId } as const;
+  }
 
-    return { raw, name, slug, guildId };
+  function findEmbeddedJsonObject(text: string): string | null {
+    const starts: number[] = [];
+    const ends: number[] = [];
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === "{") starts.push(i);
+      if (text[i] === "}") ends.push(i);
+    }
+
+    for (const start of starts) {
+      for (let idx = ends.length - 1; idx >= 0; idx--) {
+        const end = ends[idx];
+        if (end <= start) continue;
+        const candidate = text.slice(start, end + 1).trim();
+        if (!candidate.includes('":')) continue;
+        try {
+          const parsed = JSON.parse(candidate) as unknown;
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            return JSON.stringify(parsed);
+          }
+        } catch {
+          // keep scanning
+        }
+      }
+    }
+
+    return null;
+  }
+
+  try {
+    return parseJsonCandidate(cleaned);
   } catch {
-    return { raw };
+    const embedded = findEmbeddedJsonObject(cleaned);
+    if (embedded) {
+      try {
+        return parseJsonCandidate(embedded);
+      } catch {
+        // fallback to raw below
+      }
+    }
+    return { raw: cleaned || raw };
   }
 }
 
@@ -1190,8 +1235,18 @@ export default function Page() {
           setSpaceMetadataExists(!!metadataAcct);
           if (metadataAcct?.data) {
             const decoded = decodeCommunityMetadata(metadataAcct.data);
-            setSpaceCommunityMetadata(decoded);
-            setSpaceCommunityMetadataInput(decoded ?? "");
+            const parsedMeta = parseCommunityMetadataForUi(decoded);
+            const cleaned = parsedMeta?.raw ?? decoded ?? "";
+            setSpaceCommunityMetadata(cleaned || null);
+            setSpaceCommunityMetadataInput(cleaned);
+            if (parsedMeta?.name) {
+              rememberLocalCommunity({
+                daoId: daoPk.toBase58(),
+                name: parsedMeta.name,
+                slug: parsedMeta.slug || undefined,
+                guildId: parsedMeta.guildId || undefined,
+              });
+            }
           }
         }
       } catch {
@@ -1221,7 +1276,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [connection, daoPk, refreshCounter]);
+  }, [connection, daoPk, refreshCounter, rememberLocalCommunity]);
 
   // Derive Identity + Link and load accounts + all linked wallets
   useEffect(() => {
