@@ -24,7 +24,13 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import WalletIcon from "@mui/icons-material/AccountBalanceWallet";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Connection, PublicKey, Transaction } from "@solana/web3.js";
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
+import { Buffer } from "buffer";
 
 import CreateSpaceDialog from "./components/CreateSpaceDialog";
 import CreateCommunityDialog from "./components/CreateCommunityDialog";
@@ -32,6 +38,7 @@ import WalletComicButton from "./components/WalletComicButton";
 
 import {
   COMMUNITY_METADATA_MAX_LEN,
+  PROGRAM_ID,
   VerificationPlatform,
   buildClearSpaceCommunityMetadataIx,
   buildSetSpaceCommunityMetadataIx,
@@ -584,6 +591,48 @@ function setModeToLocalStorage(advanced: boolean) {
   }
 }
 
+function concatBytes(...arrays: Uint8Array[]) {
+  const len = arrays.reduce((n, a) => n + a.length, 0);
+  const out = new Uint8Array(len);
+  let off = 0;
+  for (const a of arrays) {
+    out.set(a, off);
+    off += a.length;
+  }
+  return out;
+}
+
+function ixDisc(nameSnake: string): Uint8Array {
+  return sha256(utf8ToBytes(`global:${nameSnake}`)).slice(0, 8);
+}
+
+function buildSetSpaceAttestorIx(args: {
+  daoId: PublicKey;
+  authority: PublicKey;
+  newAttestor: PublicKey;
+  programId?: PublicKey;
+}) {
+  const programId = args.programId ?? PROGRAM_ID;
+  const [spaceAcct] = deriveSpacePda(args.daoId);
+
+  const data = Buffer.from(
+    concatBytes(
+      ixDisc("set_space_attestor"),
+      args.daoId.toBytes(),
+      args.newAttestor.toBytes()
+    )
+  );
+
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: spaceAcct, isSigner: false, isWritable: true },
+      { pubkey: args.authority, isSigner: true, isWritable: false },
+    ],
+    data,
+  });
+}
+
 /* =========================================================================
  * LINK ACCOUNT DISCRIMINATOR
  *
@@ -651,6 +700,8 @@ export default function Page() {
   const [spaceFrozen, setSpaceFrozen] = useState<boolean | null>(null);
   const [spaceAuthority, setSpaceAuthority] = useState<PublicKey | null>(null);
   const [spaceAttestor, setSpaceAttestor] = useState<PublicKey | null>(null);
+  const [spaceAttestorInput, setSpaceAttestorInput] = useState("");
+  const [spaceAttestorSaving, setSpaceAttestorSaving] = useState(false);
   const [spaceMetadataPda, setSpaceMetadataPda] = useState<PublicKey | null>(null);
   const [spaceMetadataExists, setSpaceMetadataExists] = useState<boolean | null>(null);
   const [spaceCommunityMetadata, setSpaceCommunityMetadata] = useState<string | null>(
@@ -1217,6 +1268,7 @@ export default function Page() {
       setSpaceFrozen(null);
       setSpaceAuthority(null);
       setSpaceAttestor(null);
+      setSpaceAttestorInput("");
       setSpaceMetadataPda(null);
       setSpaceMetadataExists(null);
       setSpaceCommunityMetadata(null);
@@ -1279,6 +1331,7 @@ export default function Page() {
       setSpaceFrozen(parsedSpace.isFrozen);
       setSpaceAuthority(parsedSpace.authority);
       setSpaceAttestor(parsedSpace.attestor);
+      setSpaceAttestorInput(parsedSpace.attestor.toBase58());
     }
 
     run().catch((e) => setError(String(e?.message || e)));
@@ -1380,6 +1433,63 @@ export default function Page() {
 
   async function refresh() {
     setRefreshCounter((c) => c + 1);
+  }
+
+  async function updateSpaceAttestor(nextAttestor: string) {
+    setError("");
+    setMsg("Updating space attestor...");
+    setSpaceAttestorSaving(true);
+
+    try {
+      if (!daoPk) throw new Error("DAO ID is required.");
+      if (!publicKey) throw new Error("Connect wallet first.");
+      if (spaceExists !== true) throw new Error("Space account not found.");
+      if (!spaceAuthority) throw new Error("Space authority could not be read.");
+      if (!publicKey.equals(spaceAuthority)) {
+        throw new Error(
+          `Only space authority can change attestor: ${spaceAuthority.toBase58()}`
+        );
+      }
+      if (!sendTransaction)
+        throw new Error("Wallet adapter missing sendTransaction.");
+
+      const trimmed = nextAttestor.trim();
+      if (!trimmed) throw new Error("New attestor public key is required.");
+      const newAttestor = new PublicKey(trimmed);
+
+      const ix = buildSetSpaceAttestorIx({
+        daoId: daoPk,
+        authority: publicKey,
+        newAttestor,
+      });
+
+      const tx = new Transaction().add(ix);
+      tx.feePayer = publicKey;
+
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+
+      const sig = await sendTransaction(tx, connection, {
+        preflightCommitment: "confirmed",
+      });
+
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
+
+      setSpaceAttestorInput(newAttestor.toBase58());
+      setMsg(
+        `✅ Updated space attestor to ${newAttestor.toBase58()}\nTransaction: ${sig}`
+      );
+      await refresh();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setMsg("");
+    } finally {
+      setSpaceAttestorSaving(false);
+    }
   }
 
   async function updateSpaceCommunityMetadata(nextValue: string | null) {
@@ -1837,11 +1947,13 @@ export default function Page() {
     !currentWalletLinked &&
     spaceExists !== false;
 
-  const canManageSpaceMetadata =
+  const canManageSpaceAdmin =
     !!publicKey &&
     !!spaceAuthority &&
     publicKey.equals(spaceAuthority) &&
     spaceExists === true;
+
+  const canManageSpaceMetadata = canManageSpaceAdmin;
 
   const shortDaoId = useMemo(() => {
     const s = daoIdStr.trim();
@@ -3065,6 +3177,76 @@ export default function Page() {
                             : "—"
                         }
                       />
+                      <Typography
+                        sx={{
+                          fontFamily: "system-ui",
+                          fontSize: 12,
+                          opacity: 0.7,
+                          mt: 1,
+                        }}
+                      >
+                        Set Space Attestor
+                      </Typography>
+                      <Typography
+                        sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.65 }}
+                      >
+                        Use a persistent server/bot wallet for attestation.
+                      </Typography>
+                      <Box
+                        component="input"
+                        value={spaceAttestorInput}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setSpaceAttestorInput(e.target.value)
+                        }
+                        disabled={!canManageSpaceAdmin || spaceAttestorSaving}
+                        placeholder="Attestor public key"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          borderRadius: 12,
+                          border: "3px solid #0b1220",
+                          outline: "none",
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          background: "rgba(255,255,255,0.06)",
+                          color: "rgba(255,255,255,0.92)",
+                        }}
+                      />
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        sx={{ mt: 0.5 }}
+                      >
+                        <Button
+                          variant="contained"
+                          onClick={() => updateSpaceAttestor(spaceAttestorInput)}
+                          disabled={
+                            !canManageSpaceAdmin ||
+                            !sendTransaction ||
+                            spaceAttestorSaving ||
+                            !spaceAttestorInput.trim()
+                          }
+                          sx={{
+                            fontFamily: '"Bangers", system-ui',
+                            letterSpacing: 0.7,
+                          }}
+                        >
+                          {spaceAttestorSaving ? "Saving..." : "Update Attestor"}
+                        </Button>
+                        {process.env.NEXT_PUBLIC_ATTESTOR_PUBKEY && (
+                          <Button
+                            variant="outlined"
+                            onClick={() =>
+                              setSpaceAttestorInput(
+                                process.env.NEXT_PUBLIC_ATTESTOR_PUBKEY || ""
+                              )
+                            }
+                            disabled={spaceAttestorSaving}
+                          >
+                            Use Default Attestor
+                          </Button>
+                        )}
+                      </Stack>
                       <InfoRow
                         label="Salt (hex)"
                         value={spaceSalt ? bytesToHex(spaceSalt) : "—"}
@@ -3537,7 +3719,7 @@ export default function Page() {
         <CreateCommunityDialog
           open={communityCreateOpen}
           onClose={() => setCommunityCreateOpen(false)}
-          onCreated={({ daoId, name, slug, guildId }) => {
+          onCreated={({ daoId, name, slug, guildId, attestor }) => {
             if (name) {
               rememberLocalCommunity({
                 daoId,
@@ -3550,7 +3732,7 @@ export default function Page() {
             setDeepLinkCommunityLabel(name || null);
             setCommunityCreateOpen(false);
             setMsg(
-              `✅ Created community${name ? ` (${name})` : ""}.\nDAO: ${daoId}\nSpace + metadata initialized.`
+              `✅ Created community${name ? ` (${name})` : ""}.\nDAO: ${daoId}\nAttestor: ${attestor || "authority wallet"}\nSpace + metadata initialized.`
             );
             refresh().catch(() => {});
           }}

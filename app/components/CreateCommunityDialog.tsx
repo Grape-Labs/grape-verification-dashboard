@@ -15,7 +15,10 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import CloseIcon from "@mui/icons-material/Close";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { Buffer } from "buffer";
+import { sha256 } from "@noble/hashes/sha256";
+import { utf8ToBytes } from "@noble/hashes/utils";
 
 import {
   buildInitializeSpaceIx,
@@ -33,6 +36,7 @@ type Props = {
     name?: string;
     slug?: string;
     guildId?: string;
+    attestor?: string;
   }) => void;
 };
 
@@ -54,6 +58,44 @@ function safePk(value: string): PublicKey | null {
   }
 }
 
+function concatBytes(...arrays: Uint8Array[]) {
+  const len = arrays.reduce((n, a) => n + a.length, 0);
+  const out = new Uint8Array(len);
+  let off = 0;
+  for (const a of arrays) {
+    out.set(a, off);
+    off += a.length;
+  }
+  return out;
+}
+
+function ixDisc(nameSnake: string): Uint8Array {
+  return sha256(utf8ToBytes(`global:${nameSnake}`)).slice(0, 8);
+}
+
+function buildSetSpaceAttestorIx(args: {
+  daoId: PublicKey;
+  authority: PublicKey;
+  newAttestor: PublicKey;
+  programId?: PublicKey;
+}) {
+  const programId = args.programId ?? PROGRAM_ID;
+  const disc = ixDisc("set_space_attestor");
+  const [spaceAcct] = deriveSpacePda(args.daoId);
+  const data = Buffer.from(
+    concatBytes(disc, args.daoId.toBytes(), args.newAttestor.toBytes())
+  );
+
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: spaceAcct, isSigner: false, isWritable: true },
+      { pubkey: args.authority, isSigner: true, isWritable: false },
+    ],
+    data,
+  });
+}
+
 export default function CreateCommunityDialog({ open, onClose, onCreated }: Props) {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -62,6 +104,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
   const [slug, setSlug] = useState("");
   const [guildId, setGuildId] = useState("");
   const [daoIdInput, setDaoIdInput] = useState("");
+  const [attestorInput, setAttestorInput] = useState("");
   const [salt, setSalt] = useState<Uint8Array | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -85,6 +128,9 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
     setCommunityName("");
     setSlug("");
     setGuildId("");
+    setAttestorInput(
+      (process.env.NEXT_PUBLIC_ATTESTOR_PUBKEY || "").trim()
+    );
     setDaoIdInput(randomDaoId());
     setSalt(randomSalt32());
   }, [open]);
@@ -103,6 +149,11 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
 
       const trimmedSlug = slug.trim();
       const trimmedGuild = guildId.trim();
+      const trimmedAttestor = attestorInput.trim();
+      const configuredAttestor = trimmedAttestor ? safePk(trimmedAttestor) : null;
+      if (trimmedAttestor && !configuredAttestor) {
+        throw new Error("Attestor public key is invalid.");
+      }
 
       const metadata: Record<string, string> = { name: trimmedName };
       if (trimmedSlug) metadata.slug = trimmedSlug;
@@ -128,6 +179,20 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
         programId: PROGRAM_ID,
       }).ix;
       tx.add(initIx);
+
+      if (
+        configuredAttestor &&
+        !configuredAttestor.equals(wallet.publicKey)
+      ) {
+        tx.add(
+          buildSetSpaceAttestorIx({
+            daoId: daoPk,
+            authority: wallet.publicKey,
+            newAttestor: configuredAttestor,
+            programId: PROGRAM_ID,
+          })
+        );
+      }
 
       const metaIx = buildSetSpaceCommunityMetadataIx({
         daoId: daoPk,
@@ -157,6 +222,9 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
         name: trimmedName,
         slug: trimmedSlug || undefined,
         guildId: trimmedGuild || undefined,
+        attestor: configuredAttestor
+          ? configuredAttestor.toBase58()
+          : wallet.publicKey.toBase58(),
       });
       onClose();
     } catch (e: unknown) {
@@ -272,6 +340,28 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                   border: "2px solid rgba(255,255,255,0.18)",
                   outline: "none",
                   fontFamily: "system-ui",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "rgba(255,255,255,0.92)",
+                }}
+              />
+
+              <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
+                Attestor Wallet (optional)
+              </Typography>
+              <Box
+                component="input"
+                value={attestorInput}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setAttestorInput(e.target.value)
+                }
+                placeholder="Defaults to connected authority wallet"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "2px solid rgba(255,255,255,0.18)",
+                  outline: "none",
+                  fontFamily: "monospace",
                   background: "rgba(255,255,255,0.08)",
                   color: "rgba(255,255,255,0.92)",
                 }}
