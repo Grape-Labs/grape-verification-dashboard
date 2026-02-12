@@ -490,6 +490,20 @@ function parseCommunityMetadataForUi(metadata: string | null) {
   }
 }
 
+function formatCommunityMetadataLabel(
+  parsed: ReturnType<typeof parseCommunityMetadataForUi>
+): string | null {
+  if (!parsed) return null;
+
+  const parts: string[] = [];
+  if (parsed.name) parts.push(parsed.name);
+  if (parsed.slug) parts.push(`slug=${parsed.slug}`);
+  if (parsed.guildId) parts.push(`guild=${parsed.guildId}`);
+
+  if (parts.length > 0) return parts.join(" | ");
+  return parsed.raw || null;
+}
+
 function fmtTs(ts: number) {
   if (!ts) return "—";
   try {
@@ -624,6 +638,9 @@ export default function Page() {
   const [communityExplorerOpen, setCommunityExplorerOpen] = useState(false);
   const [communitySearch, setCommunitySearch] = useState("");
   const [localCommunities, setLocalCommunities] = useState<CommunityConfig[]>([]);
+  const [communityMetadataByDao, setCommunityMetadataByDao] = useState<
+    Record<string, string | null>
+  >({});
   const [refreshCounter, setRefreshCounter] = useState(0);
 
   const communityRegistry = useMemo(
@@ -1799,18 +1816,10 @@ export default function Page() {
     [spaceCommunityMetadata]
   );
 
-  const onChainCommunityLabel = useMemo(() => {
-    if (!parsedCommunityMetadata) return null;
-
-    const parts: string[] = [];
-    if (parsedCommunityMetadata.name) parts.push(parsedCommunityMetadata.name);
-    if (parsedCommunityMetadata.slug) parts.push(`slug=${parsedCommunityMetadata.slug}`);
-    if (parsedCommunityMetadata.guildId)
-      parts.push(`guild=${parsedCommunityMetadata.guildId}`);
-
-    if (parts.length > 0) return parts.join(" | ");
-    return parsedCommunityMetadata.raw || null;
-  }, [parsedCommunityMetadata]);
+  const onChainCommunityLabel = useMemo(
+    () => formatCommunityMetadataLabel(parsedCommunityMetadata),
+    [parsedCommunityMetadata]
+  );
 
   const switchCommunity = useCallback(
     (nextDaoId: string) => {
@@ -1875,6 +1884,46 @@ export default function Page() {
     shortDaoId,
   ]);
 
+  useEffect(() => {
+    if (!communityExplorerOpen) return;
+
+    const missingDaoIds = communityExplorerList
+      .map((community) => community.daoId)
+      .filter((daoId) => !Object.prototype.hasOwnProperty.call(communityMetadataByDao, daoId));
+
+    if (missingDaoIds.length === 0) return;
+
+    let cancelled = false;
+
+    async function loadMissingMetadata() {
+      const loaded = await Promise.all(
+        missingDaoIds.map(async (daoId) => {
+          try {
+            const daoPk = new PublicKey(daoId);
+            const metadataAcct = await fetchSpaceMetadataByDaoId(connection, daoPk);
+            if (!metadataAcct?.data) return [daoId, null] as const;
+            const decoded = decodeCommunityMetadata(metadataAcct.data);
+            return [daoId, decoded] as const;
+          } catch {
+            return [daoId, null] as const;
+          }
+        })
+      );
+
+      if (cancelled) return;
+      setCommunityMetadataByDao((prev) => {
+        const next = { ...prev };
+        for (const [daoId, value] of loaded) next[daoId] = value;
+        return next;
+      });
+    }
+
+    loadMissingMetadata().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [communityExplorerOpen, communityExplorerList, communityMetadataByDao, connection]);
+
   const communityExplorerResults = useMemo(() => {
     const query = communitySearch.trim().toLowerCase();
     if (!query) return communityExplorerList;
@@ -1885,12 +1934,13 @@ export default function Page() {
         community.daoId,
         community.slug || "",
         community.guildId || "",
+        communityMetadataByDao[community.daoId] || "",
       ]
         .join(" ")
         .toLowerCase();
       return haystack.includes(query);
     });
-  }, [communityExplorerList, communitySearch]);
+  }, [communityExplorerList, communitySearch, communityMetadataByDao]);
 
   return (
     <Box
@@ -2155,6 +2205,24 @@ export default function Page() {
                         community.daoId.length > 12
                           ? `${community.daoId.slice(0, 4)}…${community.daoId.slice(-4)}`
                           : community.daoId;
+                      const hasOnChainMetadata = Object.prototype.hasOwnProperty.call(
+                        communityMetadataByDao,
+                        community.daoId
+                      );
+                      const onChainRawMetadata =
+                        communityMetadataByDao[community.daoId] ?? null;
+                      const parsedExplorerMetadata =
+                        parseCommunityMetadataForUi(onChainRawMetadata);
+                      const explorerMetadataLabel =
+                        formatCommunityMetadataLabel(parsedExplorerMetadata);
+                      const fallbackMetadataParts = [
+                        community.slug ? `slug=${community.slug}` : "",
+                        community.guildId ? `guild=${community.guildId}` : "",
+                      ].filter(Boolean);
+                      const fallbackMetadataLabel =
+                        fallbackMetadataParts.length > 0
+                          ? fallbackMetadataParts.join(" | ")
+                          : null;
                       return (
                         <Box
                           key={community.daoId}
@@ -2191,6 +2259,17 @@ export default function Page() {
                                 }${
                                   community.guildId ? `, guild=${community.guildId}` : ""
                                 }`}
+                              </Typography>
+                              <Typography
+                                sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.74 }}
+                              >
+                                {!hasOnChainMetadata
+                                  ? "on-chain metadata=loading..."
+                                  : explorerMetadataLabel
+                                  ? `on-chain metadata=${explorerMetadataLabel}`
+                                  : fallbackMetadataLabel
+                                  ? `on-chain metadata=not set (registry: ${fallbackMetadataLabel})`
+                                  : "on-chain metadata=not set"}
                               </Typography>
                             </Box>
                             <Button
