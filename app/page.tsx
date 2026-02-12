@@ -351,66 +351,118 @@ function parseLink(data: Uint8Array) {
 
 function decodeCommunityMetadata(data: Uint8Array): string | null {
   const decoder = new TextDecoder();
+  let sawExplicitNone = false;
 
-  // Layout A:
-  // disc(8) + version(1) + space(32) + bump(1) + metadata_len(u16) + metadata bytes
-  const offsetA = 8 + 1 + 32 + 1;
-  if (data.length >= offsetA + 2) {
-    const lenA = data[offsetA] | (data[offsetA + 1] << 8);
-    if (
-      lenA <= COMMUNITY_METADATA_MAX_LEN &&
-      data.length >= offsetA + 2 + lenA
-    ) {
-      if (lenA === 0) return null;
-      return decoder.decode(data.slice(offsetA + 2, offsetA + 2 + lenA));
-    }
+  function clean(s: string): string | null {
+    const t = s.replace(/\u0000+/g, "").trim();
+    return t ? t : null;
   }
 
-  // Layout B:
-  // disc(8) + version(1) + space(32) + bump(1) + Option<String>
-  const offsetB = 8 + 1 + 32 + 1;
-  if (data.length >= offsetB + 1) {
-    const tag = data[offsetB];
+  function decodeOptionStringAt(offset: number): string | null | undefined {
+    if (offset < 0 || offset + 1 > data.length) return undefined;
+    const tag = data[offset];
     if (tag === 0) return null;
-    if (tag === 1 && data.length >= offsetB + 5) {
-      const lenB =
-        data[offsetB + 1] |
-        (data[offsetB + 2] << 8) |
-        (data[offsetB + 3] << 16) |
-        (data[offsetB + 4] << 24);
-      if (
-        lenB >= 0 &&
-        lenB <= COMMUNITY_METADATA_MAX_LEN &&
-        data.length >= offsetB + 5 + lenB
-      ) {
-        return decoder.decode(data.slice(offsetB + 5, offsetB + 5 + lenB));
-      }
+    if (tag !== 1) return undefined;
+    if (offset + 5 > data.length) return undefined;
+
+    const len =
+      data[offset + 1] |
+      (data[offset + 2] << 8) |
+      (data[offset + 3] << 16) |
+      (data[offset + 4] << 24);
+    if (len < 0 || len > COMMUNITY_METADATA_MAX_LEN) return undefined;
+    if (offset + 5 + len > data.length) return undefined;
+    if (len === 0) return null;
+
+    return clean(decoder.decode(data.slice(offset + 5, offset + 5 + len)));
+  }
+
+  function decodeU16LenStringAt(offset: number): string | null | undefined {
+    if (offset < 0 || offset + 2 > data.length) return undefined;
+    const len = data[offset] | (data[offset + 1] << 8);
+    if (len > COMMUNITY_METADATA_MAX_LEN) return undefined;
+    if (offset + 2 + len > data.length) return undefined;
+    if (len === 0) return null;
+
+    return clean(decoder.decode(data.slice(offset + 2, offset + 2 + len)));
+  }
+
+  const optionOffsets = [
+    8 + 1 + 32 + 1, // disc + version + space + bump + Option<String>
+    8 + 1 + 32, // disc + version + space + Option<String> + bump
+    8, // disc + Option<String>
+  ];
+  for (const offset of optionOffsets) {
+    const decoded = decodeOptionStringAt(offset);
+    if (decoded === undefined) continue;
+    if (decoded === null) {
+      sawExplicitNone = true;
+      continue;
+    }
+    return decoded;
+  }
+
+  const u16Offsets = [
+    8 + 1 + 32 + 1, // disc + version + space + bump + len(u16) + bytes
+    8 + 1 + 32, // disc + version + space + len(u16) + bytes + bump
+  ];
+  for (const offset of u16Offsets) {
+    const decoded = decodeU16LenStringAt(offset);
+    if (decoded === undefined) continue;
+    if (decoded === null) {
+      sawExplicitNone = true;
+      continue;
+    }
+    return decoded;
+  }
+
+  // Fallback: recover a visible JSON/blob segment even if layout changed.
+  const fullText = decoder.decode(data).replace(/\u0000+/g, " ");
+  const firstBrace = fullText.indexOf("{");
+  const lastBrace = fullText.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const candidate = clean(fullText.slice(firstBrace, lastBrace + 1));
+    if (candidate && candidate.length <= COMMUNITY_METADATA_MAX_LEN * 2) {
+      return candidate;
     }
   }
 
-  // Layout C:
-  // disc(8) + Option<String>
-  const offsetC = 8;
-  if (data.length >= offsetC + 1) {
-    const tag = data[offsetC];
-    if (tag === 0) return null;
-    if (tag === 1 && data.length >= offsetC + 5) {
-      const lenC =
-        data[offsetC + 1] |
-        (data[offsetC + 2] << 8) |
-        (data[offsetC + 3] << 16) |
-        (data[offsetC + 4] << 24);
-      if (
-        lenC >= 0 &&
-        lenC <= COMMUNITY_METADATA_MAX_LEN &&
-        data.length >= offsetC + 5 + lenC
-      ) {
-        return decoder.decode(data.slice(offsetC + 5, offsetC + 5 + lenC));
-      }
-    }
+  const textChunks = fullText
+    .split(/\s{2,}/)
+    .map((c) => c.trim())
+    .filter((c) => c.length >= 3 && c.length <= COMMUNITY_METADATA_MAX_LEN * 2);
+  const bestChunk = textChunks.sort((a, b) => b.length - a.length)[0];
+  if (bestChunk && /[A-Za-z0-9]/.test(bestChunk)) {
+    return bestChunk;
   }
 
+  if (sawExplicitNone) return null;
   return null;
+}
+
+function normalizeCommunityMetadataInput(raw: string): string {
+  return raw
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'");
+}
+
+function canonicalizeCommunityMetadataInput(raw: string): string {
+  const normalized = normalizeCommunityMetadataInput(raw).trim();
+  if (!normalized) return normalized;
+
+  // Treat object/array-looking input as JSON so malformed payloads fail fast.
+  if (normalized.startsWith("{") || normalized.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(normalized);
+      return JSON.stringify(parsed);
+    } catch {
+      throw new Error(
+        'Community metadata JSON is invalid. Example: {"name":"Grape","slug":"grape","guildId":"837189238289203201"}'
+      );
+    }
+  }
+
+  return normalized;
 }
 
 function fmtTs(ts: number) {
@@ -1164,7 +1216,9 @@ export default function Page() {
         throw new Error("Wallet adapter missing sendTransaction.");
 
       const value =
-        nextValue == null || !nextValue.trim() ? null : nextValue.trim();
+        nextValue == null || !nextValue.trim()
+          ? null
+          : canonicalizeCommunityMetadataInput(nextValue);
 
       const { ix } =
         value == null
@@ -1201,6 +1255,11 @@ export default function Page() {
           ? `✅ Cleared community metadata. Transaction: ${sig}`
           : `✅ Updated community metadata. Transaction: ${sig}`
       );
+      setSpaceCommunityMetadata(value);
+      setSpaceCommunityMetadataInput(value ?? "");
+      if (value != null) {
+        setSpaceMetadataExists(true);
+      }
       await refresh();
     } catch (e: any) {
       setError(String(e?.message || e));
