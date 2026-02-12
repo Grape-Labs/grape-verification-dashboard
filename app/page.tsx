@@ -109,6 +109,21 @@ function platformTag(platform: PlatformKey): string {
   }
 }
 
+function platformLabel(platform: PlatformKey): string {
+  switch (platform) {
+    case "discord":
+      return "Discord";
+    case "telegram":
+      return "Telegram";
+    case "twitter":
+      return "Twitter";
+    case "email":
+      return "Email";
+    default:
+      return "Discord";
+  }
+}
+
 function shortB58(pk: PublicKey | null | undefined) {
   if (!pk) return "—";
   const s = pk.toBase58();
@@ -284,10 +299,17 @@ export default function Page() {
   const [platformUserId, setPlatformUserId] = useState("");
   const [deepLinkSource, setDeepLinkSource] = useState<string | null>(null);
   const [deepLinkGuildId, setDeepLinkGuildId] = useState<string | null>(null);
+  const [deepLinkCommunityLabel, setDeepLinkCommunityLabel] = useState<
+    string | null
+  >(null);
+  const [deepLinkDaoId, setDeepLinkDaoId] = useState<string | null>(null);
   const [deepLinkPlatform, setDeepLinkPlatform] = useState<PlatformKey | null>(
     null
   );
   const [deepLinkAutoStarted, setDeepLinkAutoStarted] = useState(false);
+  const [walletLinkedByPlatform, setWalletLinkedByPlatform] = useState<
+    Partial<Record<PlatformKey, boolean>>
+  >({});
 
   const [spacePda, setSpacePda] = useState<PublicKey | null>(null);
   const [spaceSalt, setSpaceSalt] = useState<Uint8Array | null>(null);
@@ -348,10 +370,19 @@ export default function Page() {
       ""
     ).trim();
     const guildIdParam = (params.get("guild_id") || params.get("guildId") || "").trim();
+    const guildNameParam = (
+      params.get("guild_name") ||
+      params.get("guildName") ||
+      params.get("community_name") ||
+      params.get("communityName") ||
+      params.get("community") ||
+      ""
+    ).trim();
     const daoIdParam = (params.get("dao_id") || params.get("daoId") || "").trim();
 
     if (sourceParam) setDeepLinkSource(sourceParam);
     if (guildIdParam) setDeepLinkGuildId(guildIdParam);
+    if (guildNameParam) setDeepLinkCommunityLabel(guildNameParam);
     if (targetPlatform) setDeepLinkPlatform(targetPlatform);
 
     if (targetPlatform) setPlatform(targetPlatform);
@@ -362,6 +393,7 @@ export default function Page() {
 
     if (daoIdParam) {
       setDaoIdStr(daoIdParam);
+      setDeepLinkDaoId(daoIdParam);
       return;
     }
 
@@ -370,7 +402,14 @@ export default function Page() {
         process.env.NEXT_PUBLIC_DISCORD_GUILD_DAO_MAP
       );
       const mappedDaoId = guildMap[guildIdParam];
-      if (mappedDaoId) setDaoIdStr(mappedDaoId);
+      if (mappedDaoId) {
+        setDaoIdStr(mappedDaoId);
+        setDeepLinkDaoId(mappedDaoId);
+      }
+    }
+
+    if (!guildNameParam && guildIdParam) {
+      setDeepLinkCommunityLabel(`Discord guild ${guildIdParam}`);
     }
   }, []);
 
@@ -405,6 +444,12 @@ export default function Page() {
     telegramConnected,
     startDiscordConnect,
   ]);
+
+  const publicKeyBase58 = publicKey?.toBase58() || "";
+
+  useEffect(() => {
+    setWalletLinkedByPlatform({});
+  }, [publicKeyBase58]);
 
   const toggleMode = () => {
     setAdvancedMode((v) => {
@@ -1128,6 +1173,41 @@ export default function Page() {
   // Current wallet already linked?
   const currentWalletLinked = linkExists === true;
 
+  const currentPlatformConnected =
+    (platform === "discord" && discordConnected) ||
+    (platform === "email" && emailConnected) ||
+    (platform === "telegram" && telegramConnected);
+
+  useEffect(() => {
+    if (!publicKey) return;
+    if (!currentPlatformConnected) return;
+    if (!platformUserId.trim()) return;
+    if (linkExists == null) return;
+
+    setWalletLinkedByPlatform((prev) => ({ ...prev, [platform]: linkExists }));
+  }, [
+    publicKey,
+    currentPlatformConnected,
+    platformUserId,
+    linkExists,
+    platform,
+  ]);
+
+  const linkedElsewherePlatforms = useMemo(
+    () =>
+      (["discord", "email", "telegram", "twitter"] as const).filter(
+        (p) => p !== platform && walletLinkedByPlatform[p]
+      ),
+    [platform, walletLinkedByPlatform]
+  );
+
+  const canLinkCurrentPlatformWallet =
+    !!publicKey &&
+    !!spaceSalt &&
+    !!platformUserId.trim() &&
+    !currentWalletLinked &&
+    spaceExists !== false;
+
   return (
     <Box
       sx={{
@@ -1244,7 +1324,7 @@ export default function Page() {
               multiple wallets to the same identity.
             </Typography>
 
-            {(deepLinkSource || deepLinkGuildId) && (
+            {(deepLinkSource || deepLinkGuildId || deepLinkCommunityLabel) && (
               <Paper
                 sx={{
                   p: 1.25,
@@ -1261,10 +1341,29 @@ export default function Page() {
                 <Typography
                   sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.82 }}
                 >
-                  {`source=${deepLinkSource || "unknown"}${
-                    deepLinkGuildId ? `, guild_id=${deepLinkGuildId}` : ""
-                  }`}
+                  {`platform=${platformLabel(
+                    deepLinkPlatform || platform
+                  )}, source=${deepLinkSource || "unknown"}`}
                 </Typography>
+                {(deepLinkCommunityLabel || deepLinkGuildId || deepLinkDaoId) && (
+                  <Typography
+                    sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.75, mt: 0.5 }}
+                  >
+                    {`community=${
+                      deepLinkCommunityLabel ||
+                      (deepLinkGuildId ? `Discord guild ${deepLinkGuildId}` : "unknown")
+                    }${
+                      deepLinkGuildId ? `, guild_id=${deepLinkGuildId}` : ""
+                    }${deepLinkDaoId ? `, dao=${deepLinkDaoId}` : ""}`}
+                  </Typography>
+                )}
+                {deepLinkPlatform === "email" && !emailConnected && (
+                  <Typography
+                    sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.9, mt: 0.75 }}
+                  >
+                    Enter your email below to continue this direct verification.
+                  </Typography>
+                )}
               </Paper>
             )}
 
@@ -1316,6 +1415,24 @@ export default function Page() {
                 )}
               </Stack>
 
+              <Paper
+                sx={{
+                  p: 1.25,
+                  mb: 2,
+                  background: "rgba(124,77,255,0.10)",
+                  border: "1px solid rgba(124,77,255,0.35)",
+                }}
+              >
+                <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
+                  Wallet links are per-platform identity
+                </Typography>
+                <Typography sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.8 }}>
+                  {`A wallet linked on Discord does not auto-link on ${platformLabel(
+                    platform
+                  )}. Link the same wallet once per platform identity.`}
+                </Typography>
+              </Paper>
+
               {/* Platform-Specific Connection UI */}
               {platform === "discord" && (
                 <PlatformConnectionCard
@@ -1353,6 +1470,12 @@ export default function Page() {
                     setEmailCodeSent(false);
                     setEmailCode("");
                   }}
+                  deepLinkHint={
+                    deepLinkPlatform === "email" && !emailConnected
+                      ? `Enter your email to continue${deepLinkCommunityLabel ? ` for ${deepLinkCommunityLabel}` : ""}.`
+                      : null
+                  }
+                  autoFocusInput={deepLinkPlatform === "email" && !emailConnected}
                 />
               )}
 
@@ -1402,9 +1525,7 @@ export default function Page() {
             </Box>
 
             {/* Step 2: Link Wallet (Only shows when platform connected) */}
-            {((platform === "discord" && discordConnected) ||
-              (platform === "email" && emailConnected) ||
-              (platform === "telegram" && telegramConnected)) && (
+            {currentPlatformConnected && (
               <Box
                 sx={{
                   p: 2,
@@ -1455,19 +1576,46 @@ export default function Page() {
                   />
                 </Stack>
 
+                {!currentWalletLinked && linkedElsewherePlatforms.length > 0 && (
+                  <Paper
+                    sx={{
+                      mb: 2,
+                      p: 1.25,
+                      background: "rgba(56,189,248,0.10)",
+                      border: "1px solid rgba(56,189,248,0.35)",
+                    }}
+                  >
+                    <Typography
+                      sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}
+                    >
+                      Same wallet, new platform
+                    </Typography>
+                    <Typography
+                      sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.8, mb: 1 }}
+                    >
+                      {`This wallet is already linked on ${linkedElsewherePlatforms
+                        .map(platformLabel)
+                        .join(", ")}. Link it on ${platformLabel(platform)} with one click.`}
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => linkWalletOneClick()}
+                      disabled={!canLinkCurrentPlatformWallet}
+                      sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
+                    >
+                      {`Link same wallet on ${platformLabel(platform)}`}
+                    </Button>
+                  </Paper>
+                )}
+
                 {/* Primary Action Button */}
                 <Button
                   variant="contained"
                   size="large"
                   fullWidth
                   onClick={() => linkWalletOneClick()}
-                  disabled={
-                    !publicKey ||
-                    !spaceSalt ||
-                    !platformUserId.trim() ||
-                    currentWalletLinked ||
-                    spaceExists === false
-                  }
+                  disabled={!canLinkCurrentPlatformWallet}
                   sx={{
                     fontFamily: '"Bangers", system-ui',
                     letterSpacing: 0.8,
@@ -2497,6 +2645,8 @@ function EmailConnectionCard({
   disconnect,
   onRefresh,
   onCancel,
+  deepLinkHint,
+  autoFocusInput,
 }: {
   connected: boolean;
   email: string | null;
@@ -2512,6 +2662,8 @@ function EmailConnectionCard({
   disconnect: () => void;
   onRefresh: () => void;
   onCancel: () => void;
+  deepLinkHint?: string | null;
+  autoFocusInput?: boolean;
 }) {
   if (connected) {
     return (
@@ -2567,6 +2719,21 @@ function EmailConnectionCard({
           border: "2px solid rgba(255,255,255,0.10)",
         }}
       >
+        {deepLinkHint && (
+          <Paper
+            sx={{
+              p: 1,
+              mb: 1.25,
+              background: "rgba(38,198,255,0.12)",
+              border: "1px solid rgba(38,198,255,0.35)",
+            }}
+          >
+            <Typography sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.9 }}>
+              {deepLinkHint}
+            </Typography>
+          </Paper>
+        )}
+
         <Typography
           sx={{
             fontFamily: '"Bangers", system-ui',
@@ -2592,6 +2759,7 @@ function EmailConnectionCard({
           <Box
             component="input"
             type="email"
+            autoFocus={autoFocusInput}
             value={emailInput}
             onChange={(e: any) => setEmailInput(e.target.value)}
             placeholder="your@email.com"
