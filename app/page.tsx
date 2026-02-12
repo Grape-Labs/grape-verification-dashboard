@@ -619,6 +619,8 @@ export default function Page() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
+  const [communityExplorerOpen, setCommunityExplorerOpen] = useState(false);
+  const [communitySearch, setCommunitySearch] = useState("");
   const [refreshCounter, setRefreshCounter] = useState(0);
 
   const communityRegistry = useMemo(
@@ -1744,6 +1746,74 @@ export default function Page() {
     [communityOptions, applyDaoContext]
   );
 
+  const communityExplorerList = useMemo(() => {
+    const currentDao = daoIdStr.trim();
+    const merged = new Map<
+      string,
+      { daoId: string; name: string; slug?: string; guildId?: string }
+    >();
+
+    for (const community of communityRegistry) {
+      if (!community.daoId) continue;
+      const fallbackName = `DAO ${community.daoId.slice(0, 4)}…${community.daoId.slice(-4)}`;
+      merged.set(community.daoId, {
+        daoId: community.daoId,
+        name: community.name || fallbackName,
+        slug: community.slug,
+        guildId: community.guildId,
+      });
+    }
+
+    for (const option of communityOptions) {
+      if (!option.daoId) continue;
+      const existing = merged.get(option.daoId);
+      const fallbackName = `DAO ${option.daoId.slice(0, 4)}…${option.daoId.slice(-4)}`;
+      merged.set(option.daoId, {
+        daoId: option.daoId,
+        name:
+          existing?.name ||
+          option.label ||
+          (option.daoId === currentDao ? activeCommunityLabel : fallbackName),
+        slug: existing?.slug,
+        guildId: existing?.guildId,
+      });
+    }
+
+    if (currentDao && !merged.has(currentDao)) {
+      merged.set(currentDao, {
+        daoId: currentDao,
+        name: activeCommunityLabel || `DAO ${shortDaoId}`,
+      });
+    }
+
+    return Array.from(merged.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+  }, [
+    activeCommunityLabel,
+    communityOptions,
+    communityRegistry,
+    daoIdStr,
+    shortDaoId,
+  ]);
+
+  const communityExplorerResults = useMemo(() => {
+    const query = communitySearch.trim().toLowerCase();
+    if (!query) return communityExplorerList;
+
+    return communityExplorerList.filter((community) => {
+      const haystack = [
+        community.name,
+        community.daoId,
+        community.slug || "",
+        community.guildId || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [communityExplorerList, communitySearch]);
+
   return (
     <Box
       sx={{
@@ -1888,31 +1958,48 @@ export default function Page() {
                   </Typography>
                 </Box>
 
-                {communityOptions.length > 1 && (
-                  <Box
-                    component="select"
-                    value={daoIdStr.trim()}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                      switchCommunity(e.target.value || "")
-                    }
-                    style={{
-                      minWidth: 260,
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: "2px solid rgba(255,255,255,0.18)",
-                      outline: "none",
-                      fontFamily: "system-ui",
-                      background: "rgba(255,255,255,0.08)",
-                      color: "rgba(255,255,255,0.92)",
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  {communityOptions.length > 1 && (
+                    <Box
+                      component="select"
+                      value={daoIdStr.trim()}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                        switchCommunity(e.target.value || "")
+                      }
+                      style={{
+                        minWidth: 260,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "2px solid rgba(255,255,255,0.18)",
+                        outline: "none",
+                        fontFamily: "system-ui",
+                        background: "rgba(255,255,255,0.08)",
+                        color: "rgba(255,255,255,0.92)",
+                      }}
+                    >
+                      {communityOptions.map((community) => (
+                        <option key={community.daoId} value={community.daoId}>
+                          {community.label}
+                        </option>
+                      ))}
+                    </Box>
+                  )}
+                  <Button
+                    variant={communityExplorerOpen ? "contained" : "outlined"}
+                    startIcon={<TravelExploreIcon />}
+                    onClick={() => {
+                      setCommunityExplorerOpen((prev) => !prev);
+                      if (communityExplorerOpen) setCommunitySearch("");
+                    }}
+                    sx={{
+                      fontFamily: '"Bangers", system-ui',
+                      letterSpacing: 0.6,
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {communityOptions.map((community) => (
-                      <option key={community.daoId} value={community.daoId}>
-                        {community.label}
-                      </option>
-                    ))}
-                  </Box>
-                )}
+                    {communityExplorerOpen ? "Hide Explorer" : "Explore Communities"}
+                  </Button>
+                </Stack>
               </Stack>
               <Typography sx={{ mt: 0.75, fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}>
                 Verification and wallet links are scoped per community (DAO).
@@ -1923,6 +2010,119 @@ export default function Page() {
                 >
                   {`On-chain metadata: ${onChainCommunityLabel}`}
                 </Typography>
+              )}
+              {communityExplorerOpen && (
+                <Paper
+                  sx={{
+                    mt: 1.25,
+                    p: 1.25,
+                    background: "rgba(38,198,255,0.08)",
+                    border: "1px solid rgba(38,198,255,0.35)",
+                  }}
+                >
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1}
+                    alignItems={{ xs: "stretch", sm: "center" }}
+                    justifyContent="space-between"
+                    sx={{ mb: 1 }}
+                  >
+                    <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
+                      {`Browse Communities (${communityExplorerList.length})`}
+                    </Typography>
+                    <Box
+                      component="input"
+                      value={communitySearch}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setCommunitySearch(e.target.value)
+                      }
+                      placeholder="Search by name, slug, guild, or DAO"
+                      style={{
+                        minWidth: 280,
+                        width: "100%",
+                        maxWidth: 420,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "2px solid rgba(255,255,255,0.18)",
+                        outline: "none",
+                        fontFamily: "system-ui",
+                        background: "rgba(255,255,255,0.08)",
+                        color: "rgba(255,255,255,0.92)",
+                      }}
+                    />
+                  </Stack>
+
+                  <Stack spacing={1} sx={{ maxHeight: 260, overflowY: "auto", pr: 0.5 }}>
+                    {communityExplorerResults.length === 0 && (
+                      <Typography
+                        sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.75 }}
+                      >
+                        No communities match your search.
+                      </Typography>
+                    )}
+                    {communityExplorerResults.map((community) => {
+                      const isActive = community.daoId === daoIdStr.trim();
+                      const shortDao =
+                        community.daoId.length > 12
+                          ? `${community.daoId.slice(0, 4)}…${community.daoId.slice(-4)}`
+                          : community.daoId;
+                      return (
+                        <Box
+                          key={community.daoId}
+                          sx={{
+                            p: 1,
+                            borderRadius: 1,
+                            border: "1px solid rgba(255,255,255,0.16)",
+                            background: isActive
+                              ? "rgba(34,197,94,0.14)"
+                              : "rgba(255,255,255,0.04)",
+                          }}
+                        >
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1}
+                            alignItems={{ xs: "flex-start", sm: "center" }}
+                            justifyContent="space-between"
+                          >
+                            <Box>
+                              <Typography
+                                sx={{
+                                  fontFamily: "system-ui",
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {community.name}
+                              </Typography>
+                              <Typography
+                                sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.74 }}
+                              >
+                                {`dao=${shortDao}${
+                                  community.slug ? `, slug=${community.slug}` : ""
+                                }${
+                                  community.guildId ? `, guild=${community.guildId}` : ""
+                                }`}
+                              </Typography>
+                            </Box>
+                            <Button
+                              size="small"
+                              variant={isActive ? "contained" : "outlined"}
+                              onClick={() => {
+                                switchCommunity(community.daoId);
+                                setCommunityExplorerOpen(false);
+                                setCommunitySearch("");
+                              }}
+                              disabled={isActive}
+                              sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.55 }}
+                            >
+                              {isActive ? "Active" : "Open"}
+                            </Button>
+                          </Stack>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </Paper>
               )}
             </Paper>
 
