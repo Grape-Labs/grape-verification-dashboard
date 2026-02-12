@@ -465,6 +465,30 @@ function canonicalizeCommunityMetadataInput(raw: string): string {
   return normalized;
 }
 
+function parseCommunityMetadataForUi(metadata: string | null) {
+  const raw = metadata?.trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return { raw };
+
+    const obj = parsed as Record<string, unknown>;
+    const name =
+      typeof obj.name === "string" && obj.name.trim() ? obj.name.trim() : null;
+    const slug =
+      typeof obj.slug === "string" && obj.slug.trim() ? obj.slug.trim() : null;
+    const guildId =
+      typeof obj.guildId === "string" && obj.guildId.trim()
+        ? obj.guildId.trim()
+        : null;
+
+    return { raw, name, slug, guildId };
+  } catch {
+    return { raw };
+  }
+}
+
 function fmtTs(ts: number) {
   if (!ts) return "—";
   try {
@@ -1690,6 +1714,24 @@ export default function Page() {
     return `DAO ${shortDaoId}`;
   }, [communityOptions, daoIdStr, deepLinkCommunityLabel, shortDaoId]);
 
+  const parsedCommunityMetadata = useMemo(
+    () => parseCommunityMetadataForUi(spaceCommunityMetadata),
+    [spaceCommunityMetadata]
+  );
+
+  const onChainCommunityLabel = useMemo(() => {
+    if (!parsedCommunityMetadata) return null;
+
+    const parts: string[] = [];
+    if (parsedCommunityMetadata.name) parts.push(parsedCommunityMetadata.name);
+    if (parsedCommunityMetadata.slug) parts.push(`slug=${parsedCommunityMetadata.slug}`);
+    if (parsedCommunityMetadata.guildId)
+      parts.push(`guild=${parsedCommunityMetadata.guildId}`);
+
+    if (parts.length > 0) return parts.join(" | ");
+    return parsedCommunityMetadata.raw || null;
+  }, [parsedCommunityMetadata]);
+
   const switchCommunity = useCallback(
     (nextDaoId: string) => {
       const trimmed = nextDaoId.trim();
@@ -1875,6 +1917,13 @@ export default function Page() {
               <Typography sx={{ mt: 0.75, fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}>
                 Verification and wallet links are scoped per community (DAO).
               </Typography>
+              {onChainCommunityLabel && (
+                <Typography
+                  sx={{ mt: 0.5, fontFamily: "system-ui", fontSize: 12, opacity: 0.82 }}
+                >
+                  {`On-chain metadata: ${onChainCommunityLabel}`}
+                </Typography>
+              )}
             </Paper>
 
             {(deepLinkSource || deepLinkGuildId || deepLinkCommunityLabel) && (
