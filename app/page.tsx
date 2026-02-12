@@ -3459,38 +3459,38 @@ export default function Page() {
               </>
             )}
 
-            <CreateSpaceDialog
-              open={spaceDialogOpen}
-              onClose={() => setSpaceDialogOpen(false)}
-              daoIdStr={daoIdStr}
-              onCreated={() => {
-                refresh().catch(() => {});
-                setSpaceDialogOpen(false);
-              }}
-            />
-            <CreateCommunityDialog
-              open={communityCreateOpen}
-              onClose={() => setCommunityCreateOpen(false)}
-              onCreated={({ daoId, name, slug, guildId }) => {
-                if (name) {
-                  rememberLocalCommunity({
-                    daoId,
-                    name,
-                    slug,
-                    guildId,
-                  });
-                }
-                applyDaoContext(daoId, name);
-                setDeepLinkCommunityLabel(name || null);
-                setCommunityCreateOpen(false);
-                setMsg(
-                  `✅ Created community${name ? ` (${name})` : ""}.\nDAO: ${daoId}\nSpace + metadata initialized.`
-                );
-                refresh().catch(() => {});
-              }}
-            />
           </>
         )}
+        <CreateSpaceDialog
+          open={spaceDialogOpen}
+          onClose={() => setSpaceDialogOpen(false)}
+          daoIdStr={daoIdStr}
+          onCreated={() => {
+            refresh().catch(() => {});
+            setSpaceDialogOpen(false);
+          }}
+        />
+        <CreateCommunityDialog
+          open={communityCreateOpen}
+          onClose={() => setCommunityCreateOpen(false)}
+          onCreated={({ daoId, name, slug, guildId }) => {
+            if (name) {
+              rememberLocalCommunity({
+                daoId,
+                name,
+                slug,
+                guildId,
+              });
+            }
+            applyDaoContext(daoId, name);
+            setDeepLinkCommunityLabel(name || null);
+            setCommunityCreateOpen(false);
+            setMsg(
+              `✅ Created community${name ? ` (${name})` : ""}.\nDAO: ${daoId}\nSpace + metadata initialized.`
+            );
+            refresh().catch(() => {});
+          }}
+        />
       </Container>
     </Box>
   );
