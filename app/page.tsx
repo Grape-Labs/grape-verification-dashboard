@@ -24,16 +24,21 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import WalletIcon from "@mui/icons-material/AccountBalanceWallet";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 
 import CreateSpaceDialog from "./components/CreateSpaceDialog";
 import WalletComicButton from "./components/WalletComicButton";
 
 import {
+  COMMUNITY_METADATA_MAX_LEN,
   VerificationPlatform,
+  buildClearSpaceCommunityMetadataIx,
+  buildSetSpaceCommunityMetadataIx,
   deriveIdentityPda,
   deriveLinkPda,
+  deriveSpaceMetadataPda,
   deriveSpacePda,
+  fetchSpaceMetadataByDaoId,
   identityHash,
   walletHash,
   TAG_DISCORD,
@@ -248,9 +253,36 @@ function shortHex(hex: string) {
   return `${hex.slice(0, 6)}…${hex.slice(-6)}`;
 }
 
-function parseSpaceSalt(data: Uint8Array): Uint8Array {
-  const SALT_OFFSET = 8 + 1 + 32 + 32 + 32 + 1 + 1; // 107
-  return data.slice(SALT_OFFSET, SALT_OFFSET + 32);
+function parseSpace(data: Uint8Array) {
+  // Space layout (v2):
+  // disc(8) + version(1) + dao_id(32) + authority(32) + attestor(32) +
+  // is_frozen(1) + bump(1) + salt(32)
+  if (data.length < 8 + 1 + 32 + 32 + 32 + 1 + 1 + 32) {
+    throw new Error("Invalid Space account layout");
+  }
+
+  let o = 8;
+  const version = data[o];
+  o += 1;
+
+  const daoId = new PublicKey(data.slice(o, o + 32));
+  o += 32;
+
+  const authority = new PublicKey(data.slice(o, o + 32));
+  o += 32;
+
+  const attestor = new PublicKey(data.slice(o, o + 32));
+  o += 32;
+
+  const isFrozen = data[o] === 1;
+  o += 1;
+
+  const bump = data[o];
+  o += 1;
+
+  const salt = data.slice(o, o + 32);
+
+  return { version, daoId, authority, attestor, isFrozen, bump, salt };
 }
 
 function parseIdentity(data: Uint8Array) {
@@ -317,6 +349,70 @@ function parseLink(data: Uint8Array) {
   return { version, identity, walletHashBytes, linkedAt, bump };
 }
 
+function decodeCommunityMetadata(data: Uint8Array): string | null {
+  const decoder = new TextDecoder();
+
+  // Layout A:
+  // disc(8) + version(1) + space(32) + bump(1) + metadata_len(u16) + metadata bytes
+  const offsetA = 8 + 1 + 32 + 1;
+  if (data.length >= offsetA + 2) {
+    const lenA = data[offsetA] | (data[offsetA + 1] << 8);
+    if (
+      lenA <= COMMUNITY_METADATA_MAX_LEN &&
+      data.length >= offsetA + 2 + lenA
+    ) {
+      if (lenA === 0) return null;
+      return decoder.decode(data.slice(offsetA + 2, offsetA + 2 + lenA));
+    }
+  }
+
+  // Layout B:
+  // disc(8) + version(1) + space(32) + bump(1) + Option<String>
+  const offsetB = 8 + 1 + 32 + 1;
+  if (data.length >= offsetB + 1) {
+    const tag = data[offsetB];
+    if (tag === 0) return null;
+    if (tag === 1 && data.length >= offsetB + 5) {
+      const lenB =
+        data[offsetB + 1] |
+        (data[offsetB + 2] << 8) |
+        (data[offsetB + 3] << 16) |
+        (data[offsetB + 4] << 24);
+      if (
+        lenB >= 0 &&
+        lenB <= COMMUNITY_METADATA_MAX_LEN &&
+        data.length >= offsetB + 5 + lenB
+      ) {
+        return decoder.decode(data.slice(offsetB + 5, offsetB + 5 + lenB));
+      }
+    }
+  }
+
+  // Layout C:
+  // disc(8) + Option<String>
+  const offsetC = 8;
+  if (data.length >= offsetC + 1) {
+    const tag = data[offsetC];
+    if (tag === 0) return null;
+    if (tag === 1 && data.length >= offsetC + 5) {
+      const lenC =
+        data[offsetC + 1] |
+        (data[offsetC + 2] << 8) |
+        (data[offsetC + 3] << 16) |
+        (data[offsetC + 4] << 24);
+      if (
+        lenC >= 0 &&
+        lenC <= COMMUNITY_METADATA_MAX_LEN &&
+        data.length >= offsetC + 5 + lenC
+      ) {
+        return decoder.decode(data.slice(offsetC + 5, offsetC + 5 + lenC));
+      }
+    }
+  }
+
+  return null;
+}
+
 function fmtTs(ts: number) {
   if (!ts) return "—";
   try {
@@ -365,7 +461,7 @@ const LINK_ACCOUNT_DISC = sha256(utf8ToBytes("account:LinkAccount")).slice(0, 8)
 
 export default function Page() {
   const { connection } = useConnection();
-  const { publicKey, signMessage } = useWallet();
+  const { publicKey, signMessage, sendTransaction } = useWallet();
 
   // Mode state
   const [advancedMode, setAdvancedMode] = useState(false);
@@ -417,6 +513,15 @@ export default function Page() {
   const [spaceSalt, setSpaceSalt] = useState<Uint8Array | null>(null);
   const [spaceExists, setSpaceExists] = useState<boolean | null>(null);
   const [spaceFrozen, setSpaceFrozen] = useState<boolean | null>(null);
+  const [spaceAuthority, setSpaceAuthority] = useState<PublicKey | null>(null);
+  const [spaceAttestor, setSpaceAttestor] = useState<PublicKey | null>(null);
+  const [spaceMetadataPda, setSpaceMetadataPda] = useState<PublicKey | null>(null);
+  const [spaceMetadataExists, setSpaceMetadataExists] = useState<boolean | null>(null);
+  const [spaceCommunityMetadata, setSpaceCommunityMetadata] = useState<string | null>(
+    null
+  );
+  const [spaceCommunityMetadataInput, setSpaceCommunityMetadataInput] = useState("");
+  const [spaceMetadataSaving, setSpaceMetadataSaving] = useState(false);
 
   const [idHashBytes, setIdHashBytes] = useState<Uint8Array | null>(null);
   const [identityPda, setIdentityPda] = useState<PublicKey | null>(null);
@@ -883,6 +988,12 @@ export default function Page() {
       setSpaceSalt(null);
       setSpaceExists(null);
       setSpaceFrozen(null);
+      setSpaceAuthority(null);
+      setSpaceAttestor(null);
+      setSpaceMetadataPda(null);
+      setSpaceMetadataExists(null);
+      setSpaceCommunityMetadata(null);
+      setSpaceCommunityMetadataInput("");
 
       setIdentityPda(null);
       setIdentityExists(null);
@@ -897,6 +1008,26 @@ export default function Page() {
 
       const [pda] = deriveSpacePda(daoPk);
       setSpacePda(pda);
+      const [metaPda] = deriveSpaceMetadataPda(pda);
+      setSpaceMetadataPda(metaPda);
+
+      try {
+        const metadataAcct = await fetchSpaceMetadataByDaoId(connection, daoPk);
+        if (!cancelled) {
+          setSpaceMetadataExists(!!metadataAcct);
+          if (metadataAcct?.data) {
+            const decoded = decodeCommunityMetadata(metadataAcct.data);
+            setSpaceCommunityMetadata(decoded);
+            setSpaceCommunityMetadataInput(decoded ?? "");
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setSpaceMetadataExists(false);
+          setSpaceCommunityMetadata(null);
+          setSpaceCommunityMetadataInput("");
+        }
+      }
 
       const acct = await safeGetAccountInfo(connection, pda);
       if (cancelled) return;
@@ -906,11 +1037,11 @@ export default function Page() {
       setSpaceExists(!!acct);
       if (!acct) return;
 
-      const salt = parseSpaceSalt(acct.data);
-      setSpaceSalt(salt);
-
-      const FROZEN_OFFSET = 8 + 1 + 32 + 32 + 32; // 105
-      setSpaceFrozen(acct.data[FROZEN_OFFSET] === 1);
+      const parsedSpace = parseSpace(acct.data);
+      setSpaceSalt(parsedSpace.salt);
+      setSpaceFrozen(parsedSpace.isFrozen);
+      setSpaceAuthority(parsedSpace.authority);
+      setSpaceAttestor(parsedSpace.attestor);
     }
 
     run().catch((e) => setError(String(e?.message || e)));
@@ -1012,6 +1143,71 @@ export default function Page() {
 
   async function refresh() {
     setRefreshCounter((c) => c + 1);
+  }
+
+  async function updateSpaceCommunityMetadata(nextValue: string | null) {
+    setError("");
+    setMsg("Updating community metadata...");
+    setSpaceMetadataSaving(true);
+
+    try {
+      if (!daoPk) throw new Error("DAO ID is required.");
+      if (!publicKey) throw new Error("Connect wallet first.");
+      if (spaceExists !== true) throw new Error("Space account not found.");
+      if (!spaceAuthority) throw new Error("Space authority could not be read.");
+      if (!publicKey.equals(spaceAuthority)) {
+        throw new Error(
+          `Only space authority can update metadata: ${spaceAuthority.toBase58()}`
+        );
+      }
+      if (!sendTransaction)
+        throw new Error("Wallet adapter missing sendTransaction.");
+
+      const value =
+        nextValue == null || !nextValue.trim() ? null : nextValue.trim();
+
+      const { ix } =
+        value == null
+          ? buildClearSpaceCommunityMetadataIx({
+              daoId: daoPk,
+              authority: publicKey,
+              payer: publicKey,
+            })
+          : buildSetSpaceCommunityMetadataIx({
+              daoId: daoPk,
+              authority: publicKey,
+              payer: publicKey,
+              communityMetadata: value,
+            });
+
+      const tx = new Transaction().add(ix);
+      tx.feePayer = publicKey;
+
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+
+      const sig = await sendTransaction(tx, connection, {
+        preflightCommitment: "confirmed",
+      });
+
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
+
+      setMsg(
+        value == null
+          ? `✅ Cleared community metadata. Transaction: ${sig}`
+          : `✅ Updated community metadata. Transaction: ${sig}`
+      );
+      await refresh();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setMsg("");
+    } finally {
+      setSpaceMetadataSaving(false);
+    }
   }
 
   // ===========================
@@ -1396,6 +1592,12 @@ export default function Page() {
     !!platformUserId.trim() &&
     !currentWalletLinked &&
     spaceExists !== false;
+
+  const canManageSpaceMetadata =
+    !!publicKey &&
+    !!spaceAuthority &&
+    publicKey.equals(spaceAuthority) &&
+    spaceExists === true;
 
   const shortDaoId = useMemo(() => {
     const s = daoIdStr.trim();
@@ -2284,10 +2486,138 @@ export default function Page() {
                         }
                       />
                       <InfoRow
+                        label="Authority"
+                        value={spaceAuthority?.toBase58() || "—"}
+                        mono
+                      />
+                      <InfoRow
+                        label="Attestor"
+                        value={spaceAttestor?.toBase58() || "—"}
+                        mono
+                      />
+                      <InfoRow
+                        label="Can Edit Metadata"
+                        value={
+                          canManageSpaceMetadata
+                            ? "✅ connected authority"
+                            : spaceExists === true
+                            ? "❌ connect authority wallet"
+                            : "—"
+                        }
+                      />
+                      <InfoRow
                         label="Salt (hex)"
                         value={spaceSalt ? bytesToHex(spaceSalt) : "—"}
                         mono
                       />
+                      <InfoRow
+                        label="Metadata PDA"
+                        value={spaceMetadataPda?.toBase58() || "—"}
+                        mono
+                      />
+                      <InfoRow
+                        label="Metadata acct"
+                        value={
+                          spaceMetadataExists == null
+                            ? "—"
+                            : spaceMetadataExists
+                            ? "✅ exists"
+                            : "❌ missing"
+                        }
+                      />
+                      <InfoRow
+                        label="Metadata value"
+                        value={spaceCommunityMetadata ?? "—"}
+                      />
+
+                      <Typography
+                        sx={{
+                          fontFamily: "system-ui",
+                          fontSize: 12,
+                          opacity: 0.7,
+                          mt: 1,
+                        }}
+                      >
+                        Community Metadata (optional)
+                      </Typography>
+                      <Typography
+                        sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.65 }}
+                      >
+                        Only the Space authority wallet can set or clear metadata.
+                      </Typography>
+
+                      <Box
+                        component="textarea"
+                        value={spaceCommunityMetadataInput}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                          setSpaceCommunityMetadataInput(e.target.value)
+                        }
+                        disabled={!canManageSpaceMetadata || spaceMetadataSaving}
+                        placeholder={`e.g. {"name":"Grape DAO","slug":"grape","guildId":"..."}`}
+                        style={{
+                          width: "100%",
+                          minHeight: 84,
+                          padding: "12px 12px",
+                          borderRadius: 16,
+                          border: "3px solid #0b1220",
+                          outline: "none",
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          background: "rgba(255,255,255,0.06)",
+                          color: "rgba(255,255,255,0.92)",
+                          resize: "vertical",
+                        }}
+                      />
+
+                      <Typography
+                        sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.65 }}
+                      >
+                        {`${spaceCommunityMetadataInput.length}/${COMMUNITY_METADATA_MAX_LEN} bytes max`}
+                      </Typography>
+
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        sx={{ mt: 1 }}
+                      >
+                        <Button
+                          variant="contained"
+                          onClick={() =>
+                            updateSpaceCommunityMetadata(spaceCommunityMetadataInput)
+                          }
+                          disabled={
+                            !canManageSpaceMetadata ||
+                            !sendTransaction ||
+                            spaceMetadataSaving ||
+                            spaceCommunityMetadataInput.length >
+                              COMMUNITY_METADATA_MAX_LEN
+                          }
+                          sx={{
+                            fontFamily: '"Bangers", system-ui',
+                            letterSpacing: 0.7,
+                          }}
+                        >
+                          {spaceMetadataSaving ? "Saving..." : "Save Metadata"}
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          onClick={() => updateSpaceCommunityMetadata(null)}
+                          disabled={
+                            !canManageSpaceMetadata ||
+                            !sendTransaction ||
+                            spaceMetadataSaving
+                          }
+                        >
+                          Clear
+                        </Button>
+                        <Button
+                          variant="text"
+                          onClick={() => refresh().catch(() => {})}
+                          disabled={spaceMetadataSaving}
+                        >
+                          Reload
+                        </Button>
+                      </Stack>
 
                       {spaceExists === false && (
                         <Stack
