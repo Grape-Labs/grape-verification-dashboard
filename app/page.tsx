@@ -758,8 +758,17 @@ export default function Page() {
         slug: community.slug?.trim() || next[idx]?.slug,
         guildId: community.guildId?.trim() || next[idx]?.guildId,
       };
-      if (idx >= 0) next[idx] = merged;
-      else next.push(merged);
+      if (idx >= 0) {
+        const existing = next[idx];
+        const unchanged =
+          existing.name === merged.name &&
+          existing.slug === merged.slug &&
+          existing.guildId === merged.guildId;
+        if (unchanged) return prev;
+        next[idx] = merged;
+      } else {
+        next.push(merged);
+      }
 
       if (typeof window !== "undefined") {
         try {
