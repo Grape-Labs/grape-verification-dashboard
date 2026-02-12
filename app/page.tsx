@@ -27,6 +27,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 
 import CreateSpaceDialog from "./components/CreateSpaceDialog";
+import CreateCommunityDialog from "./components/CreateCommunityDialog";
 import WalletComicButton from "./components/WalletComicButton";
 
 import {
@@ -619,8 +620,10 @@ export default function Page() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
+  const [communityCreateOpen, setCommunityCreateOpen] = useState(false);
   const [communityExplorerOpen, setCommunityExplorerOpen] = useState(false);
   const [communitySearch, setCommunitySearch] = useState("");
+  const [localCommunities, setLocalCommunities] = useState<CommunityConfig[]>([]);
   const [refreshCounter, setRefreshCounter] = useState(0);
 
   const communityRegistry = useMemo(
@@ -631,6 +634,81 @@ export default function Page() {
       ),
     []
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem("gvd_local_communities");
+      if (!raw) return;
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+
+      const cleaned: CommunityConfig[] = [];
+      for (const item of parsed) {
+        const obj = asRecord(item);
+        if (!obj) continue;
+        const daoId = typeof obj.daoId === "string" ? obj.daoId.trim() : "";
+        const name = typeof obj.name === "string" ? obj.name.trim() : "";
+        if (!daoId || !name || !validPkString(daoId)) continue;
+
+        const slug =
+          typeof obj.slug === "string" && obj.slug.trim() ? obj.slug.trim() : undefined;
+        const guildId =
+          typeof obj.guildId === "string" && obj.guildId.trim()
+            ? obj.guildId.trim()
+            : undefined;
+        cleaned.push({ daoId, name, slug, guildId });
+      }
+      setLocalCommunities(cleaned);
+    } catch {
+      // ignore local storage parse errors
+    }
+  }, []);
+
+  const mergedCommunityRegistry = useMemo(() => {
+    const merged = new Map<string, CommunityConfig>();
+    for (const community of [...communityRegistry, ...localCommunities]) {
+      const daoId = community.daoId.trim();
+      if (!daoId || !validPkString(daoId)) continue;
+
+      const existing = merged.get(daoId);
+      merged.set(daoId, {
+        daoId,
+        name: community.name || existing?.name || `DAO ${daoId.slice(0, 4)}…${daoId.slice(-4)}`,
+        slug: community.slug || existing?.slug,
+        guildId: community.guildId || existing?.guildId,
+      });
+    }
+    return Array.from(merged.values());
+  }, [communityRegistry, localCommunities]);
+
+  const rememberLocalCommunity = useCallback((community: CommunityConfig) => {
+    const daoId = community.daoId.trim();
+    const name = community.name.trim();
+    if (!daoId || !name || !validPkString(daoId)) return;
+
+    setLocalCommunities((prev) => {
+      const next = [...prev];
+      const idx = next.findIndex((c) => c.daoId === daoId);
+      const merged: CommunityConfig = {
+        daoId,
+        name,
+        slug: community.slug?.trim() || next[idx]?.slug,
+        guildId: community.guildId?.trim() || next[idx]?.guildId,
+      };
+      if (idx >= 0) next[idx] = merged;
+      else next.push(merged);
+
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem("gvd_local_communities", JSON.stringify(next));
+        } catch {
+          // ignore local storage write errors
+        }
+      }
+      return next;
+    });
+  }, []);
 
   const syncDaoIdInUrl = useCallback((nextDaoId: string) => {
     if (typeof window === "undefined") return;
@@ -669,11 +747,11 @@ export default function Page() {
       if (!validPkString(trimmed)) return;
 
       setDeepLinkDaoId(trimmed);
-      const known = communityRegistry.find((c) => c.daoId === trimmed);
+      const known = mergedCommunityRegistry.find((c) => c.daoId === trimmed);
       if (known?.name) setDeepLinkCommunityLabel(known.name);
       syncDaoIdInUrl(trimmed);
     },
-    [communityRegistry, syncDaoIdInUrl]
+    [mergedCommunityRegistry, syncDaoIdInUrl]
   );
 
   const startDiscordConnect = useCallback(() => {
@@ -728,15 +806,15 @@ export default function Page() {
     const daoIdParam = (params.get("dao_id") || params.get("daoId") || "").trim();
 
     const communityFromDao = daoIdParam
-      ? communityRegistry.find((c) => c.daoId === daoIdParam)
+      ? mergedCommunityRegistry.find((c) => c.daoId === daoIdParam)
       : null;
     const communityFromSlug = communitySlugParam
-      ? communityRegistry.find((c) => c.slug === communitySlugParam)
+      ? mergedCommunityRegistry.find((c) => c.slug === communitySlugParam)
       : communitySlugFromRaw
-      ? communityRegistry.find((c) => c.slug === communitySlugFromRaw)
+      ? mergedCommunityRegistry.find((c) => c.slug === communitySlugFromRaw)
       : null;
     const communityFromGuild = guildIdParam
-      ? communityRegistry.find((c) => c.guildId === guildIdParam)
+      ? mergedCommunityRegistry.find((c) => c.guildId === guildIdParam)
       : null;
 
     if (sourceParam) setDeepLinkSource(sourceParam);
@@ -783,7 +861,7 @@ export default function Page() {
     if (!guildNameParam && guildIdParam) {
       setDeepLinkCommunityLabel(`Discord guild ${guildIdParam}`);
     }
-  }, [communityRegistry, applyDaoContext]);
+  }, [mergedCommunityRegistry, applyDaoContext]);
 
   useEffect(() => {
     if (!deepLinkPlatform || deepLinkAutoStarted) return;
@@ -1692,7 +1770,7 @@ export default function Page() {
 
   const communityOptions = useMemo(() => {
     const unique = new Map<string, { daoId: string; label: string }>();
-    for (const c of communityRegistry) {
+    for (const c of mergedCommunityRegistry) {
       if (!c.daoId || !c.name) continue;
       unique.set(c.daoId, { daoId: c.daoId, label: c.name });
     }
@@ -1705,7 +1783,7 @@ export default function Page() {
       });
     }
     return Array.from(unique.values());
-  }, [communityRegistry, daoIdStr, deepLinkCommunityLabel, shortDaoId]);
+  }, [mergedCommunityRegistry, daoIdStr, deepLinkCommunityLabel, shortDaoId]);
 
   const activeCommunityLabel = useMemo(() => {
     const currentDao = daoIdStr.trim();
@@ -1753,7 +1831,7 @@ export default function Page() {
       { daoId: string; name: string; slug?: string; guildId?: string }
     >();
 
-    for (const community of communityRegistry) {
+    for (const community of mergedCommunityRegistry) {
       if (!community.daoId) continue;
       const fallbackName = `DAO ${community.daoId.slice(0, 4)}…${community.daoId.slice(-4)}`;
       merged.set(community.daoId, {
@@ -1792,7 +1870,7 @@ export default function Page() {
   }, [
     activeCommunityLabel,
     communityOptions,
-    communityRegistry,
+    mergedCommunityRegistry,
     daoIdStr,
     shortDaoId,
   ]);
@@ -1998,6 +2076,17 @@ export default function Page() {
                     }}
                   >
                     {communityExplorerOpen ? "Hide Explorer" : "Explore Communities"}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setCommunityCreateOpen(true)}
+                    sx={{
+                      fontFamily: '"Bangers", system-ui',
+                      letterSpacing: 0.6,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Create Community
                   </Button>
                 </Stack>
               </Stack>
@@ -2535,9 +2624,29 @@ export default function Page() {
                     }}
                   >
                     <Typography sx={{ fontFamily: "system-ui", fontSize: 13 }}>
-                      Verification isn't enabled for this community yet. Please
-                      contact an admin.
+                      Verification is not enabled for this community yet.
                     </Typography>
+                    <Typography
+                      sx={{ mt: 0.5, fontFamily: "system-ui", fontSize: 12, opacity: 0.78 }}
+                    >
+                      If you are an admin, create the community space and metadata now.
+                    </Typography>
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1}
+                      sx={{ mt: 1.25 }}
+                    >
+                      <Button
+                        variant="contained"
+                        onClick={() => setCommunityCreateOpen(true)}
+                        sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
+                      >
+                        Create Community
+                      </Button>
+                      <Button variant="outlined" onClick={() => refresh()}>
+                        Refresh
+                      </Button>
+                    </Stack>
                   </Paper>
                 )}
               </Box>
@@ -3278,6 +3387,27 @@ export default function Page() {
               onCreated={() => {
                 refresh().catch(() => {});
                 setSpaceDialogOpen(false);
+              }}
+            />
+            <CreateCommunityDialog
+              open={communityCreateOpen}
+              onClose={() => setCommunityCreateOpen(false)}
+              onCreated={({ daoId, name, slug, guildId }) => {
+                if (name) {
+                  rememberLocalCommunity({
+                    daoId,
+                    name,
+                    slug,
+                    guildId,
+                  });
+                }
+                applyDaoContext(daoId, name);
+                setDeepLinkCommunityLabel(name || null);
+                setCommunityCreateOpen(false);
+                setMsg(
+                  `✅ Created community${name ? ` (${name})` : ""}.\nDAO: ${daoId}\nSpace + metadata initialized.`
+                );
+                refresh().catch(() => {});
               }}
             />
           </>
