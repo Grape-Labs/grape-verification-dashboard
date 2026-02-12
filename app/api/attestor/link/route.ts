@@ -71,6 +71,84 @@ function parseSecretKey(sk: string): Uint8Array {
   );
 }
 
+function resolveAttestorSecretKeyForDao(daoId: string): string | null {
+  // 1) Vercel KV / Upstash per-DAO key
+  // key format: attestor:key:<daoId> => {"secretKey":"..."}
+  // This is async via REST, so this sync helper keeps env-only behavior.
+  // The async KV lookup is done by `resolveAttestorSecretKeyForDaoAsync`.
+  const rawMap = (process.env.ATTESTOR_SECRET_KEYS_BY_DAO || "").trim();
+  if (rawMap) {
+    try {
+      const parsed: unknown = JSON.parse(rawMap);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const rec = parsed as Record<string, unknown>;
+        const selected = rec[daoId] ?? rec.default ?? rec["*"];
+
+        if (typeof selected === "string" && selected.trim()) {
+          return selected.trim();
+        }
+
+        if (selected && typeof selected === "object" && !Array.isArray(selected)) {
+          const withKey = selected as Record<string, unknown>;
+          const sk = withKey.secretKey;
+          if (typeof sk === "string" && sk.trim()) {
+            return sk.trim();
+          }
+        }
+      }
+    } catch (e) {
+      dbg("Failed to parse ATTESTOR_SECRET_KEYS_BY_DAO:", e);
+    }
+  }
+
+  const fallback = (process.env.ATTESTOR_SECRET_KEY || "").trim();
+  return fallback || null;
+}
+
+async function resolveAttestorSecretKeyForDaoAsync(
+  daoId: string
+): Promise<string | null> {
+  const kvUrl = (process.env.KV_REST_API_URL || "").trim();
+  const kvToken = (process.env.KV_REST_API_TOKEN || "").trim();
+  if (kvUrl && kvToken) {
+    try {
+      const key = `attestor:key:${daoId}`;
+      const res = await fetch(`${kvUrl}/get/${encodeURIComponent(key)}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${kvToken}` },
+        cache: "no-store",
+      });
+
+      if (res.ok) {
+        const payload = await res.json().catch(() => null);
+        const result = payload?.result;
+        if (result) {
+          let parsed: unknown = result;
+          if (typeof result === "string") {
+            try {
+              parsed = JSON.parse(result);
+            } catch {
+              parsed = null;
+            }
+          }
+
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            const rec = parsed as Record<string, unknown>;
+            const sk = rec.secretKey;
+            if (typeof sk === "string" && sk.trim()) {
+              return sk.trim();
+            }
+          }
+        }
+      }
+    } catch (e) {
+      dbg("KV attestor lookup failed:", e);
+    }
+  }
+
+  return resolveAttestorSecretKeyForDao(daoId);
+}
+
 function platformSeed(platform: string): number {
   switch (platform) {
     case "discord":
@@ -231,7 +309,6 @@ export async function POST(req: Request) {
     const programIdStr = REGISTRY_PROGRAM_ID;
     const rpc =
       process.env.NEXT_PUBLIC_SOLANA_RPC || process.env.REACT_APP_RPC_ENDPOINT;
-    const attestorSk = process.env.ATTESTOR_SECRET_KEY;
     const discordProofSecret = process.env.DISCORD_PROOF_SECRET;
 
     if (!rpc)
@@ -239,12 +316,6 @@ export async function POST(req: Request) {
         { error: "NEXT_PUBLIC_SOLANA_RPC missing" },
         { status: 500 }
       );
-    if (!attestorSk)
-      return NextResponse.json(
-        { error: "ATTESTOR_SECRET_KEY missing" },
-        { status: 500 }
-      );
-
     const daoId = String(payload.daoId || payload.daoIdStr || "").trim();
     const platform = String(payload.platform || "discord").trim();
     const walletStr = String(payload.wallet || "").trim();
@@ -260,6 +331,19 @@ export async function POST(req: Request) {
         { error: "payload.wallet missing" },
         { status: 400 }
       );
+
+    const attestorSk = await resolveAttestorSecretKeyForDaoAsync(daoId);
+    if (!attestorSk) {
+      return NextResponse.json(
+        {
+          error: "No attestor secret configured for DAO",
+          daoId,
+          hint:
+            "Set ATTESTOR_SECRET_KEYS_BY_DAO (preferred) or ATTESTOR_SECRET_KEY (fallback).",
+        },
+        { status: 500 }
+      );
+    }
 
     const platformProof = payload.platformProof
       ? String(payload.platformProof)

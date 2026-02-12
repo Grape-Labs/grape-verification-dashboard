@@ -702,6 +702,17 @@ export default function Page() {
   const [spaceAttestor, setSpaceAttestor] = useState<PublicKey | null>(null);
   const [spaceAttestorInput, setSpaceAttestorInput] = useState("");
   const [spaceAttestorSaving, setSpaceAttestorSaving] = useState(false);
+  const [spaceAttestorSecretInput, setSpaceAttestorSecretInput] = useState("");
+  const [spaceAttestorSecretSaving, setSpaceAttestorSecretSaving] = useState(false);
+  const [storedAttestorPubkey, setStoredAttestorPubkey] = useState<string | null>(
+    null
+  );
+  const [storedAttestorUpdatedAt, setStoredAttestorUpdatedAt] = useState<string | null>(
+    null
+  );
+  const [storedAttestorMatchesOnChain, setStoredAttestorMatchesOnChain] = useState<
+    boolean | null
+  >(null);
   const [spaceMetadataPda, setSpaceMetadataPda] = useState<PublicKey | null>(null);
   const [spaceMetadataExists, setSpaceMetadataExists] = useState<boolean | null>(null);
   const [spaceCommunityMetadata, setSpaceCommunityMetadata] = useState<string | null>(
@@ -1269,6 +1280,10 @@ export default function Page() {
       setSpaceAuthority(null);
       setSpaceAttestor(null);
       setSpaceAttestorInput("");
+      setSpaceAttestorSecretInput("");
+      setStoredAttestorPubkey(null);
+      setStoredAttestorUpdatedAt(null);
+      setStoredAttestorMatchesOnChain(null);
       setSpaceMetadataPda(null);
       setSpaceMetadataExists(null);
       setSpaceCommunityMetadata(null);
@@ -1315,6 +1330,31 @@ export default function Page() {
           setSpaceMetadataExists(false);
           setSpaceCommunityMetadata(null);
           setSpaceCommunityMetadataInput("");
+        }
+      }
+
+      try {
+        const res = await fetch(
+          `/api/attestor/admin-key?daoId=${encodeURIComponent(daoPk.toBase58())}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json().catch(() => null);
+        if (!cancelled && res.ok && data?.ok) {
+          setStoredAttestorPubkey(
+            data.exists && typeof data.attestorPubkey === "string"
+              ? data.attestorPubkey
+              : null
+          );
+          setStoredAttestorUpdatedAt(
+            data.exists && typeof data.updatedAt === "string"
+              ? data.updatedAt
+              : null
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setStoredAttestorPubkey(null);
+          setStoredAttestorUpdatedAt(null);
         }
       }
 
@@ -1489,6 +1529,78 @@ export default function Page() {
       setMsg("");
     } finally {
       setSpaceAttestorSaving(false);
+    }
+  }
+
+  async function saveSpaceAttestorSecret() {
+    setError("");
+    setMsg("Saving attestor key for this DAO...");
+    setSpaceAttestorSecretSaving(true);
+
+    try {
+      if (!daoPk) throw new Error("DAO ID is required.");
+      if (!publicKey) throw new Error("Connect wallet first.");
+      if (!spaceAuthority) throw new Error("Space authority could not be read.");
+      if (!publicKey.equals(spaceAuthority)) {
+        throw new Error(
+          `Only space authority can save attestor key: ${spaceAuthority.toBase58()}`
+        );
+      }
+      if (!signMessage) {
+        throw new Error("Wallet does not support signMessage.");
+      }
+
+      const secret = spaceAttestorSecretInput.trim();
+      if (!secret) throw new Error("Attestor secret key is required.");
+
+      const ts = Date.now();
+      const messageText =
+        "Grape Attestor Key Save\n" +
+        `daoId=${daoPk.toBase58()}\n` +
+        `wallet=${publicKey.toBase58()}\n` +
+        `ts=${ts}`;
+      const messageBytes = new TextEncoder().encode(messageText);
+      const sigBytes = await signMessage(messageBytes);
+      const signatureBase64 = Buffer.from(sigBytes).toString("base64");
+
+      const res = await fetch("/api/attestor/admin-key", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          daoId: daoPk.toBase58(),
+          wallet: publicKey.toBase58(),
+          attestorSecretKey: secret,
+          ts,
+          message: messageText,
+          signatureBase64,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(String(data?.error || res.statusText || "Failed to save key"));
+      }
+
+      setSpaceAttestorSecretInput("");
+      setStoredAttestorPubkey(
+        typeof data?.attestorPubkey === "string" ? data.attestorPubkey : null
+      );
+      setStoredAttestorUpdatedAt(new Date().toISOString());
+      setStoredAttestorMatchesOnChain(
+        typeof data?.matchesOnChainAttestor === "boolean"
+          ? data.matchesOnChainAttestor
+          : null
+      );
+
+      setMsg(
+        `✅ Saved attestor key for DAO in KV.\nAttestor: ${
+          data?.attestorPubkey || "unknown"
+        }`
+      );
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setMsg("");
+    } finally {
+      setSpaceAttestorSecretSaving(false);
     }
   }
 
@@ -1954,6 +2066,16 @@ export default function Page() {
     spaceExists === true;
 
   const canManageSpaceMetadata = canManageSpaceAdmin;
+
+  useEffect(() => {
+    if (!spaceAttestor || !storedAttestorPubkey) {
+      setStoredAttestorMatchesOnChain(null);
+      return;
+    }
+    setStoredAttestorMatchesOnChain(
+      storedAttestorPubkey === spaceAttestor.toBase58()
+    );
+  }, [spaceAttestor, storedAttestorPubkey]);
 
   const shortDaoId = useMemo(() => {
     const s = daoIdStr.trim();
@@ -3246,6 +3368,90 @@ export default function Page() {
                             Use Default Attestor
                           </Button>
                         )}
+                      </Stack>
+                      <InfoRow
+                        label="KV Attestor Key"
+                        value={
+                          storedAttestorPubkey
+                            ? `✅ ${storedAttestorPubkey}`
+                            : "❌ not stored"
+                        }
+                        mono
+                      />
+                      <InfoRow
+                        label="KV Key Matches On-chain"
+                        value={
+                          storedAttestorMatchesOnChain == null
+                            ? "—"
+                            : storedAttestorMatchesOnChain
+                            ? "✅ yes"
+                            : "❌ no"
+                        }
+                      />
+                      <InfoRow
+                        label="KV Updated At"
+                        value={storedAttestorUpdatedAt || "—"}
+                      />
+                      <Typography
+                        sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.7, mt: 1 }}
+                      >
+                        Store Attestor Secret (KV)
+                      </Typography>
+                      <Typography
+                        sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.65 }}
+                      >
+                        Save per-community attestor secret in Vercel KV (server-side only).
+                      </Typography>
+                      <Box
+                        component="textarea"
+                        value={spaceAttestorSecretInput}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                          setSpaceAttestorSecretInput(e.target.value)
+                        }
+                        disabled={!canManageSpaceAdmin || spaceAttestorSecretSaving}
+                        placeholder="Attestor secret key (JSON array or base64)"
+                        style={{
+                          width: "100%",
+                          minHeight: 70,
+                          padding: "10px 12px",
+                          borderRadius: 12,
+                          border: "3px solid #0b1220",
+                          outline: "none",
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          background: "rgba(255,255,255,0.06)",
+                          color: "rgba(255,255,255,0.92)",
+                          resize: "vertical",
+                        }}
+                      />
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        sx={{ mt: 0.5 }}
+                      >
+                        <Button
+                          variant="contained"
+                          onClick={() => saveSpaceAttestorSecret()}
+                          disabled={
+                            !canManageSpaceAdmin ||
+                            !signMessage ||
+                            spaceAttestorSecretSaving ||
+                            !spaceAttestorSecretInput.trim()
+                          }
+                          sx={{
+                            fontFamily: '"Bangers", system-ui',
+                            letterSpacing: 0.7,
+                          }}
+                        >
+                          {spaceAttestorSecretSaving ? "Saving..." : "Save Attestor Key"}
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          onClick={() => refresh().catch(() => {})}
+                          disabled={spaceAttestorSecretSaving}
+                        >
+                          Reload KV Status
+                        </Button>
                       </Stack>
                       <InfoRow
                         label="Salt (hex)"
