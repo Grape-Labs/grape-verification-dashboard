@@ -3400,7 +3400,7 @@ export default function Page() {
                       <Typography
                         sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.65 }}
                       >
-                        Save per-community attestor secret in Vercel KV (server-side only).
+                        Save per-community attestor secret (server-side only).
                       </Typography>
                       <Box
                         component="textarea"
