@@ -26,6 +26,7 @@ import WalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   Connection,
+  Keypair,
   PublicKey,
   Transaction,
   TransactionInstruction,
@@ -704,6 +705,7 @@ export default function Page() {
   const [spaceAttestorSaving, setSpaceAttestorSaving] = useState(false);
   const [spaceAttestorSecretInput, setSpaceAttestorSecretInput] = useState("");
   const [spaceAttestorSecretSaving, setSpaceAttestorSecretSaving] = useState(false);
+  const [spaceAttestorGenerating, setSpaceAttestorGenerating] = useState(false);
   const [storedAttestorPubkey, setStoredAttestorPubkey] = useState<string | null>(
     null
   );
@@ -1475,7 +1477,10 @@ export default function Page() {
     setRefreshCounter((c) => c + 1);
   }
 
-  async function updateSpaceAttestor(nextAttestor: string) {
+  async function updateSpaceAttestor(
+    nextAttestor: string,
+    options?: { suppressSuccessMessage?: boolean; skipRefresh?: boolean; rethrow?: boolean }
+  ) {
     setError("");
     setMsg("Updating space attestor...");
     setSpaceAttestorSaving(true);
@@ -1520,19 +1525,29 @@ export default function Page() {
       );
 
       setSpaceAttestorInput(newAttestor.toBase58());
-      setMsg(
-        `✅ Updated space attestor to ${newAttestor.toBase58()}\nTransaction: ${sig}`
-      );
-      await refresh();
+      if (!options?.suppressSuccessMessage) {
+        setMsg(
+          `✅ Updated space attestor to ${newAttestor.toBase58()}\nTransaction: ${sig}`
+        );
+      }
+      if (!options?.skipRefresh) {
+        await refresh();
+      }
+      return { signature: sig, attestor: newAttestor.toBase58() };
     } catch (e: any) {
       setError(String(e?.message || e));
       setMsg("");
+      if (options?.rethrow) throw e;
+      return null;
     } finally {
       setSpaceAttestorSaving(false);
     }
   }
 
-  async function saveSpaceAttestorSecret() {
+  async function saveSpaceAttestorSecret(
+    overrideSecret?: string,
+    options?: { suppressSuccessMessage?: boolean; clearInput?: boolean; rethrow?: boolean }
+  ) {
     setError("");
     setMsg("Saving attestor key for this DAO...");
     setSpaceAttestorSecretSaving(true);
@@ -1550,7 +1565,10 @@ export default function Page() {
         throw new Error("Wallet does not support signMessage.");
       }
 
-      const secret = spaceAttestorSecretInput.trim();
+      const secret =
+        typeof overrideSecret === "string"
+          ? overrideSecret.trim()
+          : spaceAttestorSecretInput.trim();
       if (!secret) throw new Error("Attestor secret key is required.");
 
       const ts = Date.now();
@@ -1580,7 +1598,9 @@ export default function Page() {
         throw new Error(String(data?.error || res.statusText || "Failed to save key"));
       }
 
-      setSpaceAttestorSecretInput("");
+      if (options?.clearInput !== false) {
+        setSpaceAttestorSecretInput("");
+      }
       setStoredAttestorPubkey(
         typeof data?.attestorPubkey === "string" ? data.attestorPubkey : null
       );
@@ -1591,16 +1611,76 @@ export default function Page() {
           : null
       );
 
+      if (!options?.suppressSuccessMessage) {
+        setMsg(
+          `✅ Saved attestor key for DAO in KV.\nAttestor: ${
+            data?.attestorPubkey || "unknown"
+          }`
+        );
+      }
+
+      return {
+        attestorPubkey:
+          typeof data?.attestorPubkey === "string" ? data.attestorPubkey : null,
+        matchesOnChainAttestor:
+          typeof data?.matchesOnChainAttestor === "boolean"
+            ? data.matchesOnChainAttestor
+            : null,
+      };
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setMsg("");
+      if (options?.rethrow) throw e;
+      return null;
+    } finally {
+      setSpaceAttestorSecretSaving(false);
+    }
+  }
+
+  async function generateAndApplyAttestorKey() {
+    setError("");
+    setMsg("Generating attestor keypair and applying updates...");
+    setSpaceAttestorGenerating(true);
+
+    try {
+      if (!signMessage) {
+        throw new Error("Wallet does not support signMessage.");
+      }
+
+      const kp = Keypair.generate();
+      const nextAttestor = kp.publicKey.toBase58();
+      const nextSecret = JSON.stringify(Array.from(kp.secretKey));
+
+      setSpaceAttestorInput(nextAttestor);
+      setSpaceAttestorSecretInput(nextSecret);
+
+      const updateResult = await updateSpaceAttestor(nextAttestor, {
+        suppressSuccessMessage: true,
+        skipRefresh: true,
+        rethrow: true,
+      });
+      if (!updateResult) {
+        throw new Error("Failed to update on-chain attestor.");
+      }
+
+      const saveResult = await saveSpaceAttestorSecret(nextSecret, {
+        suppressSuccessMessage: true,
+        clearInput: true,
+        rethrow: true,
+      });
+      if (!saveResult) {
+        throw new Error("Failed to save attestor key in KV.");
+      }
+
       setMsg(
-        `✅ Saved attestor key for DAO in KV.\nAttestor: ${
-          data?.attestorPubkey || "unknown"
-        }`
+        `✅ Generated new attestor and applied both updates.\nAttestor: ${nextAttestor}\nTransaction: ${updateResult.signature}`
       );
+      await refresh();
     } catch (e: any) {
       setError(String(e?.message || e));
       setMsg("");
     } finally {
-      setSpaceAttestorSecretSaving(false);
+      setSpaceAttestorGenerating(false);
     }
   }
 
@@ -3312,7 +3392,8 @@ export default function Page() {
                       <Typography
                         sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.65 }}
                       >
-                        Use a persistent server/bot wallet for attestation.
+                        Use a dedicated soft server/bot wallet for attestation and keep only a
+                        small operational balance in it.
                       </Typography>
                       <Box
                         component="input"
@@ -3320,7 +3401,12 @@ export default function Page() {
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           setSpaceAttestorInput(e.target.value)
                         }
-                        disabled={!canManageSpaceAdmin || spaceAttestorSaving}
+                        disabled={
+                          !canManageSpaceAdmin ||
+                          spaceAttestorSaving ||
+                          spaceAttestorSecretSaving ||
+                          spaceAttestorGenerating
+                        }
                         placeholder="Attestor public key"
                         style={{
                           width: "100%",
@@ -3346,6 +3432,8 @@ export default function Page() {
                             !canManageSpaceAdmin ||
                             !sendTransaction ||
                             spaceAttestorSaving ||
+                            spaceAttestorSecretSaving ||
+                            spaceAttestorGenerating ||
                             !spaceAttestorInput.trim()
                           }
                           sx={{
@@ -3368,6 +3456,22 @@ export default function Page() {
                             Use Default Attestor
                           </Button>
                         )}
+                        <Button
+                          variant="outlined"
+                          onClick={() => generateAndApplyAttestorKey()}
+                          disabled={
+                            !canManageSpaceAdmin ||
+                            !sendTransaction ||
+                            !signMessage ||
+                            spaceAttestorSaving ||
+                            spaceAttestorSecretSaving ||
+                            spaceAttestorGenerating
+                          }
+                        >
+                          {spaceAttestorGenerating
+                            ? "Generating..."
+                            : "Generate + Apply Attestor"}
+                        </Button>
                       </Stack>
                       <InfoRow
                         label="KV Attestor Key"
@@ -3395,12 +3499,13 @@ export default function Page() {
                       <Typography
                         sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.7, mt: 1 }}
                       >
-                        Store Attestor Secret (KV)
+                        Store Attestor Secret
                       </Typography>
                       <Typography
                         sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.65 }}
                       >
-                        Save per-community attestor secret (server-side only).
+                        Save per-community attestor secret (server-side only). This should be a
+                        soft wallet key with only a small amount of funds.
                       </Typography>
                       <Box
                         component="textarea"
@@ -3408,7 +3513,12 @@ export default function Page() {
                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                           setSpaceAttestorSecretInput(e.target.value)
                         }
-                        disabled={!canManageSpaceAdmin || spaceAttestorSecretSaving}
+                        disabled={
+                          !canManageSpaceAdmin ||
+                          spaceAttestorSecretSaving ||
+                          spaceAttestorSaving ||
+                          spaceAttestorGenerating
+                        }
                         placeholder="Attestor secret key (JSON array or base64)"
                         style={{
                           width: "100%",
@@ -3436,6 +3546,8 @@ export default function Page() {
                             !canManageSpaceAdmin ||
                             !signMessage ||
                             spaceAttestorSecretSaving ||
+                            spaceAttestorSaving ||
+                            spaceAttestorGenerating ||
                             !spaceAttestorSecretInput.trim()
                           }
                           sx={{
@@ -3448,7 +3560,11 @@ export default function Page() {
                         <Button
                           variant="outlined"
                           onClick={() => refresh().catch(() => {})}
-                          disabled={spaceAttestorSecretSaving}
+                          disabled={
+                            spaceAttestorSecretSaving ||
+                            spaceAttestorSaving ||
+                            spaceAttestorGenerating
+                          }
                         >
                           Reload KV Status
                         </Button>

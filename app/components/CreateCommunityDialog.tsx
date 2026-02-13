@@ -348,13 +348,17 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
               <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
                 Attestor Wallet (optional)
               </Typography>
+              <Typography sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.7 }}>
+                Recommended: use a dedicated soft wallet and keep only a small amount of funds in
+                it.
+              </Typography>
               <Box
                 component="input"
                 value={attestorInput}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setAttestorInput(e.target.value)
                 }
-                placeholder="Defaults to connected authority wallet"
+                placeholder="Defaults to connected authority wallet (not recommended long-term)"
                 style={{
                   width: "100%",
                   padding: "10px 12px",
