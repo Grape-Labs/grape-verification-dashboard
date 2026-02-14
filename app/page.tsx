@@ -588,6 +588,29 @@ function fmtTs(ts: number) {
   }
 }
 
+function isDiscordSnowflake(value: string) {
+  return /^\d{17,22}$/.test(value.trim());
+}
+
+function buildDiscordRoleConfigMessage(p: {
+  daoId: string;
+  wallet: string;
+  guildId: string;
+  verifiedRoleId: string;
+  enabled: boolean;
+  ts: number;
+}) {
+  return (
+    "Grape Discord Role Config Save\n" +
+    `daoId=${p.daoId}\n` +
+    `wallet=${p.wallet}\n` +
+    `guildId=${p.guildId}\n` +
+    `verifiedRoleId=${p.verifiedRoleId}\n` +
+    `enabled=${p.enabled ? "1" : "0"}\n` +
+    `ts=${p.ts}`
+  );
+}
+
 async function safeGetAccountInfo(connection: Connection, pubkey: PublicKey) {
   try {
     return await connection.getAccountInfo(pubkey);
@@ -728,6 +751,21 @@ export default function Page() {
   const [spaceAttestorSecretInput, setSpaceAttestorSecretInput] = useState("");
   const [spaceAttestorSecretSaving, setSpaceAttestorSecretSaving] = useState(false);
   const [spaceAttestorGenerating, setSpaceAttestorGenerating] = useState(false);
+  const [discordRoleGuildIdInput, setDiscordRoleGuildIdInput] = useState("");
+  const [discordRoleVerifiedRoleIdInput, setDiscordRoleVerifiedRoleIdInput] =
+    useState("");
+  const [discordRoleEnabled, setDiscordRoleEnabled] = useState(true);
+  const [discordRoleConfigExists, setDiscordRoleConfigExists] = useState<
+    boolean | null
+  >(null);
+  const [discordRoleConfigUpdatedAt, setDiscordRoleConfigUpdatedAt] = useState<
+    string | null
+  >(null);
+  const [discordRoleConfigUpdatedBy, setDiscordRoleConfigUpdatedBy] = useState<
+    string | null
+  >(null);
+  const [discordRoleConfigSaving, setDiscordRoleConfigSaving] = useState(false);
+  const [discordRoleConfigLoading, setDiscordRoleConfigLoading] = useState(false);
   const [storedAttestorPubkey, setStoredAttestorPubkey] = useState<string | null>(
     null
   );
@@ -1313,6 +1351,12 @@ export default function Page() {
       setSpaceAttestor(null);
       setSpaceAttestorInput("");
       setSpaceAttestorSecretInput("");
+      setDiscordRoleGuildIdInput("");
+      setDiscordRoleVerifiedRoleIdInput("");
+      setDiscordRoleEnabled(true);
+      setDiscordRoleConfigExists(null);
+      setDiscordRoleConfigUpdatedAt(null);
+      setDiscordRoleConfigUpdatedBy(null);
       setStoredAttestorPubkey(null);
       setStoredAttestorUpdatedAt(null);
       setStoredAttestorMatchesOnChain(null);
@@ -1332,6 +1376,8 @@ export default function Page() {
 
       if (!daoPk) return;
 
+      let metadataGuildHint: string | null = null;
+
       const [pda] = deriveSpacePda(daoPk);
       setSpacePda(pda);
       const [metaPda] = deriveSpaceMetadataPda(pda);
@@ -1347,6 +1393,7 @@ export default function Page() {
             const cleaned = parsedMeta?.raw ?? decoded ?? "";
             setSpaceCommunityMetadata(cleaned || null);
             setSpaceCommunityMetadataInput(cleaned);
+            metadataGuildHint = parsedMeta?.guildId || null;
             if (parsedMeta?.name) {
               rememberLocalCommunity({
                 daoId: daoPk.toBase58(),
@@ -1388,6 +1435,55 @@ export default function Page() {
           setStoredAttestorPubkey(null);
           setStoredAttestorUpdatedAt(null);
         }
+      }
+
+      setDiscordRoleConfigLoading(true);
+      try {
+        const res = await fetch(
+          `/api/discord/role-config?daoId=${encodeURIComponent(daoPk.toBase58())}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json().catch(() => null);
+        if (!cancelled && res.ok && data?.ok) {
+          const exists = !!data.exists;
+          setDiscordRoleConfigExists(exists);
+          setDiscordRoleConfigUpdatedAt(
+            exists && typeof data.updatedAt === "string" ? data.updatedAt : null
+          );
+          setDiscordRoleConfigUpdatedBy(
+            exists && typeof data.updatedBy === "string" ? data.updatedBy : null
+          );
+          setDiscordRoleEnabled(exists ? data.enabled !== false : true);
+          if (exists) {
+            setDiscordRoleGuildIdInput(
+              typeof data.guildId === "string" ? data.guildId : ""
+            );
+            setDiscordRoleVerifiedRoleIdInput(
+              typeof data.verifiedRoleId === "string" ? data.verifiedRoleId : ""
+            );
+          } else {
+            setDiscordRoleGuildIdInput(metadataGuildHint || "");
+            setDiscordRoleVerifiedRoleIdInput("");
+          }
+        } else if (!cancelled) {
+          setDiscordRoleConfigExists(false);
+          setDiscordRoleConfigUpdatedAt(null);
+          setDiscordRoleConfigUpdatedBy(null);
+          setDiscordRoleEnabled(true);
+          setDiscordRoleGuildIdInput(metadataGuildHint || "");
+          setDiscordRoleVerifiedRoleIdInput("");
+        }
+      } catch {
+        if (!cancelled) {
+          setDiscordRoleConfigExists(false);
+          setDiscordRoleConfigUpdatedAt(null);
+          setDiscordRoleConfigUpdatedBy(null);
+          setDiscordRoleEnabled(true);
+          setDiscordRoleGuildIdInput(metadataGuildHint || "");
+          setDiscordRoleVerifiedRoleIdInput("");
+        }
+      } finally {
+        if (!cancelled) setDiscordRoleConfigLoading(false);
       }
 
       const acct = await safeGetAccountInfo(connection, pda);
@@ -1505,6 +1601,122 @@ export default function Page() {
 
   async function refresh() {
     setRefreshCounter((c) => c + 1);
+  }
+
+  async function reloadDiscordRoleConfig() {
+    if (!daoPk) return;
+
+    setDiscordRoleConfigLoading(true);
+    try {
+      const res = await fetch(
+        `/api/discord/role-config?daoId=${encodeURIComponent(daoPk.toBase58())}`,
+        { cache: "no-store" }
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        throw new Error(
+          String(data?.error || res.statusText || "Failed to load role config")
+        );
+      }
+
+      const exists = !!data.exists;
+      setDiscordRoleConfigExists(exists);
+      setDiscordRoleConfigUpdatedAt(
+        exists && typeof data.updatedAt === "string" ? data.updatedAt : null
+      );
+      setDiscordRoleConfigUpdatedBy(
+        exists && typeof data.updatedBy === "string" ? data.updatedBy : null
+      );
+      setDiscordRoleEnabled(exists ? data.enabled !== false : true);
+      setDiscordRoleGuildIdInput(exists && typeof data.guildId === "string" ? data.guildId : "");
+      setDiscordRoleVerifiedRoleIdInput(
+        exists && typeof data.verifiedRoleId === "string" ? data.verifiedRoleId : ""
+      );
+    } finally {
+      setDiscordRoleConfigLoading(false);
+    }
+  }
+
+  async function saveDiscordRoleConfig() {
+    setError("");
+    setMsg("Saving Discord role config...");
+    setDiscordRoleConfigSaving(true);
+
+    try {
+      if (!daoPk) throw new Error("DAO ID is required.");
+      if (!publicKey) throw new Error("Connect wallet first.");
+      if (!spaceAuthority) throw new Error("Space authority could not be read.");
+      if (!publicKey.equals(spaceAuthority)) {
+        throw new Error(
+          `Only space authority can update role config: ${spaceAuthority.toBase58()}`
+        );
+      }
+      if (!signMessage) {
+        throw new Error("Wallet does not support signMessage.");
+      }
+
+      const guildId = discordRoleGuildIdInput.trim();
+      const verifiedRoleId = discordRoleVerifiedRoleIdInput.trim();
+      if (!isDiscordSnowflake(guildId)) {
+        throw new Error("Guild ID must be a valid Discord snowflake.");
+      }
+      if (!isDiscordSnowflake(verifiedRoleId)) {
+        throw new Error("Verified Role ID must be a valid Discord snowflake.");
+      }
+
+      const ts = Date.now();
+      const messageText = buildDiscordRoleConfigMessage({
+        daoId: daoPk.toBase58(),
+        wallet: publicKey.toBase58(),
+        guildId,
+        verifiedRoleId,
+        enabled: discordRoleEnabled,
+        ts,
+      });
+      const messageBytes = new TextEncoder().encode(messageText);
+      const sigBytes = await signMessage(messageBytes);
+      const signatureBase64 = Buffer.from(sigBytes).toString("base64");
+
+      const res = await fetch("/api/discord/role-config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          daoId: daoPk.toBase58(),
+          wallet: publicKey.toBase58(),
+          guildId,
+          verifiedRoleId,
+          enabled: discordRoleEnabled,
+          ts,
+          message: messageText,
+          signatureBase64,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(
+          String(data?.error || res.statusText || "Failed to save role config")
+        );
+      }
+
+      setDiscordRoleConfigExists(true);
+      setDiscordRoleConfigUpdatedAt(
+        typeof data?.updatedAt === "string" ? data.updatedAt : new Date().toISOString()
+      );
+      setDiscordRoleConfigUpdatedBy(
+        typeof data?.updatedBy === "string" ? data.updatedBy : publicKey.toBase58()
+      );
+      setMsg(
+        `✅ Saved Discord role config.\nGuild: ${guildId}\nVerified role: ${verifiedRoleId}\nEnabled: ${
+          discordRoleEnabled ? "yes" : "no"
+        }`
+      );
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setMsg("");
+    } finally {
+      setDiscordRoleConfigSaving(false);
+    }
   }
 
   async function updateSpaceAttestor(
@@ -4052,6 +4264,172 @@ export default function Page() {
                           Reload
                         </Button>
                       </Stack>
+
+                      <Divider sx={{ my: 1 }} />
+                      <Typography
+                        sx={{
+                          fontFamily: "system-ui",
+                          fontSize: 12,
+                          opacity: 0.7,
+                          mt: 0.5,
+                        }}
+                      >
+                        Discord Role Configuration
+                      </Typography>
+                      <Typography
+                        sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.65 }}
+                      >
+                        Configure per-community guild and verified role IDs. The Discord bot
+                        enforces role assignment; this dashboard only stores admin-managed config.
+                      </Typography>
+                      <InfoRow
+                        label="Role Config"
+                        value={
+                          discordRoleConfigExists == null
+                            ? "loading..."
+                            : discordRoleConfigExists
+                            ? "✅ configured"
+                            : "❌ not set"
+                        }
+                      />
+                      <InfoRow
+                        label="Updated At"
+                        value={discordRoleConfigUpdatedAt || "—"}
+                      />
+                      <InfoRow
+                        label="Updated By"
+                        value={discordRoleConfigUpdatedBy || "—"}
+                        mono
+                      />
+                      <Box
+                        component="input"
+                        value={discordRoleGuildIdInput}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setDiscordRoleGuildIdInput(e.target.value)
+                        }
+                        disabled={
+                          !canManageSpaceAdmin || discordRoleConfigSaving || discordRoleConfigLoading
+                        }
+                        placeholder="Discord Guild ID"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          borderRadius: 12,
+                          border: "3px solid #0b1220",
+                          outline: "none",
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          background: "rgba(255,255,255,0.06)",
+                          color: "rgba(255,255,255,0.92)",
+                        }}
+                      />
+                      <Box
+                        component="input"
+                        value={discordRoleVerifiedRoleIdInput}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setDiscordRoleVerifiedRoleIdInput(e.target.value)
+                        }
+                        disabled={
+                          !canManageSpaceAdmin || discordRoleConfigSaving || discordRoleConfigLoading
+                        }
+                        placeholder="Verified Role ID"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          borderRadius: 12,
+                          border: "3px solid #0b1220",
+                          outline: "none",
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          background: "rgba(255,255,255,0.06)",
+                          color: "rgba(255,255,255,0.92)",
+                        }}
+                      />
+                      <Box
+                        component="label"
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 1,
+                          fontFamily: "system-ui",
+                          fontSize: 12,
+                          opacity: 0.9,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={discordRoleEnabled}
+                          onChange={(e) => setDiscordRoleEnabled(e.target.checked)}
+                          disabled={
+                            !canManageSpaceAdmin ||
+                            discordRoleConfigSaving ||
+                            discordRoleConfigLoading
+                          }
+                        />
+                        Role enforcement enabled
+                      </Box>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        sx={{ mt: 0.5 }}
+                      >
+                        <Button
+                          variant="contained"
+                          onClick={() => saveDiscordRoleConfig()}
+                          disabled={
+                            !canManageSpaceAdmin ||
+                            !signMessage ||
+                            discordRoleConfigSaving ||
+                            discordRoleConfigLoading ||
+                            !discordRoleGuildIdInput.trim() ||
+                            !discordRoleVerifiedRoleIdInput.trim()
+                          }
+                          sx={{
+                            fontFamily: '"Bangers", system-ui',
+                            letterSpacing: 0.7,
+                          }}
+                        >
+                          {discordRoleConfigSaving ? "Saving..." : "Save Role Config"}
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          onClick={() => {
+                            reloadDiscordRoleConfig().catch((e: any) =>
+                              setError(String(e?.message || e))
+                            );
+                          }}
+                          disabled={discordRoleConfigSaving || discordRoleConfigLoading}
+                        >
+                          {discordRoleConfigLoading ? "Loading..." : "Reload Role Config"}
+                        </Button>
+                        {!!parsedCommunityMetadata?.guildId && (
+                          <Button
+                            variant="text"
+                            onClick={() =>
+                              setDiscordRoleGuildIdInput(parsedCommunityMetadata.guildId || "")
+                            }
+                            disabled={discordRoleConfigSaving || discordRoleConfigLoading}
+                          >
+                            Use Metadata Guild
+                          </Button>
+                        )}
+                      </Stack>
+                      {discordRoleGuildIdInput.trim() &&
+                        !isDiscordSnowflake(discordRoleGuildIdInput) && (
+                          <Typography
+                            sx={{ fontFamily: "system-ui", fontSize: 11, color: "#fca5a5" }}
+                          >
+                            Guild ID must be a Discord snowflake (numeric ID).
+                          </Typography>
+                        )}
+                      {discordRoleVerifiedRoleIdInput.trim() &&
+                        !isDiscordSnowflake(discordRoleVerifiedRoleIdInput) && (
+                          <Typography
+                            sx={{ fontFamily: "system-ui", fontSize: 11, color: "#fca5a5" }}
+                          >
+                            Verified Role ID must be a Discord snowflake (numeric ID).
+                          </Typography>
+                        )}
 
                       {spaceExists === false && (
                         <Stack
