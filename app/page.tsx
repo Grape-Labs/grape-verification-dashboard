@@ -67,6 +67,23 @@ type CommunityConfig = {
   guildId?: string;
 };
 
+type CommunityHealthSnapshot = {
+  daoId: string;
+  spaceExists: boolean;
+  spaceFrozen: boolean | null;
+  authority: string | null;
+  attestor: string | null;
+  metadataLoaded: boolean;
+  metadataPresent: boolean;
+  metadataLabel: string | null;
+  kvLoaded: boolean;
+  kvExists: boolean;
+  kvAttestor: string | null;
+  kvMatchesOnChain: boolean | null;
+  healthScore: number;
+  healthLevel: "healthy" | "attention" | "setup";
+};
+
 const PLATFORM_KEYS = new Set<PlatformKey>([
   "discord",
   "telegram",
@@ -244,6 +261,11 @@ function shortB58(pk: PublicKey | null | undefined) {
   if (!pk) return "—";
   const s = pk.toBase58();
   return `${s.slice(0, 4)}…${s.slice(-4)}`;
+}
+
+function shortPkString(value: string | null | undefined) {
+  if (!value) return "—";
+  return value.length > 12 ? `${value.slice(0, 4)}…${value.slice(-4)}` : value;
 }
 
 function b58(pk: PublicKey | null | undefined) {
@@ -750,6 +772,14 @@ export default function Page() {
   const [communityMetadataByDao, setCommunityMetadataByDao] = useState<
     Record<string, string | null>
   >({});
+  const [communityHealthByDao, setCommunityHealthByDao] = useState<
+    Record<string, CommunityHealthSnapshot>
+  >({});
+  const [communityHealthLoading, setCommunityHealthLoading] = useState(false);
+  const [communityHealthReloadCounter, setCommunityHealthReloadCounter] = useState(0);
+  const [communityHealthLastUpdatedAt, setCommunityHealthLastUpdatedAt] = useState<
+    string | null
+  >(null);
   const [refreshCounter, setRefreshCounter] = useState(0);
 
   const communityRegistry = useMemo(
@@ -2265,42 +2295,233 @@ export default function Page() {
   useEffect(() => {
     if (!communityExplorerOpen) return;
 
-    const missingDaoIds = communityExplorerList
-      .map((community) => community.daoId)
-      .filter((daoId) => !Object.prototype.hasOwnProperty.call(communityMetadataByDao, daoId));
-
-    if (missingDaoIds.length === 0) return;
+    const daoIds = Array.from(
+      new Set(
+        communityExplorerList.map((community) => community.daoId).filter((daoId) => !!daoId)
+      )
+    );
+    if (daoIds.length === 0) {
+      setCommunityHealthByDao({});
+      setCommunityHealthLastUpdatedAt(new Date().toISOString());
+      return;
+    }
 
     let cancelled = false;
 
-    async function loadMissingMetadata() {
-      const loaded = await Promise.all(
-        missingDaoIds.map(async (daoId) => {
+    async function loadCommunityHealth() {
+      setCommunityHealthLoading(true);
+      try {
+        type ValidEntry = { daoId: string; daoPk: PublicKey; spacePda: PublicKey };
+        type KvStatus = {
+          loaded: boolean;
+          exists: boolean;
+          attestorPubkey: string | null;
+        };
+
+        const validEntries: ValidEntry[] = [];
+        const invalidDaoIds = new Set<string>();
+        for (const daoId of daoIds) {
           try {
             const daoPk = new PublicKey(daoId);
-            const metadataAcct = await fetchSpaceMetadataByDaoId(connection, daoPk);
-            if (!metadataAcct?.data) return [daoId, null] as const;
-            const decoded = decodeCommunityMetadata(metadataAcct.data);
-            return [daoId, decoded] as const;
+            const [spacePda] = deriveSpacePda(daoPk);
+            validEntries.push({ daoId, daoPk, spacePda });
           } catch {
-            return [daoId, null] as const;
+            invalidDaoIds.add(daoId);
           }
-        })
-      );
+        }
 
-      if (cancelled) return;
-      setCommunityMetadataByDao((prev) => {
-        const next = { ...prev };
-        for (const [daoId, value] of loaded) next[daoId] = value;
-        return next;
-      });
+        const spaceAccounts: Array<
+          Awaited<ReturnType<typeof connection.getAccountInfo>>
+        > = new Array(validEntries.length).fill(null);
+
+        const chunkSize = 100;
+        for (let i = 0; i < validEntries.length; i += chunkSize) {
+          const chunk = validEntries.slice(i, i + chunkSize);
+          const chunkPdas = chunk.map((entry) => entry.spacePda);
+          try {
+            const accounts = await connection.getMultipleAccountsInfo(chunkPdas);
+            for (let j = 0; j < accounts.length; j++) {
+              spaceAccounts[i + j] = accounts[j];
+            }
+          } catch {
+            const fallback = await Promise.all(
+              chunkPdas.map((pda) => safeGetAccountInfo(connection, pda))
+            );
+            for (let j = 0; j < fallback.length; j++) {
+              spaceAccounts[i + j] = fallback[j];
+            }
+          }
+        }
+
+        const metadataPairs = await Promise.all(
+          validEntries.map(async ({ daoId, daoPk }) => {
+            try {
+              const metadataAcct = await fetchSpaceMetadataByDaoId(connection, daoPk);
+              if (!metadataAcct?.data) return [daoId, null] as const;
+              const decoded = decodeCommunityMetadata(metadataAcct.data);
+              return [daoId, decoded] as const;
+            } catch {
+              return [daoId, null] as const;
+            }
+          })
+        );
+        const metadataMap = Object.fromEntries(metadataPairs) as Record<
+          string,
+          string | null
+        >;
+
+        const kvPairs = await Promise.all(
+          validEntries.map(async ({ daoId }) => {
+            try {
+              const res = await fetch(
+                `/api/attestor/admin-key?daoId=${encodeURIComponent(daoId)}`,
+                { cache: "no-store" }
+              );
+              if (!res.ok) {
+                return [
+                  daoId,
+                  { loaded: false, exists: false, attestorPubkey: null } as KvStatus,
+                ] as const;
+              }
+              const data = await res.json().catch(() => null);
+              if (!data?.ok) {
+                return [
+                  daoId,
+                  { loaded: false, exists: false, attestorPubkey: null } as KvStatus,
+                ] as const;
+              }
+              return [
+                daoId,
+                {
+                  loaded: true,
+                  exists: !!data.exists,
+                  attestorPubkey:
+                    data.exists && typeof data.attestorPubkey === "string"
+                      ? data.attestorPubkey
+                      : null,
+                } as KvStatus,
+              ] as const;
+            } catch {
+              return [
+                daoId,
+                { loaded: false, exists: false, attestorPubkey: null } as KvStatus,
+              ] as const;
+            }
+          })
+        );
+        const kvMap = Object.fromEntries(kvPairs) as Record<string, KvStatus>;
+
+        const nextHealth: Record<string, CommunityHealthSnapshot> = {};
+
+        for (let i = 0; i < validEntries.length; i++) {
+          const { daoId } = validEntries[i];
+          const spaceAcct = spaceAccounts[i];
+
+          let parsedSpace: ReturnType<typeof parseSpace> | null = null;
+          if (spaceAcct?.data) {
+            try {
+              parsedSpace = parseSpace(spaceAcct.data);
+            } catch {
+              parsedSpace = null;
+            }
+          }
+
+          const rawMetadata = metadataMap[daoId] ?? null;
+          const parsedMetadata = parseCommunityMetadataForUi(rawMetadata);
+          const metadataLabel = formatCommunityMetadataLabel(parsedMetadata);
+          const metadataPresent = !!metadataLabel;
+
+          if (parsedMetadata?.name) {
+            rememberLocalCommunity({
+              daoId,
+              name: parsedMetadata.name,
+              slug: parsedMetadata.slug || undefined,
+              guildId: parsedMetadata.guildId || undefined,
+            });
+          }
+
+          const kvStatus = kvMap[daoId] || {
+            loaded: false,
+            exists: false,
+            attestorPubkey: null,
+          };
+
+          let kvMatchesOnChain: boolean | null = null;
+          if (kvStatus.loaded) {
+            if (kvStatus.exists && kvStatus.attestorPubkey && parsedSpace?.attestor) {
+              kvMatchesOnChain = kvStatus.attestorPubkey === parsedSpace.attestor.toBase58();
+            } else if (!kvStatus.exists) {
+              kvMatchesOnChain = false;
+            }
+          }
+
+          let healthScore = 0;
+          if (parsedSpace) healthScore += 1;
+          if (parsedSpace && !parsedSpace.isFrozen) healthScore += 1;
+          if (metadataPresent) healthScore += 1;
+          if (kvMatchesOnChain === true) healthScore += 1;
+
+          const healthLevel =
+            healthScore >= 4 ? "healthy" : healthScore >= 2 ? "attention" : "setup";
+
+          nextHealth[daoId] = {
+            daoId,
+            spaceExists: !!parsedSpace,
+            spaceFrozen: parsedSpace ? parsedSpace.isFrozen : null,
+            authority: parsedSpace?.authority.toBase58() || null,
+            attestor: parsedSpace?.attestor.toBase58() || null,
+            metadataLoaded: true,
+            metadataPresent,
+            metadataLabel,
+            kvLoaded: kvStatus.loaded,
+            kvExists: kvStatus.exists,
+            kvAttestor: kvStatus.attestorPubkey,
+            kvMatchesOnChain,
+            healthScore,
+            healthLevel,
+          };
+        }
+
+        for (const daoId of invalidDaoIds) {
+          nextHealth[daoId] = {
+            daoId,
+            spaceExists: false,
+            spaceFrozen: null,
+            authority: null,
+            attestor: null,
+            metadataLoaded: false,
+            metadataPresent: false,
+            metadataLabel: null,
+            kvLoaded: false,
+            kvExists: false,
+            kvAttestor: null,
+            kvMatchesOnChain: null,
+            healthScore: 0,
+            healthLevel: "setup",
+          };
+        }
+
+        if (cancelled) return;
+        setCommunityMetadataByDao((prev) => ({ ...prev, ...metadataMap }));
+        setCommunityHealthByDao((prev) => ({ ...prev, ...nextHealth }));
+        setCommunityHealthLastUpdatedAt(new Date().toISOString());
+      } finally {
+        if (!cancelled) setCommunityHealthLoading(false);
+      }
     }
 
-    loadMissingMetadata().catch(() => {});
+    loadCommunityHealth().catch(() => {});
+
     return () => {
       cancelled = true;
     };
-  }, [communityExplorerOpen, communityExplorerList, communityMetadataByDao, connection]);
+  }, [
+    communityExplorerOpen,
+    communityExplorerList,
+    connection,
+    rememberLocalCommunity,
+    communityHealthReloadCounter,
+  ]);
 
   const communityExplorerResults = useMemo(() => {
     const query = communitySearch.trim().toLowerCase();
@@ -2319,6 +2540,35 @@ export default function Page() {
       return haystack.includes(query);
     });
   }, [communityExplorerList, communitySearch, communityMetadataByDao]);
+
+  const communityHealthSummary = useMemo(() => {
+    const summary = {
+      total: communityExplorerList.length,
+      loaded: 0,
+      healthy: 0,
+      attention: 0,
+      setup: 0,
+      spacesEnabled: 0,
+      spacesFrozen: 0,
+      metadataSet: 0,
+      kvMatches: 0,
+    };
+
+    for (const community of communityExplorerList) {
+      const health = communityHealthByDao[community.daoId];
+      if (!health) continue;
+      summary.loaded += 1;
+      if (health.spaceExists) summary.spacesEnabled += 1;
+      if (health.spaceFrozen) summary.spacesFrozen += 1;
+      if (health.metadataPresent) summary.metadataSet += 1;
+      if (health.kvMatchesOnChain === true) summary.kvMatches += 1;
+      if (health.healthLevel === "healthy") summary.healthy += 1;
+      else if (health.healthLevel === "attention") summary.attention += 1;
+      else summary.setup += 1;
+    }
+
+    return summary;
+  }, [communityExplorerList, communityHealthByDao]);
 
   return (
     <Box
@@ -2547,27 +2797,105 @@ export default function Page() {
                     <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
                       {`Browse Communities (${communityExplorerList.length})`}
                     </Typography>
-                    <Box
-                      component="input"
-                      value={communitySearch}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setCommunitySearch(e.target.value)
-                      }
-                      placeholder="Search by name, slug, guild, or DAO"
-                      style={{
-                        minWidth: 280,
-                        width: "100%",
-                        maxWidth: 420,
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "2px solid rgba(255,255,255,0.18)",
-                        outline: "none",
-                        fontFamily: "system-ui",
-                        background: "rgba(255,255,255,0.08)",
-                        color: "rgba(255,255,255,0.92)",
-                      }}
-                    />
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1}
+                      sx={{ width: { xs: "100%", sm: "auto" } }}
+                    >
+                      <Box
+                        component="input"
+                        value={communitySearch}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setCommunitySearch(e.target.value)
+                        }
+                        placeholder="Search by name, slug, guild, or DAO"
+                        style={{
+                          minWidth: 280,
+                          width: "100%",
+                          maxWidth: 420,
+                          padding: "8px 10px",
+                          borderRadius: 10,
+                          border: "2px solid rgba(255,255,255,0.18)",
+                          outline: "none",
+                          fontFamily: "system-ui",
+                          background: "rgba(255,255,255,0.08)",
+                          color: "rgba(255,255,255,0.92)",
+                        }}
+                      />
+                      <Button
+                        variant="outlined"
+                        onClick={() => setCommunityHealthReloadCounter((c) => c + 1)}
+                        disabled={communityHealthLoading}
+                        sx={{ whiteSpace: "nowrap" }}
+                      >
+                        {communityHealthLoading ? "Refreshing..." : "Refresh Health"}
+                      </Button>
+                    </Stack>
                   </Stack>
+
+                  <Paper
+                    sx={{
+                      mb: 1.25,
+                      p: 1,
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.14)",
+                    }}
+                  >
+                    <Typography
+                      sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700, mb: 0.75 }}
+                    >
+                      Community Health Dashboard
+                    </Typography>
+                    <Stack
+                      direction={{ xs: "column", md: "row" }}
+                      spacing={0.75}
+                      useFlexGap
+                      flexWrap="wrap"
+                    >
+                      <StatusChip
+                        label={`Loaded: ${communityHealthSummary.loaded}/${communityHealthSummary.total}`}
+                        ok={
+                          communityHealthSummary.total > 0 &&
+                          communityHealthSummary.loaded === communityHealthSummary.total
+                        }
+                      />
+                      <StatusChip
+                        label={`Healthy: ${communityHealthSummary.healthy}`}
+                        ok={communityHealthSummary.healthy > 0}
+                      />
+                      <StatusChip
+                        label={`Needs setup: ${communityHealthSummary.setup}`}
+                        ok={communityHealthSummary.setup === 0}
+                      />
+                      <StatusChip
+                        label={`Spaces enabled: ${communityHealthSummary.spacesEnabled}`}
+                        ok={communityHealthSummary.spacesEnabled > 0}
+                      />
+                      <StatusChip
+                        label={`Frozen spaces: ${communityHealthSummary.spacesFrozen}`}
+                        ok={communityHealthSummary.spacesFrozen === 0}
+                      />
+                      <StatusChip
+                        label={`Metadata set: ${communityHealthSummary.metadataSet}`}
+                        ok={communityHealthSummary.metadataSet > 0}
+                      />
+                      <StatusChip
+                        label={`KV matches attestor: ${communityHealthSummary.kvMatches}`}
+                        ok={communityHealthSummary.kvMatches > 0}
+                      />
+                    </Stack>
+                    <Typography
+                      sx={{ mt: 0.75, fontFamily: "system-ui", fontSize: 11, opacity: 0.7 }}
+                    >
+                      {communityHealthLoading
+                        ? "Updating health snapshots..."
+                        : `Last updated: ${
+                            communityHealthLastUpdatedAt
+                              ? new Date(communityHealthLastUpdatedAt).toLocaleString()
+                              : "—"
+                          }`}
+                    </Typography>
+                  </Paper>
 
                   <Stack spacing={1} sx={{ maxHeight: 260, overflowY: "auto", pr: 0.5 }}>
                     {communityExplorerResults.length === 0 && (
@@ -2601,6 +2929,30 @@ export default function Page() {
                         fallbackMetadataParts.length > 0
                           ? fallbackMetadataParts.join(" | ")
                           : null;
+                      const health = communityHealthByDao[community.daoId];
+                      const healthLabel = !health
+                        ? "loading"
+                        : health.healthLevel === "healthy"
+                        ? "healthy"
+                        : health.healthLevel === "attention"
+                        ? "attention needed"
+                        : "needs setup";
+                      const spaceStatus = !health
+                        ? "loading"
+                        : !health.spaceExists
+                        ? "missing"
+                        : health.spaceFrozen
+                        ? "frozen"
+                        : "ready";
+                      const kvStatus = !health
+                        ? "loading"
+                        : !health.kvLoaded
+                        ? "unavailable"
+                        : health.kvMatchesOnChain === true
+                        ? "match"
+                        : health.kvExists
+                        ? "mismatch"
+                        : "missing";
                       return (
                         <Box
                           key={community.daoId}
@@ -2649,6 +3001,24 @@ export default function Page() {
                                   ? `on-chain metadata=not set (registry: ${fallbackMetadataLabel})`
                                   : "on-chain metadata=not set"}
                               </Typography>
+                              <Typography
+                                sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.8 }}
+                              >
+                                {`health=${healthLabel}, space=${spaceStatus}, kv=${kvStatus}, score=${
+                                  health ? `${health.healthScore}/4` : "—"
+                                }`}
+                              </Typography>
+                              {health?.attestor && (
+                                <Typography
+                                  sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.7 }}
+                                >
+                                  {`attestor=${shortPkString(health.attestor)}${
+                                    health.kvAttestor
+                                      ? `, kv=${shortPkString(health.kvAttestor)}`
+                                      : ""
+                                  }`}
+                                </Typography>
+                              )}
                             </Box>
                             <Button
                               size="small"
