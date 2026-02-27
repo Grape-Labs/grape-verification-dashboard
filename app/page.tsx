@@ -930,12 +930,21 @@ export default function Page() {
 
     const url = new URL(window.location.href);
     const trimmed = nextDaoId.trim();
-    if (trimmed) url.searchParams.set("dao_id", trimmed);
-    else url.searchParams.delete("dao_id");
+    url.searchParams.delete("dao_id");
+    url.searchParams.delete("daoId");
+
+    if (trimmed) {
+      url.pathname = `/dao/${encodeURIComponent(trimmed)}`;
+    } else {
+      url.pathname = "/";
+    }
 
     const query = url.searchParams.toString();
     const nextUrl = `${url.pathname}${query ? `?${query}` : ""}${url.hash}`;
-    window.history.replaceState({}, "", nextUrl);
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (nextUrl !== currentUrl) {
+      window.history.replaceState({}, "", nextUrl);
+    }
   }, []);
 
   const applyDaoContext = useCallback(
@@ -991,6 +1000,15 @@ export default function Page() {
     if (typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
+    const pathMatch = window.location.pathname.match(/^\/dao\/([^/]+)\/?$/);
+    const daoIdFromPath = (() => {
+      if (!pathMatch?.[1]) return "";
+      try {
+        return decodeURIComponent(pathMatch[1]).trim();
+      } catch {
+        return pathMatch[1].trim();
+      }
+    })();
     const sourceParam = (params.get("source") || "").trim().toLowerCase();
     const platformParam = toPlatformKey(params.get("platform"));
     const sourceAsPlatform = toPlatformKey(sourceParam);
@@ -1018,7 +1036,12 @@ export default function Page() {
       params.get("communityName") ||
       ""
     ).trim();
-    const daoIdParam = (params.get("dao_id") || params.get("daoId") || "").trim();
+    const daoIdParam = (
+      daoIdFromPath ||
+      params.get("dao_id") ||
+      params.get("daoId") ||
+      ""
+    ).trim();
 
     const communityFromDao = daoIdParam
       ? mergedCommunityRegistry.find((c) => c.daoId === daoIdParam)
