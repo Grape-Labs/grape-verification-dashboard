@@ -22,6 +22,10 @@ import TravelExploreIcon from "@mui/icons-material/TravelExplore";
 import TuneIcon from "@mui/icons-material/Tune";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import WalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import ForumIcon from "@mui/icons-material/Forum";
+import TelegramIcon from "@mui/icons-material/Telegram";
+import EmailIcon from "@mui/icons-material/Email";
+import XIcon from "@mui/icons-material/X";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
@@ -249,11 +253,26 @@ function platformLabel(platform: PlatformKey): string {
     case "telegram":
       return "Telegram";
     case "twitter":
-      return "Twitter";
+      return "X";
     case "email":
       return "Email";
     default:
       return "Discord";
+  }
+}
+
+function platformIcon(platform: PlatformKey) {
+  switch (platform) {
+    case "discord":
+      return <ForumIcon sx={{ fontSize: 18 }} />;
+    case "telegram":
+      return <TelegramIcon sx={{ fontSize: 18 }} />;
+    case "twitter":
+      return <XIcon sx={{ fontSize: 18 }} />;
+    case "email":
+      return <EmailIcon sx={{ fontSize: 18 }} />;
+    default:
+      return <ForumIcon sx={{ fontSize: 18 }} />;
   }
 }
 
@@ -3119,15 +3138,16 @@ export default function Page() {
                     <Button
                       key={p}
                       onClick={() => setPlatform(p)}
+                      startIcon={platformIcon(p)}
                       variant={platform === p ? "contained" : "outlined"}
                       sx={{
                         fontFamily: '"Bangers", system-ui',
                         letterSpacing: 0.6,
-                        textTransform: "capitalize",
+                        textTransform: "none",
                         minWidth: 100,
                       }}
                     >
-                      {p}
+                      {platformLabel(p)}
                     </Button>
                   )
                 )}
@@ -3226,7 +3246,7 @@ export default function Page() {
                   <Typography
                     sx={{ fontFamily: "system-ui", fontSize: 14, opacity: 0.9 }}
                   >
-                    Twitter verification coming soon!
+                    X verification coming soon!
                   </Typography>
                   <Typography
                     sx={{
@@ -4125,7 +4145,7 @@ export default function Page() {
                       >
                         <option value="discord">Discord</option>
                         <option value="telegram">Telegram</option>
-                        <option value="twitter">Twitter</option>
+                        <option value="twitter">X</option>
                         <option value="email">Email</option>
                       </Box>
 
