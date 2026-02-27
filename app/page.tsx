@@ -22,8 +22,6 @@ import TravelExploreIcon from "@mui/icons-material/TravelExplore";
 import TuneIcon from "@mui/icons-material/Tune";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import WalletIcon from "@mui/icons-material/AccountBalanceWallet";
-import ForumIcon from "@mui/icons-material/Forum";
-import TelegramIcon from "@mui/icons-material/Telegram";
 import EmailIcon from "@mui/icons-material/Email";
 import XIcon from "@mui/icons-material/X";
 
@@ -262,17 +260,31 @@ function platformLabel(platform: PlatformKey): string {
 }
 
 function platformIcon(platform: PlatformKey) {
+  const logo = (src: string, alt: string) => (
+    <Box
+      component="img"
+      src={src}
+      alt={alt}
+      sx={{
+        width: 18,
+        height: 18,
+        display: "block",
+        objectFit: "contain",
+      }}
+    />
+  );
+
   switch (platform) {
     case "discord":
-      return <ForumIcon sx={{ fontSize: 18 }} />;
+      return logo("/discord-logo.svg", "Discord logo");
     case "telegram":
-      return <TelegramIcon sx={{ fontSize: 18 }} />;
+      return logo("/telegram-logo.svg", "Telegram logo");
     case "twitter":
       return <XIcon sx={{ fontSize: 18 }} />;
     case "email":
       return <EmailIcon sx={{ fontSize: 18 }} />;
     default:
-      return <ForumIcon sx={{ fontSize: 18 }} />;
+      return logo("/discord-logo.svg", "Discord logo");
   }
 }
 
