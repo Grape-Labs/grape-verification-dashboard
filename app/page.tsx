@@ -277,6 +277,21 @@ function DiscordBrandIcon({
   );
 }
 
+function GitHubBrandIcon({
+  sx,
+}: {
+  sx?: React.ComponentProps<typeof SvgIcon>["sx"];
+}) {
+  return (
+    <SvgIcon viewBox="0 0 24 24" sx={sx}>
+      <path
+        fill="currentColor"
+        d="M12 0C5.37 0 0 5.48 0 12.24c0 5.41 3.44 10 8.21 11.62.6.11.82-.26.82-.58v-2.16c-3.34.74-4.04-1.64-4.04-1.64-.54-1.41-1.33-1.78-1.33-1.78-1.08-.75.08-.74.08-.74 1.2.09 1.83 1.26 1.83 1.26 1.06 1.85 2.78 1.32 3.45 1.01.11-.79.42-1.33.76-1.64-2.66-.31-5.47-1.36-5.47-6.06 0-1.34.47-2.44 1.24-3.31-.13-.31-.54-1.56.11-3.25 0 0 1.01-.33 3.3 1.26A11.3 11.3 0 0 1 12 5.37c1.02 0 2.05.14 3.01.42 2.29-1.59 3.3-1.26 3.3-1.26.65 1.69.24 2.94.12 3.25.77.87 1.24 1.97 1.24 3.31 0 4.71-2.81 5.75-5.49 6.05.43.38.81 1.12.81 2.27v3.36c0 .32.22.7.82.58A12.22 12.22 0 0 0 24 12.24C24 5.48 18.63 0 12 0Z"
+      />
+    </SvgIcon>
+  );
+}
+
 function TelegramBrandIcon({
   sx,
 }: {
@@ -4503,6 +4518,62 @@ export default function Page() {
             refresh().catch(() => {});
           }}
         />
+        <Stack
+          direction="row"
+          spacing={1}
+          flexWrap="wrap"
+          useFlexGap
+          justifyContent="center"
+          sx={{ mt: 2.5, opacity: 0.82 }}
+        >
+          <Button
+            component="a"
+            href="https://grapedao.gitbook.io/products/grape-verification"
+            target="_blank"
+            rel="noopener noreferrer"
+            size="small"
+            variant="text"
+            sx={{
+              textTransform: "none",
+              fontFamily: "system-ui",
+              color: "rgba(255,255,255,0.78)",
+            }}
+          >
+            Documentation
+          </Button>
+          <Button
+            component="a"
+            href="https://discord.gg/xrxrCmvB"
+            target="_blank"
+            rel="noopener noreferrer"
+            size="small"
+            variant="text"
+            startIcon={<DiscordBrandIcon sx={{ fontSize: 17 }} />}
+            sx={{
+              textTransform: "none",
+              fontFamily: "system-ui",
+              color: "rgba(255,255,255,0.78)",
+            }}
+          >
+            Discord
+          </Button>
+          <Button
+            component="a"
+            href="https://github.com/Grape-Labs/grape-verification-dashboard"
+            target="_blank"
+            rel="noopener noreferrer"
+            size="small"
+            variant="text"
+            startIcon={<GitHubBrandIcon sx={{ fontSize: 17 }} />}
+            sx={{
+              textTransform: "none",
+              fontFamily: "system-ui",
+              color: "rgba(255,255,255,0.78)",
+            }}
+          >
+            GitHub
+          </Button>
+        </Stack>
       </Container>
     </Box>
   );
