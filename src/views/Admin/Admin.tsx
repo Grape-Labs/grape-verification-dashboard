@@ -331,7 +331,7 @@ const SOL_TOKEN = 'So11111111111111111111111111111111111111112';
                                         <li>multi-wallet support</li>
                                         <li>administrator verification settings for managing your gated communities</li>
                                         <li>dedicated NFT community tools</li>
-                                        <li>complimentary listing on Grape.art &amp; cross marketplace discovery</li>
+                                        <li>complimentary listing on grapedao.org &amp; cross marketplace discovery</li>
                                         <li>assistance with setting up SPL Governance</li>
                                     </ul>
                             </Typography>

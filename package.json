@@ -21,9 +21,9 @@
     "tsconfig.json"
   ],
   "scripts": {
-    "clean": "shx rm -rf dist .parcel-cache",
-    "build": "yarn clean && parcel build src/index.html",
-    "start": "yarn clean && parcel src/index.html",
+    "clean": "shx rm -rf dist .parcel-cache .cache",
+    "build": "yarn clean && parcel build --no-cache src/index.html",
+    "start": "yarn clean && parcel --no-cache src/index.html",
     "fmt": "prettier --write '{*,**/*}.{js,ts,jsx,tsx,json}'",
     "lint": "eslint . && prettier --check '{*,**/*}.{js,ts,jsx,tsx,json}'",
     "lint:fix": "eslint --fix . && yarn fmt",

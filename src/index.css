@@ -1,33 +1,58 @@
+@font-face {
+  font-family: 'Gilroy';
+  src: url('./public/Grape_font_Gilroy/Gilroy-Light.otf') format('opentype');
+  font-weight: 300 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('./public/Grape_font_Gilroy/Gilroy-ExtraBold.otf') format('opentype');
+  font-weight: 700 900;
+  font-style: normal;
+}
+
 html, body{
-  background: #30154E;  /* fallback for old browsers */
-  /*
-  background: radial-gradient(88.33% 113.42% at 71.34% 83.89%, #4e8ebf 0%,  #5671be 32.29%,  #713585 58.85%,  #36325d 85.5%,  #251a3a 98.96%);
-  */
-  background: linear-gradient(to right, #1a2980, #26d0ce);
-  height:100%;
+  background:
+    radial-gradient(circle at top, rgba(126, 231, 216, 0.18), transparent 34%),
+    radial-gradient(circle at 20% 20%, rgba(241, 201, 107, 0.16), transparent 26%),
+    linear-gradient(180deg, #08101d 0%, #07111f 48%, #0b1730 100%);
+  min-height:100%;
   background-attachment: fixed;
 }
+
+body {
+  color: #f6f1e8;
+  font-family: 'Gilroy', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
 .grape-dashboard-header{
   background: none;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(18px);
 }
 .grape-paper{
-  padding-top: 10px!important;
-  padding-bottom: 10px!important;
+  padding-top: 18px!important;
+  padding-bottom: 18px!important;
   width: 100%!important;
-  background: #13151C!important;
-  border-radius: 17px!important;
+  background: linear-gradient(180deg, rgba(13, 23, 39, 0.96) 0%, rgba(9, 17, 31, 0.98) 100%)!important;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 24px!important;
   height: 100%!important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
 }
 .grape-paper-background{
-  border-radius: 24px!important;
-  background: rgba(0, 0, 0, 0.6)!important;
-  padding: 10px!important;
+  border-radius: 28px!important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)!important;
+  padding: 1px!important;
   height:100%;
 }
 
 .grape-dashboard-component-header{
-  padding-left: 10px!important;
+  padding-left: 14px!important;
 }
 
 .logo-small {
@@ -37,7 +62,7 @@ html, body{
 
 .header-logo {
   height:44px;
-  margin-right:12px;
+  margin-right:4px;
 }
 
 .discord-btn {
@@ -87,4 +112,42 @@ html, body{
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(40px)!important;
+}
+
+.verification-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.verification-hero::before {
+  content: "";
+  position: absolute;
+  inset: -20% auto auto -10%;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(241, 201, 107, 0.22) 0%, rgba(241, 201, 107, 0) 72%);
+  pointer-events: none;
+}
+
+.verification-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -10% -20% auto;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(126, 231, 216, 0.18) 0%, rgba(126, 231, 216, 0) 72%);
+  pointer-events: none;
+}
+
+.wallet-adapter-button {
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #f1c96b 0%, #dca94b 100%) !important;
+  color: #1a1304 !important;
+  font-family: inherit !important;
+  font-weight: 800 !important;
+  box-shadow: 0 14px 40px rgba(220, 169, 75, 0.22) !important;
+}
+
+.wallet-adapter-button-trigger {
+  background: linear-gradient(135deg, #f1c96b 0%, #dca94b 100%) !important;
 }

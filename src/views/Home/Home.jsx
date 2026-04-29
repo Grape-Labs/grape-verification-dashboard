@@ -6,7 +6,9 @@ import {
   Paper,
   Box,
   Typography,
-  Button
+  Button,
+  Chip,
+  Stack
 } from '@mui/material';
 import { useWallet } from '@solana/wallet-adapter-react';
 
@@ -19,6 +21,49 @@ function ConnectedWalletComponent(props) {
       <ServersView /> 
       <SettingsView />
     </React.Fragment>
+  );
+}
+
+function VerificationStatusCard({ eyebrow, title, description, actionLabel, onAction, highlights = [], secondaryText = null }) {
+  return (
+    <Grid item xs={12}>
+      <Paper className="grape-paper-background">
+        <Box
+          className="grape-paper verification-hero"
+          sx={{
+            position: 'relative',
+            px: { xs: 3, md: 4 },
+            py: { xs: 4, md: 5 },
+          }}
+        >
+          <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
+            <Chip label={eyebrow} sx={{ background: 'rgba(241, 201, 107, 0.12)', color: 'primary.light', fontWeight: 700 }} />
+            {highlights.map((item) => (
+              <Chip key={item} label={item} variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.12)', color: 'text.secondary' }} />
+            ))}
+          </Stack>
+
+          <Typography variant="h3" sx={{ maxWidth: 680, mb: 1.5 }}>
+            {title}
+          </Typography>
+          <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 720, mb: 3, fontSize: '1.02rem' }}>
+            {description}
+          </Typography>
+
+          {actionLabel && onAction ? (
+            <Button variant="contained" color="primary" onClick={onAction}>
+              {actionLabel}
+            </Button>
+          ) : null}
+
+          {secondaryText ? (
+            <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 2 }}>
+              {secondaryText}
+            </Typography>
+          ) : null}
+        </Box>
+      </Paper>
+    </Grid>
   );
 }
 
@@ -44,67 +89,37 @@ function BasicComponent(props) {
 
   return (
     <React.Fragment>
-        {!isConnected ?
-          <Grid item xs={12}>
-            <Paper class="grape-paper-background">
-              <Grid 
-                class="grape-paper" 
-                container
-                spacing={0}
-                align="center"
-                justify="center"
-                direction="column"
-                sx={{mt:4}}>
-                <Grid item>
-                  <Typography 
-                    align="center"
-                    variant="h3">
-                      connecting...
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Paper>
-          </Grid>
-          :
-          <>
-            {!isWallet &&
-              <Grid item xs={12}>
-                <Paper class="grape-paper-background">
-                  <Grid 
-                    class="grape-paper" 
-                    container
-                    spacing={0}
-                    align="center"
-                    justify="center"
-                    direction="column"
-                    sx={{mt:4}}>
-                    <Grid item>
-                      <Typography 
-                        align="center"
-                        variant="h3">
-                          Proof of wallet required
-                      </Typography>
-                      <Typography 
-                        align="center"
-                        variant="h3">
-                          
-                          <Button
-                            onClick={(event) => 
-                              handleWalletAuthClick(event)}
-                          >Reconnect your wallet</Button>
-                      </Typography>
-                      
-                    </Grid>
-                  </Grid>
-                </Paper>
-              </Grid>
-            }
-          </>
-        }
-          
-        
-        
-      
+      {!wallet && (
+        <VerificationStatusCard
+          eyebrow="Verification portal"
+          title="Connect a Solana wallet to start verification."
+          description="Use the wallet button in the header to sign in, verify ownership, and unlock your linked communities."
+          highlights={['Wallet proof', 'Discord linking', 'Server access']}
+          secondaryText="Message signing is preferred. If a wallet cannot expose it, Grape can fall back to a self-verification transaction."
+        />
+      )}
+
+      {wallet && !isConnected && (
+        <VerificationStatusCard
+          eyebrow="Pending proof"
+          title="Finish wallet verification to continue."
+          description="Your wallet is connected, but the verification session is not complete yet. Reconnect and approve the prompt to finish signing."
+          actionLabel="Reconnect wallet"
+          onAction={handleWalletAuthClick}
+          highlights={['Connected locally', 'Session not verified']}
+        />
+      )}
+
+      {isConnected && !isWallet && (
+        <VerificationStatusCard
+          eyebrow="Limited access"
+          title="Wallet detected, but proof of ownership still needs confirmation."
+          description="This session is running in address-only mode. Reconnect the same wallet to retry message signing or approve the verification transaction fallback."
+          actionLabel="Retry verification"
+          onAction={handleWalletAuthClick}
+          highlights={['Address linked', 'Proof missing']}
+        />
+      )}
     </React.Fragment>
   );
 }
@@ -130,7 +145,6 @@ const RenderDashboardComponents = (props) => {
 
 export const HomeView = (props) => {
   const { session, setSession } = useSession();
-  const isConnected = session && session.isConnected;
   const { publicKey, wallet } = useWallet();
   const [callstopk, setCallToPk] = React.useState(0);
   
@@ -149,33 +163,10 @@ export const HomeView = (props) => {
   }, [session, publicKey]);
   
   return (
-            <>
-              {wallet ? 
-                <Grid container spacing={3}>
-                <RenderDashboardComponents
-                  session={session} setSession={session}
-                />
-              </Grid>
-              :
-              <Grid item xs={12}>
-                <Paper class="grape-paper-background">
-                  <Grid 
-                    class="grape-paper" 
-                    container
-                    spacing={0}
-                    align="center"
-                    justify="center"
-                    direction="column">
-                    <Grid item>
-                      <Typography 
-                        align="center"
-                        variant="h3">
-                        {'Not connected'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-              </Grid>}
-            </>
+    <Grid container spacing={3}>
+      <RenderDashboardComponents
+        session={session} setSession={session}
+      />
+    </Grid>
   );
 }

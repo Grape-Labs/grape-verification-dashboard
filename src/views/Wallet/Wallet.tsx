@@ -64,6 +64,7 @@ export const WalletView = (props:any) => {
     const [tokenCount, setTokenCount] = React.useState(0);
     const [connectedCount, setConnectedCount] = React.useState(0);
     const [nftMap, setNftMap] = React.useState(null);
+    const [walletError, setWalletError] = React.useState<string | null>(null);
     const { publicKey, wallet, disconnect } = useWallet();
     const rpclimit = 100;
     const MD_PUBKEY = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
@@ -81,6 +82,14 @@ export const WalletView = (props:any) => {
             setConnectedCount(count);
         }
 
+    }
+
+    function resetWalletSummary() {
+        setSolanaClosableHoldings([]);
+        setSolanaHoldings([]);
+        setNftMap([]);
+        setNftCount(0);
+        setTokenCount(0);
     }
 
     const getCollectionData = async (start: number, sholdings: any) => {
@@ -218,6 +227,7 @@ export const WalletView = (props:any) => {
 
   const fetchSolanaTokens = async () => {
     setLoadingPosition('Tokens');
+    setWalletError(null);
     //const response = await connection.getTokenAccountsByOwner(new PublicKey(pubkey), {programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")});
     /*
         let meta_final = JSON.parse(item.account.data);
@@ -234,13 +244,32 @@ export const WalletView = (props:any) => {
         ],
         id: "35f0036a-3801-4485-b573-2bf29a7c77d2",
     };
-    const resp = await window.fetch(RPC_ENDPOINT, {
-        method: "POST",
-        body: JSON.stringify(body),
-        headers: { "Content-Type": "application/json" },
-    })
-    const json = await resp.json();
-    const resultValues = json.result.value
+    let resultValues: any[] = [];
+
+    try {
+        const resp = await window.fetch(RPC_ENDPOINT, {
+            method: "POST",
+            body: JSON.stringify(body),
+            headers: { "Content-Type": "application/json" },
+        });
+
+        if (!resp.ok) {
+            throw new Error(`RPC request failed with status ${resp.status}`);
+        }
+
+        const json = await resp.json();
+
+        if (json?.error) {
+            throw new Error(json.error?.message || 'RPC returned an error');
+        }
+
+        resultValues = Array.isArray(json?.result?.value) ? json.result.value : [];
+    } catch (error: any) {
+        console.log('ERR: failed to fetch wallet tokens', error);
+        resetWalletSummary();
+        setWalletError('Wallet balances are temporarily unavailable. RPC data could not be loaded.');
+        return;
+    }
     //return resultValues;
 
     let holdings: any[] = [];
@@ -385,21 +414,31 @@ export const WalletView = (props:any) => {
 
   const fetchTokens = async () => {
         setLoadingPosition('Wallet');
-        const tokens = await new TokenListProvider().resolve();
-        const tokenList = tokens.filterByChainId(ENV.MainnetBeta).getList();
-        const tokenMapValue = tokenList.reduce((map, item) => {
-            map.set(item.address, item);
-            return map;
-        }, new Map())
-        setTokenMap(tokenMapValue);
-        return tokenMapValue;
+        try {
+            const tokens = await new TokenListProvider().resolve();
+            const tokenList = tokens.filterByChainId(ENV.MainnetBeta).getList();
+            const tokenMapValue = tokenList.reduce((map, item) => {
+                map.set(item.address, item);
+                return map;
+            }, new Map())
+            setTokenMap(tokenMapValue);
+            return tokenMapValue;
+        } catch (error) {
+            console.log('ERR: failed to load token list', error);
+            setTokenMap(new Map());
+            setWalletError('Token metadata is temporarily unavailable.');
+            return new Map();
+        }
     }
 
     const fetchTokenPositions = async () => {
         setLoadingTokens(true);
-        await fetchSolanaTokens();
-        getConnected();
-        setLoadingTokens(false);
+        try {
+            await fetchSolanaTokens();
+            getConnected();
+        } finally {
+            setLoadingTokens(false);
+        }
     }
 
   React.useEffect(() => {
@@ -410,8 +449,11 @@ export const WalletView = (props:any) => {
 
   const fetchWalletPositions = async () => {
     setLoadingWallet(true);
-    const tmap = await fetchTokens();
-    setLoadingWallet(false);
+    try {
+        await fetchTokens();
+    } finally {
+        setLoadingWallet(false);
+    }
 }
 
 
@@ -439,6 +481,25 @@ export const WalletView = (props:any) => {
                     <>loading {loadingPosition}</>
                     :
                         <Grid container>
+                            {walletError &&
+                                <Grid item xs={12}>
+                                    <Box
+                                        sx={{
+                                            mx: 2,
+                                            mb: 2,
+                                            px: 2,
+                                            py: 1.5,
+                                            borderRadius: '14px',
+                                            border: '1px solid rgba(255,255,255,0.08)',
+                                            background: 'rgba(255,255,255,0.04)',
+                                        }}
+                                    >
+                                        <Typography variant='body2' sx={{ color: 'text.secondary' }}>
+                                            {walletError}
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                            }
                             <Grid item xs={12} sm={4}>
                                 <Grid container
                                     alignContent="center"
@@ -507,13 +568,13 @@ export const WalletView = (props:any) => {
                                     justifyContent="center"
                                 >
                                     <Button
-                                        href='https://grape.art/identity'
+                                        href='https://grapedao.org/identity'
                                         target='_blank'
                                         variant='outlined'
                                         color='inherit'
                                         sx={{textTransform:'none',mt:2,borderRadius:'17px'}}
                                     
-                                    >View &amp; manage your wallet at Grape.art Identity</Button>
+                                    >View &amp; manage your wallet at grapedao.org Identity</Button>
                             </Grid>
                             {/*solanaHoldings && solanaHoldings.map((item: any, key: number) => (
                                     <ListItem>
@@ -533,4 +594,3 @@ export const WalletView = (props:any) => {
     </Grid>
   );
 }
-

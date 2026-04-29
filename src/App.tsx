@@ -73,7 +73,7 @@ function Copyright(props: any) {
     <Typography sx={{background:'transparent'}} variant="body2" color="text.secondary" align="center" {...props}>
       Grape Network
       {/*
-      <Link color="inherit" href="https://verify.grapes.network">
+      <Link color="inherit" href="https://verify.grapedao.org">
         Grape Network | Dashboard vXYZ
       </Link>
       */}
@@ -154,14 +154,14 @@ function DashboardContent() {
       <meta name="msapplication-TileColor" content="#da532c"/>
       <meta name="theme-color" content="#ffffff"/>
 
-      <meta property="og:url" content="https://verify.grapes.network/"/>
+      <meta property="og:url" content="https://verify.grapedao.org/"/>
       <meta property="og:type" content="website"/>
       <meta property="og:title" content="Grape Network | The Grape Ape Network"/>
       <meta property="og:description" content="Decentralized Social Networking Create, Reward &amp; Secure any online community by harnessing the power of Solana"/>
       <meta property="og:image" content="/grape_og.png"/>
 
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:site" content='https://verify.grapes.network' />
+      <meta name="twitter:site" content='https://verify.grapedao.org' />
       <meta name="twitter:title" content='Grape Network' />
       <meta name="twitter:description" content='' />
       <meta name="twitter:image" content='/grape_og.png' />

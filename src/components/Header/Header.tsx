@@ -166,6 +166,21 @@ export function Header(props: any) {
         setSnackbarState(false);
     };
 
+    const navIconSx = {
+        width: 40,
+        height: 40,
+        borderRadius: '14px',
+        color: 'text.primary',
+        border: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(255,255,255,0.04)',
+        backdropFilter: 'blur(16px)',
+        p: 0,
+        '&:hover': {
+            background: 'rgba(241, 201, 107, 0.14)',
+            borderColor: 'rgba(241, 201, 107, 0.35)',
+        },
+    };
+
 
     return (
 
@@ -173,23 +188,27 @@ export function Header(props: any) {
             className="grape-dashboard-header"
             color="inherit"
             sx={{
+                minHeight: 64,
                 pr: '24px', // keep right padding when drawer closed
+                pl: { xs: 1, sm: 2 },
                 background: 'none'
             }}
             >
             
-            <Box display='flex' flexGrow={1}>
+            <Box display='flex' flexGrow={1} alignItems="center" gap={1.25}>
                 <Tooltip title={`Dashboard`}>
-                    <IconButton sx={{borderRadius:'17px'}} component={NavLink} color="inherit" to="/">
-                        <Typography
-                            component="h1"
-                            variant="h6"
-                            color="inherit"
-                            noWrap
-                            display='flex'
-                        >
+                    <IconButton sx={{ borderRadius:'16px', px: 1, py: 0.5 }} component={NavLink} color="inherit" to="/">
+                        <Box display="flex" alignItems="center" gap={1}>
                             <img src={DASHBOARD_LOGO} height="40px" className="header-logo" alt="Grape" />
-                        </Typography>
+                            <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <Typography component="h1" variant="subtitle1" color="inherit" noWrap sx={{ fontWeight: 800, lineHeight: 1.1 }}>
+                                    Grape Access
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                    Verification
+                                </Typography>
+                            </Box>
+                        </Box>
                     </IconButton>
                 </Tooltip>
                 
@@ -197,8 +216,8 @@ export function Header(props: any) {
                 {/*
                 <Tooltip title={`GAN`}><IconButton sx={{borderRadius:'17px'}} component={NavLink} to='/admin'><AdminPanelSettingsIcon/></IconButton></Tooltip>
                 */}
-                <Tooltip title={`Collection`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grape.art' target="_blank"><PhotoOutlinedIcon/></IconButton></Tooltip>
-                <Tooltip title={`Wallet`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grape.art/identity' target="_blank"><AccountBalanceWalletOutlined/></IconButton></Tooltip>
+                <Tooltip title={`Collection`}><IconButton sx={navIconSx} component="a" href='https://grapedao.org' target="_blank"><PhotoOutlinedIcon/></IconButton></Tooltip>
+                <Tooltip title={`Wallet`}><IconButton sx={navIconSx} component="a" href='https://grapedao.org/identity' target="_blank"><AccountBalanceWalletOutlined/></IconButton></Tooltip>
                 
                 {/*
                 <Tooltip title={`Staking`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapestaking.vercel.app' target="_blank"><BrowseGalleryIcon/></IconButton></Tooltip>
@@ -208,7 +227,7 @@ export function Header(props: any) {
                     <Tooltip title={`Grape Drive`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapedrive.vercel.app' target="_blank"><StorageIcon/></IconButton></Tooltip>
                     <Tooltip title={`Streams`}><IconButton sx={{borderRadius:'17px'}} component={NavLink} color="inherit" to="/streams"><DownloadingIcon /></IconButton></Tooltip>
                     */}
-                    <Tooltip title={`About`}><IconButton sx={{borderRadius:'17px'}} component="a" href='https://grapes.network' target="_blank"><InfoOutlinedIcon/></IconButton></Tooltip>
+                    <Tooltip title={`About`}><IconButton sx={navIconSx} component="a" href='https://grapedao.org' target="_blank"><InfoOutlinedIcon/></IconButton></Tooltip>
                 </Hidden>
             </Box>
             <div>

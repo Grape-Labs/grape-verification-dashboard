@@ -10,10 +10,10 @@ UI:
 - Interface: MUI 5 https://mui.com
 
 CREATE YOU OWN COMPONENT TO INTEGRATE WITH THE DASHBOARD:
-- Integrations have migrated over to grape.art > identity
+- Integrations have migrated over to grapedao.org > identity
 - https://github.com/Grape-Labs/grape-art
 - https://github.com/Grape-Labs/grape-art/tree/main/src/Identity (see plugins folder)
-- https://grape.art/identity - https://grape.art/wallet
+- https://grapedao.org/identity - https://grapedao.org/wallet
 
 BUILD:
 ```

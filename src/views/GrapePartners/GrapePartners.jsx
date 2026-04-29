@@ -281,7 +281,7 @@ export function GrapePartnersView(props) {
   const partnerdatastatic = [
     {
       "name": "Shadowy Super Coder",
-      "image": "https://verify.grapes.network/server-logos/genesysgo.png",
+      "image": "https://verify.grapedao.org/server-logos/genesysgo.png",
       "community_strength": 47,
       "tvl": 28197,
       "nft_average": 3,
@@ -299,7 +299,7 @@ export function GrapePartnersView(props) {
     },
     {
       "name": "DEGEN DAOO",
-      "image": "https://verify.grapes.network/server-logos/degendaoo.png",
+      "image": "https://verify.grapedao.org/server-logos/degendaoo.png",
       "community_strength": 32,
       "tvl": 8196,
       "nft_average": 2,
@@ -308,7 +308,7 @@ export function GrapePartnersView(props) {
     },
     {
       "name": "Boryoku Dragonz",
-      "image": "https://verify.grapes.network/server-logos/boryoku.png",
+      "image": "https://verify.grapedao.org/server-logos/boryoku.png",
       "community_strength": 66,
       "tvl": 5545,
       "nft_average": 2,
@@ -317,7 +317,7 @@ export function GrapePartnersView(props) {
     },
     {
       "name": "Solarians",
-      "image": "https://verify.grapes.network/server-logos/solarians.gif",
+      "image": "https://verify.grapedao.org/server-logos/solarians.gif",
       "community_strength": 29,
       "tvl": 6391,
       "nft_average": 3,
@@ -326,7 +326,7 @@ export function GrapePartnersView(props) {
     },
     {
       "name": "MonkeDAO",
-      "image": "https://verify.grapes.network/server-logos/monkedao.png",
+      "image": "https://verify.grapedao.org/server-logos/monkedao.png",
       "community_strength": 51,
       "tvl": 3954,
       "nft_average": 2,
@@ -335,7 +335,7 @@ export function GrapePartnersView(props) {
     },
     {
       "name": "thugDAO",
-      "image": "https://verify.grapes.network/server-logos/thugbirdz.png",
+      "image": "https://verify.grapedao.org/server-logos/thugbirdz.png",
       "community_strength": 62,
       "tvl": 3667,
       "nft_average": 1,
@@ -344,7 +344,7 @@ export function GrapePartnersView(props) {
     },
     {
       "name": "Lifinity",
-      "image": "https://verify.grapes.network/server-logos/lifinity.png",
+      "image": "https://verify.grapedao.org/server-logos/lifinity.png",
       "community_strength": 44,
       "tvl": 791,
       "nft_average": 6,

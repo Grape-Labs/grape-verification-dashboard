@@ -190,18 +190,40 @@ export const SettingsView = (props:any) => {
     <React.Fragment>
       <Grid item xs={12} md={12} lg={12}>
         <Paper className="grape-paper-background">
-            <Box
-              className="grape-paper"
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box className="grape-paper">
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: { xs: 'flex-start', md: 'center' },
+                  justifyContent: 'space-between',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  gap: 2,
+                  px: 2,
+                  pb: 2,
+                }}
+              >
                 <Box className="grape-dashboard-component-header" sx={{ m: 0, position: 'relative' }}>
-                  <Typography gutterBottom variant="h6" component="div" sx={{ m: 0, position: 'relative'}}>
-                    SETTINGS
+                  <Typography gutterBottom variant="overline" component="div" sx={{ m: 0, color: 'primary.light', letterSpacing: '0.12em' }}>
+                    Verification
                   </Typography>
+                  <Typography gutterBottom variant="h6" component="div" sx={{ m: 0, position: 'relative'}}>
+                    Account Settings
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', maxWidth: 580 }}>
+                    Manage the accounts and wallets tied to your verification profile.
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', px: 2 }}>
+                  <Button size="small" variant={discord ? 'contained' : 'outlined'} disableElevation>
+                    {discord ? 'Discord linked' : 'Discord pending'}
+                  </Button>
+                  <Button size="small" variant={wallets?.length ? 'contained' : 'outlined'} disableElevation>
+                    {wallets?.length || 0} wallet{wallets?.length === 1 ? '' : 's'}
+                  </Button>
                 </Box>
               </Box>
               <React.Fragment>
-                  <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                  <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
                     <Tabs value={tab} onChange={handleChange} aria-label="Server Tabs">
                       <Tab label="Accounts" />
                       <Tab label="Wallets" />
@@ -209,7 +231,7 @@ export const SettingsView = (props:any) => {
                   </Box>
 
                   {tab === 0 && 
-                    <TableContainer>
+                    <TableContainer sx={{ px: 2, py: 2 }}>
                       <StyledTable aria-label="simple table" size="small">
                         <TableHead>
                           <TableRow>
@@ -233,7 +255,7 @@ export const SettingsView = (props:any) => {
                             <TableCell align="right">{discord || <i>Not linked</i>}</TableCell>
                             <TableCell align="right">
                               {!discord && 
-                                <Tooltip title={`Link Discord`}><Button href={`https://verify.grapes.network/start`} color="primary" size="small" variant="contained"><LinkIcon sx={{mr:1}}/> Link Discord</Button></Tooltip>
+                                <Tooltip title={`Link Discord`}><Button href={`https://verify.grapedao.org/start`} color="primary" size="small" variant="contained"><LinkIcon sx={{mr:1}}/> Link Discord</Button></Tooltip>
                               }{discord && 
                                 <Tooltip title={`Unlink Discord`}><Button color="primary" size="small" variant="outlined" onClick={unlinkDiscord}><LinkOffIcon/></Button></Tooltip>
                               }
@@ -247,7 +269,7 @@ export const SettingsView = (props:any) => {
                     </TableContainer>
                   }
                   {tab === 1 && 
-                    <TableContainer>
+                    <TableContainer sx={{ px: 2, py: 2 }}>
                       <StyledTable aria-label="simple table">
                         <TableHead>
                           <TableRow>
@@ -275,7 +297,7 @@ export const SettingsView = (props:any) => {
                             </TableCell>
                             <TableCell align="right">
                               <Tooltip title={`Add Wallet`}>
-                                <Button href={`https://verify.grapes.network/start`} color="primary" size="small" variant="contained"
+                                <Button href={`https://verify.grapedao.org/start`} color="primary" size="small" variant="contained"
                                   onClick={disconnectWallet}
                                 >
                                   <AddCircleOutlineOutlinedIcon sx={{mr:1}}/> Wallet</Button>
@@ -293,4 +315,3 @@ export const SettingsView = (props:any) => {
     </React.Fragment>
   );
 }
-

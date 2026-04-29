@@ -406,7 +406,7 @@ export const ServersView = (props) => {
         theseServers.push({
           id: item.serverId,
           mint: null,
-          logo: 'https://verify.grapes.network/server-logos/'+item.logo,
+          logo: 'https://verify.grapedao.org/server-logos/'+item.logo,
           name: {
             name: item.name,
             url: item.url

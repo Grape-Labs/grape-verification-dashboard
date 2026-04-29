@@ -776,7 +776,7 @@ export const PortfolioView = () => {
                         {(portfolioPositions.collectibles && portfolioPositions.collectibles.length > 0) &&
                             <Grid item sx={{textAlign:"center"}}>
                                 <Button
-                                  component="a" href={`https://grape.art/profile?pkey=${session?.publicKey}`} target="_blank"
+                                  component="a" href={`https://grapedao.org/profile?pkey=${session?.publicKey}`} target="_blank"
                                   variant="outlined" 
                                   title="View Collection"
                                   size="small"

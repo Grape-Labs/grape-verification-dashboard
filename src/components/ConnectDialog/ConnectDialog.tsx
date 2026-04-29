@@ -98,6 +98,7 @@ const WalletNavigation = (props:any) => {
   const { publicKey, wallet, disconnect, sendTransaction, signMessage, signTransaction, connect } = useWallet();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const message  = '$GRAPE';
+  const walletName = wallet?.adapter?.name || 'Wallet';
   //session: Object;
   
   function sleep(milliseconds:number) {
@@ -220,6 +221,19 @@ const WalletNavigation = (props:any) => {
     }
   }
 
+  const signMessageWithWallet = useCallback(async (payload: Uint8Array) => {
+    if (typeof signMessage === 'function') {
+      return await signMessage(payload);
+    }
+
+    const adapterSignMessage = (wallet?.adapter as any)?.signMessage;
+    if (typeof adapterSignMessage === 'function') {
+      return await adapterSignMessage.call(wallet?.adapter, payload);
+    }
+
+    return null;
+  }, [signMessage, wallet]);
+
   //if (!publicKey) throw new WalletNotConnectedError();
 
   const VerifyWallet = useCallback(async (sent_publicKey:any) => {
@@ -241,53 +255,34 @@ const WalletNavigation = (props:any) => {
         
         if (!session.isConnected){
           console.log("No session");
-          
-          if (!signMessage){ 
-            if (wallet?.adapter.name){
-              console.log(wallet?.adapter.name + ' wallet does not support message signing!');
-
-              if (wallet?.adapter.name == "Solflare"){
-              //  console.log("CD: SOLFLARE WALLET CONNECTED!");
-              }
-
-              if (wallet?.adapter.name){ // only if a wallet has a name but cannot sign (naked wallet)
-                alert("WARNING: Message signing is not supported with "+wallet?.adapter.name+" for Grape Access!");
-                // allow wallet to board but only as a naked wallet (since signing is required)
-                createNakedSession(publicKey.toBase58());
-                return null;
-                //publicKey = null;
-              }
-            } else{
-              //alert(publicKey);
-              if ((publicKey)&&(login)){ // no wallet name but we have the publicKey:
-                createNakedSession(publicKey.toBase58());
-                naked_session = true;
-                return null;
-              }
-            }
-            //if (wallet.name != "Ledger"){
-            disconnectSession(false);
-            //alert("Wallet does not support message signing!");
-            throw new Error('Wallet does not support message signing!');
-          }
-          
           // Encode anything as bytes
           const smessage = new TextEncoder().encode(message);
+          const canSignMessage = (
+            typeof signMessage === 'function' ||
+            typeof (wallet?.adapter as any)?.signMessage === 'function'
+          );
+
+          if (!canSignMessage) {
+            console.log(walletName + ' wallet does not support message signing in this session');
+            enqueueSnackbar(`${walletName} could not expose message signing here. You can still verify by approving a self-check transaction.`, {
+              variant: 'info',
+              autoHideDuration: 5000,
+            });
+          }
+
           // Sign the bytes using the wallet
-          console.log(wallet?.adapter.name + " attempting to sign message");
+          console.log(walletName + " attempting to sign message");
 
           let fromTransaction = false;
           let fromSignTransaction = false;
-          let sm_signature = await signMessage(smessage)
-          .catch((error: any)=>{
-            
-            if (publicKey){
-             
-            } else{
+          let sm_signature = canSignMessage
+            ? await signMessageWithWallet(smessage).catch((_error: any) => {
+                if (!publicKey){
+                  return null;
+                }
                 return null;
-            }
-
-          });
+              })
+            : null;
 
           /*
           if (!sm_signature){
@@ -299,7 +294,7 @@ const WalletNavigation = (props:any) => {
           }*/
           
           if (!sm_signature){
-            if (window.confirm("Grape signs a message to verify your wallet\n\nYour current wallet could not be verified, some wallets including Ledger do not support message signing, if you would like to send a transaction to your wallet to confirm your wallet please press OK")){
+            if (window.confirm("Grape usually verifies your wallet with a signed message.\n\nIf message signing is unavailable, you can still confirm your wallet by approving a small self-verification transaction. Press OK to continue.")){
               fromTransaction = true;
               sm_signature = await confirmWalletWithTransaction();
               sm_signature = new TextEncoder().encode(sm_signature); // convert to "utf-8"
@@ -355,7 +350,7 @@ const WalletNavigation = (props:any) => {
               fromSignTransaction: fromSignTransaction
           }));
 
-          console.log(wallet?.adapter.name + " connecting to Grape Dashboard...");
+          console.log(walletName + " connecting to Grape Dashboard...");
           
             if (login){ // login
               console.log("LOGIN GRAPE");
@@ -379,7 +374,7 @@ const WalletNavigation = (props:any) => {
                 });
                 const session = await response.json();
               
-                console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
+                console.log(walletName+" connected to Grape Dashboard!");
                 session.token = {address, signature};
                 session.publicKey = publicKey.toString();
                 session.isConnected = true;
@@ -425,7 +420,7 @@ const WalletNavigation = (props:any) => {
                   return null;
                 });
                 const session2 = await response2.json();
-                console.log(wallet?.adapter.name+" connected to Grape Dashboard!");
+                console.log(walletName+" connected to Grape Dashboard!");
                 session2.token = {address, signature};
                 session2.publicKey = publicKey.toString();
                 session2.discordId = discordId;
@@ -453,7 +448,7 @@ const WalletNavigation = (props:any) => {
       //setSession(null);
       return null;
     }
-  }, [signMessage]);
+  }, [closeSnackbar, connection, disconnect, enqueueSnackbar, login, publicKey, sendTransaction, session, setSession, signMessage, signMessageWithWallet, signTransaction, token, userId, discordId, walletName, wallet]);
 //};
 
   const handleDisconnectWallet = async() => {
