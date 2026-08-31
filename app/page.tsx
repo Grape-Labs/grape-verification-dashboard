@@ -3320,18 +3320,31 @@ export default function Page() {
                       {walletVerificationLoading
                         ? "Checking this wallet on-chain…"
                         : activeWalletVerifications.length > 0
-                        ? "Wallet verified for this community"
+                        ? "You're verified — no additional sign-in needed"
                         : "Wallet is not yet verified for this community"}
                     </Typography>
                     <Typography
                       sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.78 }}
                     >
                       {activeWalletVerifications.length > 0
-                        ? `Found from the wallet address (works across devices): ${activeWalletVerifications
+                        ? `This wallet is recognized on-chain on every device. Verified through: ${activeWalletVerifications
                             .map((match) => platformLabel(match.platform))
                             .join(", ")}.`
                         : "Verification is checked from Solana, not this browser's local storage or login cookies."}
                     </Typography>
+                    {activeWalletVerifications.length > 0 && (
+                      <Typography
+                        sx={{
+                          mt: 0.5,
+                          fontFamily: "system-ui",
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: "#86efac",
+                        }}
+                      >
+                        You do not need to reconnect Discord, Telegram, or email on this device.
+                      </Typography>
+                    )}
                   </Box>
                 </Stack>
               </Paper>
@@ -3355,7 +3368,17 @@ export default function Page() {
                   fontSize: 16,
                 }}
               >
-                Step 1: Connect Platform
+                {activeWalletVerifications.length > 0
+                  ? "Optional: Manage Verification Methods"
+                  : "Step 1: Verify an Identity"}
+              </Typography>
+
+              <Typography
+                sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8, mb: 1.5 }}
+              >
+                {activeWalletVerifications.length > 0
+                  ? "Only continue below if you want to add another identity method or manage an existing link. Your wallet is already verified."
+                  : "Choose one method. You only need to complete verification once; afterward this wallet is recognized on other devices."}
               </Typography>
 
               {/* Platform Tabs */}
@@ -3395,12 +3418,16 @@ export default function Page() {
                 }}
               >
                 <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                  Wallet links are per-platform identity
+                  {activeWalletVerifications.length > 0
+                    ? "Adding another method is optional"
+                    : "One verified method is enough"}
                 </Typography>
                 <Typography sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.8 }}>
-                  {`A wallet linked on Discord does not auto-link on ${platformLabel(
-                    platform
-                  )}. Link the same wallet once per platform identity.`}
+                  {activeWalletVerifications.length > 0
+                    ? `You are already verified through ${activeWalletVerifications
+                        .map((match) => platformLabel(match.platform))
+                        .join(", ")}. You do not need to verify every platform.`
+                    : "Verify with Discord, Telegram, or email, then link this wallet. You do not need to verify all three."}
                 </Typography>
               </Paper>
 
@@ -3514,7 +3541,9 @@ export default function Page() {
                     fontSize: 16,
                   }}
                 >
-                  Step 2: Link Your Wallet
+                  {activeWalletVerifications.length > 0
+                    ? `Optional: Link ${platformLabel(platform)}`
+                    : "Step 2: Link Your Wallet"}
                 </Typography>
 
                 {/* Status Summary */}
