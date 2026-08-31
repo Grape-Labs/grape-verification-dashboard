@@ -862,6 +862,7 @@ export default function Page() {
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
   const [communityCreateOpen, setCommunityCreateOpen] = useState(false);
   const [communityExplorerOpen, setCommunityExplorerOpen] = useState(false);
+  const [showVerificationManager, setShowVerificationManager] = useState(false);
   const [communitySearch, setCommunitySearch] = useState("");
   const [localCommunities, setLocalCommunities] = useState<CommunityConfig[]>([]);
   const [communityMetadataByDao, setCommunityMetadataByDao] = useState<
@@ -1183,6 +1184,7 @@ export default function Page() {
   useEffect(() => {
     setWalletLinkedByPlatform({});
     setWalletVerificationMatches([]);
+    setShowVerificationManager(false);
   }, [publicKeyBase58]);
 
   const toggleMode = () => {
@@ -2865,8 +2867,24 @@ export default function Page() {
             />
             <Chip
               icon={<VerifiedIcon />}
-              label={`Identity: ${identityStatus}`}
-              sx={{ fontFamily: "system-ui" }}
+              label={
+                activeWalletVerifications.length > 0
+                  ? "Wallet: VERIFIED"
+                  : `Identity: ${identityStatus}`
+              }
+              sx={{
+                fontFamily: "system-ui",
+                fontWeight: activeWalletVerifications.length > 0 ? 900 : 400,
+                color: activeWalletVerifications.length > 0 ? "#86efac" : undefined,
+                border:
+                  activeWalletVerifications.length > 0
+                    ? "1px solid rgba(74,222,128,.55)"
+                    : undefined,
+                background:
+                  activeWalletVerifications.length > 0
+                    ? "rgba(34,197,94,.16)"
+                    : undefined,
+              }}
             />
             <Chip
               icon={<LinkIcon />}
@@ -2886,15 +2904,24 @@ export default function Page() {
            =========================== */}
         {!advancedMode && (
           <Paper sx={{ p: 2.5, mt: 2.5 }}>
-            <Typography variant="h3" sx={{ mb: 0.5 }}>
-              Verify &amp; Link
+            <Typography
+              variant="h3"
+              sx={{
+                mb: 0.5,
+                color: activeWalletVerifications.length > 0 ? "#4ade80" : undefined,
+              }}
+            >
+              {activeWalletVerifications.length > 0
+                ? "Wallet Verified!"
+                : "Verify & Link"}
             </Typography>
             <Typography
               variant="body2"
               sx={{ opacity: 0.78, fontFamily: "system-ui", mb: 2 }}
             >
-              Choose your platform, connect, then link your wallet. You can link
-              multiple wallets to the same identity.
+              {activeWalletVerifications.length > 0
+                ? `${shortB58(publicKey)} is verified for ${activeCommunityLabel}. No further action is required.`
+                : "Choose one identity platform, verify it, then link your wallet. You only need one method."}
             </Typography>
 
             <Paper
@@ -3248,7 +3275,8 @@ export default function Page() {
               )}
             </Paper>
 
-            {(deepLinkSource || deepLinkGuildId || deepLinkCommunityLabel) && (
+            {activeWalletVerifications.length === 0 &&
+              (deepLinkSource || deepLinkGuildId || deepLinkCommunityLabel) && (
               <Paper
                 sx={{
                   p: 1.25,
@@ -3294,40 +3322,64 @@ export default function Page() {
             {!!publicKey && (
               <Paper
                 sx={{
-                  p: 1.5,
+                  p: activeWalletVerifications.length > 0 ? { xs: 2.5, md: 4 } : 1.5,
                   mb: 2,
                   background:
                     activeWalletVerifications.length > 0
-                      ? "rgba(34,197,94,0.14)"
+                      ? "linear-gradient(135deg, rgba(22,101,52,.44), rgba(6,78,59,.30))"
                       : "rgba(255,255,255,0.05)",
                   border:
                     activeWalletVerifications.length > 0
-                      ? "2px solid rgba(34,197,94,0.45)"
+                      ? "3px solid rgba(74,222,128,.72)"
                       : "1px solid rgba(255,255,255,0.14)",
+                  boxShadow:
+                    activeWalletVerifications.length > 0
+                      ? "0 18px 55px rgba(34,197,94,.16), inset 0 0 40px rgba(74,222,128,.06)"
+                      : undefined,
                 }}
               >
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={activeWalletVerifications.length > 0 ? 2.5 : 1}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  justifyContent="space-between"
+                >
                   <VerifiedIcon
                     sx={{
                       color:
                         activeWalletVerifications.length > 0 ? "#4ade80" : "inherit",
+                      fontSize: activeWalletVerifications.length > 0 ? 72 : undefined,
+                      filter:
+                        activeWalletVerifications.length > 0
+                          ? "drop-shadow(0 8px 18px rgba(74,222,128,.35))"
+                          : undefined,
                     }}
                   />
-                  <Box>
+                  <Box sx={{ flex: 1 }}>
                     <Typography
-                      sx={{ fontFamily: "system-ui", fontSize: 13, fontWeight: 800 }}
+                      sx={{
+                        fontFamily: '"Bangers", system-ui',
+                        letterSpacing: 1,
+                        fontSize: activeWalletVerifications.length > 0 ? { xs: 28, md: 38 } : 13,
+                        fontWeight: 800,
+                        color: activeWalletVerifications.length > 0 ? "#dcfce7" : undefined,
+                      }}
                     >
                       {walletVerificationLoading
                         ? "Checking this wallet on-chain…"
                         : activeWalletVerifications.length > 0
-                        ? "You're verified — no additional sign-in needed"
+                        ? "Verification Complete"
                         : "Wallet is not yet verified for this community"}
                     </Typography>
                     <Typography
-                      sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.78 }}
+                      sx={{
+                        fontFamily: "system-ui",
+                        fontSize: activeWalletVerifications.length > 0 ? 15 : 12,
+                        opacity: 0.86,
+                      }}
                     >
                       {activeWalletVerifications.length > 0
-                        ? `This wallet is recognized on-chain on every device. Verified through: ${activeWalletVerifications
+                        ? `${shortB58(publicKey)} is recognized on-chain on every device. Verified through: ${activeWalletVerifications
                             .map((match) => platformLabel(match.platform))
                             .join(", ")}.`
                         : "Verification is checked from Solana, not this browser's local storage or login cookies."}
@@ -3342,15 +3394,31 @@ export default function Page() {
                           color: "#86efac",
                         }}
                       >
-                        You do not need to reconnect Discord, Telegram, or email on this device.
+                        YOU'RE DONE — Discord, Telegram, and email do not need to be reconnected.
                       </Typography>
                     )}
                   </Box>
+                  {activeWalletVerifications.length > 0 && (
+                    <Button
+                      variant="outlined"
+                      onClick={() => setShowVerificationManager((open) => !open)}
+                      sx={{
+                        flexShrink: 0,
+                        borderColor: "rgba(134,239,172,.65)",
+                        color: "#dcfce7",
+                        fontFamily: '"Bangers", system-ui',
+                        letterSpacing: 0.7,
+                      }}
+                    >
+                      {showVerificationManager ? "Hide optional settings" : "Manage methods (optional)"}
+                    </Button>
+                  )}
                 </Stack>
               </Paper>
             )}
 
             {/* Step 1: Platform Selection & Connection */}
+            {(activeWalletVerifications.length === 0 || showVerificationManager) && (
             <Box
               sx={{
                 p: 2,
@@ -3521,9 +3589,11 @@ export default function Page() {
                 </Paper>
               )}
             </Box>
+            )}
 
             {/* Step 2: Link Wallet (Only shows when platform connected) */}
-            {currentPlatformConnected && (
+            {currentPlatformConnected &&
+              (activeWalletVerifications.length === 0 || showVerificationManager) && (
               <Box
                 sx={{
                   p: 2,
