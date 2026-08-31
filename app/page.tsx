@@ -87,6 +87,15 @@ type CommunityHealthSnapshot = {
   healthLevel: "healthy" | "attention" | "setup";
 };
 
+type WalletVerificationMatch = {
+  platform: PlatformKey;
+  identity: PublicKey;
+  linkedAt: number;
+  verifiedAt: number;
+  expiresAt: number;
+  active: boolean;
+};
+
 const PLATFORM_KEYS = new Set<PlatformKey>([
   "discord",
   "telegram",
@@ -257,6 +266,21 @@ function platformLabel(platform: PlatformKey): string {
       return "Email";
     default:
       return "Discord";
+  }
+}
+
+function platformFromSeed(seed: number): PlatformKey | null {
+  switch (seed) {
+    case VerificationPlatform.Discord:
+      return "discord";
+    case VerificationPlatform.Telegram:
+      return "telegram";
+    case VerificationPlatform.Twitter:
+      return "twitter";
+    case VerificationPlatform.Email:
+      return "email";
+    default:
+      return null;
   }
 }
 
@@ -730,7 +754,9 @@ function buildSetSpaceAttestorIx(args: {
 import { sha256 } from "@noble/hashes/sha256";
 import { utf8ToBytes } from "@noble/hashes/utils";
 
-const LINK_ACCOUNT_DISC = sha256(utf8ToBytes("account:LinkAccount")).slice(0, 8);
+const LINK_ACCOUNT_DISC = sha256(
+  utf8ToBytes("account:GrapeVerificationLink")
+).slice(0, 8);
 
 export default function Page() {
   const { connection } = useConnection();
@@ -826,6 +852,10 @@ export default function Page() {
   const [linkedWallets, setLinkedWallets] = useState<LinkedWallet[]>([]);
   const [linkedWalletsLoading, setLinkedWalletsLoading] = useState(false);
   const [unlinkingWallet, setUnlinkingWallet] = useState<string | null>(null); // walletHashHex being unlinked
+  const [walletVerificationMatches, setWalletVerificationMatches] = useState<
+    WalletVerificationMatch[]
+  >([]);
+  const [walletVerificationLoading, setWalletVerificationLoading] = useState(false);
 
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -1152,6 +1182,7 @@ export default function Page() {
 
   useEffect(() => {
     setWalletLinkedByPlatform({});
+    setWalletVerificationMatches([]);
   }, [publicKeyBase58]);
 
   const toggleMode = () => {
@@ -1578,6 +1609,89 @@ export default function Page() {
     publicKey,
     refreshCounter,
   ]);
+
+  // Discover verification from the wallet itself. This is deliberately
+  // independent of Discord/Telegram/email cookies so it works on a new device.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      setWalletVerificationMatches([]);
+      setWalletVerificationLoading(false);
+      if (!publicKey || !spacePda || !spaceSalt) return;
+
+      setWalletVerificationLoading(true);
+      try {
+        const wh = walletHash(spaceSalt, publicKey);
+        const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
+          filters: [
+            {
+              memcmp: {
+                offset: 0,
+                bytes: Buffer.from(LINK_ACCOUNT_DISC).toString("base64"),
+                encoding: "base64",
+              },
+            },
+            {
+              memcmp: {
+                offset: 41,
+                bytes: Buffer.from(wh).toString("base64"),
+                encoding: "base64",
+              },
+            },
+          ],
+        });
+
+        const now = Math.floor(Date.now() / 1000);
+        const matches = (
+          await Promise.all(
+            accounts.map(async ({ account }) => {
+              const link = parseLink(account.data);
+              const identityAccount = await safeGetAccountInfo(connection, link.identity);
+              if (!identityAccount) return null;
+
+              const identity = parseIdentity(identityAccount.data);
+              if (!identity.space.equals(spacePda)) return null;
+              const matchedPlatform = platformFromSeed(identity.platform);
+              if (!matchedPlatform) return null;
+
+              return {
+                platform: matchedPlatform,
+                identity: link.identity,
+                linkedAt: link.linkedAt,
+                verifiedAt: identity.verifiedAt,
+                expiresAt: identity.expiresAt,
+                active:
+                  identity.verified &&
+                  (identity.expiresAt === 0 || identity.expiresAt >= now),
+              } satisfies WalletVerificationMatch;
+            })
+          )
+        ).filter((match): match is WalletVerificationMatch => match !== null);
+
+        if (!cancelled) {
+          setWalletVerificationMatches(matches);
+          setWalletLinkedByPlatform((prev) => {
+            const next = { ...prev };
+            for (const match of matches) next[match.platform] = true;
+            return next;
+          });
+        }
+      } finally {
+        if (!cancelled) setWalletVerificationLoading(false);
+      }
+    }
+
+    run().catch((e) => {
+      if (!cancelled) {
+        setWalletVerificationLoading(false);
+        setError(`Could not check wallet verification: ${String(e?.message || e)}`);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, publicKey, spacePda, spaceSalt, refreshCounter]);
 
   const identityStatus = useMemo(() => {
     if (identityExists === false) return "Not found";
@@ -2256,6 +2370,10 @@ export default function Page() {
     !!platformUserId.trim() &&
     !currentWalletLinked &&
     spaceExists !== false;
+
+  const activeWalletVerifications = walletVerificationMatches.filter(
+    (match) => match.active
+  );
 
   const canManageSpaceAdmin =
     !!publicKey &&
@@ -3170,6 +3288,52 @@ export default function Page() {
                     Enter your email below to continue this direct verification.
                   </Typography>
                 )}
+              </Paper>
+            )}
+
+            {!!publicKey && (
+              <Paper
+                sx={{
+                  p: 1.5,
+                  mb: 2,
+                  background:
+                    activeWalletVerifications.length > 0
+                      ? "rgba(34,197,94,0.14)"
+                      : "rgba(255,255,255,0.05)",
+                  border:
+                    activeWalletVerifications.length > 0
+                      ? "2px solid rgba(34,197,94,0.45)"
+                      : "1px solid rgba(255,255,255,0.14)",
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <VerifiedIcon
+                    sx={{
+                      color:
+                        activeWalletVerifications.length > 0 ? "#4ade80" : "inherit",
+                    }}
+                  />
+                  <Box>
+                    <Typography
+                      sx={{ fontFamily: "system-ui", fontSize: 13, fontWeight: 800 }}
+                    >
+                      {walletVerificationLoading
+                        ? "Checking this wallet on-chain…"
+                        : activeWalletVerifications.length > 0
+                        ? "Wallet verified for this community"
+                        : "Wallet is not yet verified for this community"}
+                    </Typography>
+                    <Typography
+                      sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.78 }}
+                    >
+                      {activeWalletVerifications.length > 0
+                        ? `Found from the wallet address (works across devices): ${activeWalletVerifications
+                            .map((match) => platformLabel(match.platform))
+                            .join(", ")}.`
+                        : "Verification is checked from Solana, not this browser's local storage or login cookies."}
+                    </Typography>
+                  </Box>
+                </Stack>
               </Paper>
             )}
 
