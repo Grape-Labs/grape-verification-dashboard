@@ -498,20 +498,15 @@ export async function POST(req: Request) {
 
     console.log("✅ Unlink instruction built successfully");
 
-    // Build, sign, simulate, and send the transaction
-    const tx = new Transaction().add(unlinkIx);
-    tx.feePayer = kp.publicKey;
-
-    const { blockhash, lastValidBlockHeight } =
-      await connection.getLatestBlockhash("confirmed");
-    tx.recentBlockhash = blockhash;
-    tx.sign(kp);
-
+    // Simulate once, then build and sign a fresh transaction for every
+    // submission attempt so an expired blockhash is never reused.
+    const simulationTx = new Transaction().add(unlinkIx);
+    simulationTx.feePayer = kp.publicKey;
     console.log("🔍 Running simulation...");
 
     let sim;
     try {
-      sim = await connection.simulateTransaction(tx);
+      sim = await connection.simulateTransaction(simulationTx, [kp]);
     } catch (simError: any) {
       console.log("❌ Simulation call failed:", simError.message);
       return NextResponse.json(
@@ -555,17 +550,73 @@ export async function POST(req: Request) {
 
     console.log("✅ Simulation passed!");
 
-    const sig = await connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
-    });
+    let sig = "";
+    const maxSubmissionAttempts = 3;
 
-    console.log("✅ Transaction sent:", sig);
+    for (let attempt = 1; attempt <= maxSubmissionAttempts; attempt += 1) {
+      // An absent link PDA means a prior attempt completed even if confirmation
+      // timed out, so there is nothing left to submit.
+      if (!(await connection.getAccountInfo(linkPda, "confirmed"))) {
+        break;
+      }
 
-    await connection.confirmTransaction(
-      { signature: sig, blockhash, lastValidBlockHeight },
-      "confirmed"
-    );
+      const tx = new Transaction().add(unlinkIx);
+      tx.feePayer = kp.publicKey;
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.sign(kp);
+
+      try {
+        sig = await connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: false,
+        });
+        console.log("✅ Transaction sent:", sig);
+
+        await connection.confirmTransaction(
+          { signature: sig, blockhash, lastValidBlockHeight },
+          "confirmed"
+        );
+        break;
+      } catch (submitError: any) {
+        if (sig) {
+          const status = await connection
+            .getSignatureStatuses([sig], { searchTransactionHistory: true })
+            .catch(() => null);
+          const signatureStatus = status?.value?.[0];
+          if (signatureStatus?.err) throw submitError;
+          if (
+            signatureStatus?.confirmationStatus === "confirmed" ||
+            signatureStatus?.confirmationStatus === "finalized"
+          ) {
+            break;
+          }
+        }
+
+        if (!(await connection.getAccountInfo(linkPda, "confirmed"))) {
+          break;
+        }
+
+        const message = String(submitError?.message || submitError);
+        const blockhashExpired =
+          /block height exceeded|blockhash not found|transactionexpiredblockheightexceeded/i.test(
+            message
+          );
+        if (!blockhashExpired || attempt === maxSubmissionAttempts) {
+          throw submitError;
+        }
+
+        console.log(
+          `⚠️ Submission attempt ${attempt} expired; retrying with a fresh blockhash`
+        );
+      }
+    }
+
+    if (await connection.getAccountInfo(linkPda, "confirmed")) {
+      throw new Error(
+        "Wallet-unlink transaction was not confirmed after retrying with fresh blockhashes. Please try again."
+      );
+    }
 
     console.log("✅ Transaction confirmed! Wallet unlinked.");
 

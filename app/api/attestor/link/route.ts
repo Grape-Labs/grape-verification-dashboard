@@ -616,17 +616,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const tx = new Transaction().add(ix1, ix2);
-    tx.feePayer = kp.publicKey;
-
-    const { blockhash, lastValidBlockHeight } =
-      await connection.getLatestBlockhash("confirmed");
-    tx.recentBlockhash = blockhash;
-    tx.sign(kp);
-
+    // Simulate once before submission. Each submission attempt below builds and
+    // signs a new transaction so an expired blockhash is never reused.
+    const simulationTx = new Transaction().add(ix1, ix2);
+    simulationTx.feePayer = kp.publicKey;
     let sim;
     try {
-      sim = await connection.simulateTransaction(tx);
+      sim = await connection.simulateTransaction(simulationTx, [kp]);
     } catch (simError: any) {
       return NextResponse.json(
         {
@@ -657,15 +653,72 @@ export async function POST(req: Request) {
       );
     }
 
-    const sig = await connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
-    });
+    let sig = "";
+    const maxSubmissionAttempts = 3;
 
-    await connection.confirmTransaction(
-      { signature: sig, blockhash, lastValidBlockHeight },
-      "confirmed"
-    );
+    for (let attempt = 1; attempt <= maxSubmissionAttempts; attempt += 1) {
+      // A previous attempt may have landed even if its confirmation RPC timed
+      // out. The link PDA is the authoritative idempotency check.
+      if (await connection.getAccountInfo(linkPda, "confirmed")) {
+        break;
+      }
+
+      const tx = new Transaction().add(ix1, ix2);
+      tx.feePayer = kp.publicKey;
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.sign(kp);
+
+      try {
+        sig = await connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: false,
+        });
+
+        await connection.confirmTransaction(
+          { signature: sig, blockhash, lastValidBlockHeight },
+          "confirmed"
+        );
+        break;
+      } catch (submitError: any) {
+        // Confirmation can race with blockhash expiry. Check both the signature
+        // and resulting account before deciding that the attempt failed.
+        if (sig) {
+          const status = await connection
+            .getSignatureStatuses([sig], { searchTransactionHistory: true })
+            .catch(() => null);
+          const signatureStatus = status?.value?.[0];
+          if (signatureStatus?.err) throw submitError;
+          if (
+            signatureStatus?.confirmationStatus === "confirmed" ||
+            signatureStatus?.confirmationStatus === "finalized"
+          ) {
+            break;
+          }
+        }
+
+        if (await connection.getAccountInfo(linkPda, "confirmed")) {
+          break;
+        }
+
+        const message = String(submitError?.message || submitError);
+        const blockhashExpired =
+          /block height exceeded|blockhash not found|transactionexpiredblockheightexceeded/i.test(
+            message
+          );
+        if (!blockhashExpired || attempt === maxSubmissionAttempts) {
+          throw submitError;
+        }
+
+        dbg(`Submission attempt ${attempt} expired; retrying with a fresh blockhash`);
+      }
+    }
+
+    if (!(await connection.getAccountInfo(linkPda, "confirmed"))) {
+      throw new Error(
+        "Wallet-link transaction was not confirmed after retrying with fresh blockhashes. Please try again."
+      );
+    }
 
     return NextResponse.json({
       ok: true,
