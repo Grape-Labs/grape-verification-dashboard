@@ -25,6 +25,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import WalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import EmailIcon from "@mui/icons-material/Email";
 import XIcon from "@mui/icons-material/X";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
@@ -3959,6 +3960,18 @@ export default function Page() {
                   </Button>
                 </Stack>
 
+                <Typography
+                  sx={{
+                    fontFamily: "system-ui",
+                    fontSize: 12,
+                    opacity: 0.68,
+                    mb: 1.5,
+                  }}
+                >
+                  Your connected wallet shows its full address. Other linked wallets
+                  remain private on-chain and are shown only by their fingerprint.
+                </Typography>
+
                 <Stack spacing={1}>
                   {linkedWallets.map((lw) => (
                     <LinkedWalletRow
@@ -3967,6 +3980,7 @@ export default function Page() {
                       onUnlink={() => unlinkWallet(lw.walletHashHex)}
                       unlinking={unlinkingWallet === lw.walletHashHex}
                       canUnlink={!!publicKey && !!signMessage}
+                      connectedWalletAddress={publicKey?.toBase58() ?? null}
                     />
                   ))}
                 </Stack>
@@ -4903,6 +4917,7 @@ export default function Page() {
                               unlinkingWallet === lw.walletHashHex
                             }
                             canUnlink={!!publicKey && !!signMessage}
+                            connectedWalletAddress={publicKey?.toBase58() ?? null}
                             advanced
                           />
                         ))}
@@ -5051,14 +5066,25 @@ function LinkedWalletRow({
   onUnlink,
   unlinking,
   canUnlink,
+  connectedWalletAddress,
   advanced,
 }: {
   wallet: LinkedWallet;
   onUnlink: () => void;
   unlinking: boolean;
   canUnlink: boolean;
+  connectedWalletAddress: string | null;
   advanced?: boolean;
 }) {
+  const visibleValue = wallet.isCurrentWallet && connectedWalletAddress
+    ? connectedWalletAddress
+    : advanced
+    ? wallet.walletHashHex
+    : shortHex(wallet.walletHashHex);
+  const copyValue = wallet.isCurrentWallet && connectedWalletAddress
+    ? connectedWalletAddress
+    : wallet.walletHashHex;
+
   return (
     <Box
       sx={{
@@ -5093,7 +5119,7 @@ function LinkedWalletRow({
               whiteSpace: "nowrap",
             }}
           >
-            {advanced ? wallet.walletHashHex : shortHex(wallet.walletHashHex)}
+            {visibleValue}
             {wallet.isCurrentWallet && (
               <Chip
                 label="current"
@@ -5112,36 +5138,49 @@ function LinkedWalletRow({
           <Typography
             sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.55 }}
           >
-            Linked {fmtTs(wallet.linkedAt)}
+            {wallet.isCurrentWallet
+              ? `Wallet address • linked ${fmtTs(wallet.linkedAt)}`
+              : `Private wallet fingerprint • linked ${fmtTs(wallet.linkedAt)}`}
           </Typography>
         </Box>
       </Stack>
 
-      <Tooltip title={canUnlink ? "Unlink this wallet" : "Connect wallet to unlink"}>
-        <span>
+      <Stack direction="row" spacing={0.25}>
+        <Tooltip title={wallet.isCurrentWallet ? "Copy wallet address" : "Copy private fingerprint"}>
           <IconButton
             size="small"
-            onClick={onUnlink}
-            disabled={!canUnlink || unlinking}
-            sx={{
-              color: "rgba(255,100,100,0.8)",
-              "&:hover": {
-                background: "rgba(255,100,100,0.15)",
-                color: "#ff6b6b",
-              },
-              "&:disabled": { opacity: 0.3 },
-            }}
+            aria-label={wallet.isCurrentWallet ? "Copy wallet address" : "Copy wallet fingerprint"}
+            onClick={() => navigator.clipboard.writeText(copyValue)}
           >
-            {unlinking ? (
-              <Typography sx={{ fontSize: 11, fontFamily: "system-ui" }}>
-                …
-              </Typography>
-            ) : (
-              <LinkOffIcon sx={{ fontSize: 18 }} />
-            )}
+            <ContentCopyIcon sx={{ fontSize: 16 }} />
           </IconButton>
-        </span>
-      </Tooltip>
+        </Tooltip>
+        <Tooltip title={canUnlink ? "Unlink this wallet" : "Connect wallet to unlink"}>
+          <span>
+            <IconButton
+              size="small"
+              onClick={onUnlink}
+              disabled={!canUnlink || unlinking}
+              sx={{
+                color: "rgba(255,100,100,0.8)",
+                "&:hover": {
+                  background: "rgba(255,100,100,0.15)",
+                  color: "#ff6b6b",
+                },
+                "&:disabled": { opacity: 0.3 },
+              }}
+            >
+              {unlinking ? (
+                <Typography sx={{ fontSize: 11, fontFamily: "system-ui" }}>
+                  …
+                </Typography>
+              ) : (
+                <LinkOffIcon sx={{ fontSize: 18 }} />
+              )}
+            </IconButton>
+          </span>
+        </Tooltip>
+      </Stack>
     </Box>
   );
 }
