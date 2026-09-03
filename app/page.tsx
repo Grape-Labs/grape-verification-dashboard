@@ -3487,19 +3487,39 @@ export default function Page() {
                     )}
                   </Box>
                   {activeWalletVerifications.length > 0 && (
-                    <Button
-                      variant="outlined"
-                      onClick={() => setShowVerificationManager((open) => !open)}
-                      sx={{
-                        flexShrink: 0,
-                        borderColor: "rgba(134,239,172,.65)",
-                        color: "#dcfce7",
-                        fontFamily: '"Bangers", system-ui',
-                        letterSpacing: 0.7,
-                      }}
-                    >
-                      {showVerificationManager ? "Hide optional settings" : "Manage methods (optional)"}
-                    </Button>
+                    <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ flexShrink: 0 }}>
+                      <Button
+                        variant="contained"
+                        onClick={() => {
+                          if (!daoPk || !publicKey) return;
+                          window.open(
+                            `/dao/${daoPk.toBase58()}/wallet/${publicKey.toBase58()}`,
+                            "_blank",
+                            "noopener,noreferrer"
+                          );
+                        }}
+                        sx={{
+                          background: "rgba(70,230,165,.24)",
+                          color: "#dcfce7",
+                          fontFamily: '"Bangers", system-ui',
+                          letterSpacing: 0.7,
+                        }}
+                      >
+                        View public card
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        onClick={() => setShowVerificationManager((open) => !open)}
+                        sx={{
+                          borderColor: "rgba(134,239,172,.65)",
+                          color: "#dcfce7",
+                          fontFamily: '"Bangers", system-ui',
+                          letterSpacing: 0.7,
+                        }}
+                      >
+                        {showVerificationManager ? "Hide optional settings" : "Manage methods (optional)"}
+                      </Button>
+                    </Stack>
                   )}
                 </Stack>
               </Paper>
