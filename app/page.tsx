@@ -884,6 +884,7 @@ export default function Page() {
   const [communityCreateOpen, setCommunityCreateOpen] = useState(false);
   const [communityExplorerOpen, setCommunityExplorerOpen] = useState(false);
   const [showVerificationManager, setShowVerificationManager] = useState(false);
+  const [publicLinkCopied, setPublicLinkCopied] = useState(false);
   const [communitySearch, setCommunitySearch] = useState("");
   const [localCommunities, setLocalCommunities] = useState<CommunityConfig[]>([]);
   const [communityMetadataByDao, setCommunityMetadataByDao] = useState<
@@ -3506,6 +3507,29 @@ export default function Page() {
                         }}
                       >
                         View public card
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        startIcon={<ContentCopyIcon sx={{ fontSize: 16 }} />}
+                        onClick={async () => {
+                          if (!daoPk || !publicKey) return;
+                          const shareUrl = `${window.location.origin}/dao/${daoPk.toBase58()}/wallet/${publicKey.toBase58()}`;
+                          try {
+                            await navigator.clipboard.writeText(shareUrl);
+                            setPublicLinkCopied(true);
+                            window.setTimeout(() => setPublicLinkCopied(false), 1800);
+                          } catch {
+                            setError("Could not copy the verification link. Open the public card and copy its URL instead.");
+                          }
+                        }}
+                        sx={{
+                          borderColor: "rgba(38,198,255,.65)",
+                          color: publicLinkCopied ? "#86efac" : "#bdefff",
+                          fontFamily: '"Bangers", system-ui',
+                          letterSpacing: 0.7,
+                        }}
+                      >
+                        {publicLinkCopied ? "Link copied!" : "Copy verification link"}
                       </Button>
                       <Button
                         variant="outlined"
