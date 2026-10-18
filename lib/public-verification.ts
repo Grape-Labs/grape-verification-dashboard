@@ -27,6 +27,9 @@ export type PublicVerificationResult = {
   verified: boolean;
   methods: PublicVerificationMethod[];
   checkedAt: number;
+  linkedWalletCount: number | null;
+  linkageError: string | null;
+  comparison: "linked" | "notLinked" | "invalid" | "sameWallet" | "unavailable" | null;
 };
 
 const LINK_DISC = sha256(utf8ToBytes("account:GrapeVerificationLink")).slice(0, 8);
@@ -55,7 +58,8 @@ function communityNameFromMetadata(data: Uint8Array | undefined, fallback: strin
 
 export const getPublicVerification = cache(async (
   daoValue: string,
-  walletValue: string
+  walletValue: string,
+  compareValue?: string
 ): Promise<PublicVerificationResult> => {
   const checkedAt = Math.floor(Date.now() / 1000);
   const base = {
@@ -67,6 +71,9 @@ export const getPublicVerification = cache(async (
     verified: false,
     methods: [] as PublicVerificationMethod[],
     checkedAt,
+    linkedWalletCount: null as number | null,
+    linkageError: null as string | null,
+    comparison: compareValue !== undefined ? "unavailable" as const : null,
   };
 
   let dao: PublicKey;
@@ -132,7 +139,8 @@ export const getPublicVerification = cache(async (
       ? await connection.getMultipleAccountsInfo(identityKeys)
       : [];
 
-    const methods = identities.flatMap((account): PublicVerificationMethod[] => {
+    const activeIdentityKeys: PublicKey[] = [];
+    const methods = identities.flatMap((account, index): PublicVerificationMethod[] => {
       if (!account || !account.owner.equals(PROGRAM_ID) || account.data.length < 123) return [];
       const identitySpace = new PublicKey(account.data.slice(9, 41));
       if (!identitySpace.equals(space)) return [];
@@ -141,12 +149,50 @@ export const getPublicVerification = cache(async (
       const verifiedAt = readI64(account.data, 75);
       const expiresAt = readI64(account.data, 83);
       if (!verified || (expiresAt > 0 && expiresAt < checkedAt) || !PLATFORM_NAMES[platform]) return [];
+      activeIdentityKeys.push(identityKeys[index]);
       return [{ platform: PLATFORM_NAMES[platform], verifiedAt, expiresAt }];
     });
 
     const uniqueMethods = Array.from(
       new Map(methods.map((method) => [method.platform, method])).values()
     );
+
+    let comparison: PublicVerificationResult["comparison"] = null;
+    let compareHash: string | null = null;
+    if (compareValue !== undefined) {
+      try {
+        const other = new PublicKey(compareValue.trim());
+        comparison = other.equals(wallet) ? "sameWallet" : "notLinked";
+        compareHash = Buffer.from(walletHash(salt, other)).toString("hex");
+      } catch {
+        comparison = "invalid";
+      }
+    }
+    let linkedWalletCount: number | null = null;
+    let linkageError: string | null = null;
+    try {
+      const hashes = new Set<string>();
+      // Keep hashes server-side; only counts and a supplied-address comparison leave this function.
+      const uniqueIdentities = new Map(activeIdentityKeys.map((key) => [key.toBase58(), key]));
+      for (const identity of uniqueIdentities.values()) {
+        const siblings = await connection.getProgramAccounts(PROGRAM_ID, {
+          filters: [
+            { memcmp: { offset: 0, bytes: Buffer.from(LINK_DISC).toString("base64"), encoding: "base64" } },
+            { memcmp: { offset: 9, bytes: identity.toBase58() } },
+          ],
+        });
+        for (const { account } of siblings) {
+          if (account.data.length < 73 || !account.owner.equals(PROGRAM_ID)) continue;
+          hashes.add(Buffer.from(account.data.slice(41, 73)).toString("hex"));
+        }
+      }
+      hashes.delete(Buffer.from(targetWalletHash).toString("hex"));
+      linkedWalletCount = hashes.size;
+      if (comparison === "notLinked" && compareHash && hashes.has(compareHash)) comparison = "linked";
+    } catch {
+      linkageError = "Linked wallet information could not be checked right now.";
+      if (comparison === "notLinked") comparison = "unavailable";
+    }
 
     return {
       valid: true,
@@ -158,6 +204,9 @@ export const getPublicVerification = cache(async (
       spaceFrozen,
       verified: uniqueMethods.length > 0,
       methods: uniqueMethods,
+      linkedWalletCount,
+      linkageError,
+      comparison,
       checkedAt,
     };
   } catch {
