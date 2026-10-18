@@ -1,5 +1,7 @@
 "use client";
 
+import Alert from "@mui/material/Alert";
+import { loadLinkedWallets } from "@/lib/linked-wallets";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
@@ -872,6 +874,9 @@ export default function Page() {
   // Multi-wallet state
   const [linkedWallets, setLinkedWallets] = useState<LinkedWallet[]>([]);
   const [linkedWalletsLoading, setLinkedWalletsLoading] = useState(false);
+  const [connectedLinkedWallets, setConnectedLinkedWallets] = useState<LinkedWallet[]>([]);
+  const [connectedLinksLoading, setConnectedLinksLoading] = useState(false);
+  const [connectedLinksError, setConnectedLinksError] = useState<string | null>(null);
   const [unlinkingWallet, setUnlinkingWallet] = useState<string | null>(null); // walletHashHex being unlinked
   const [walletVerificationMatches, setWalletVerificationMatches] = useState<
     WalletVerificationMatch[]
@@ -1708,10 +1713,14 @@ export default function Page() {
 
     async function run() {
       setWalletVerificationMatches([]);
+      setConnectedLinkedWallets([]);
+      setConnectedLinksLoading(false);
+      setConnectedLinksError(null);
       setWalletVerificationLoading(false);
       if (!publicKey || !spacePda || !spaceSalt) return;
 
       setWalletVerificationLoading(true);
+      setConnectedLinksLoading(true);
       try {
         const wh = walletHash(spaceSalt, publicKey);
         const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
@@ -1768,14 +1777,25 @@ export default function Page() {
             return next;
           });
         }
+        if (cancelled) return;
+        try {
+          const wallets = await loadLinkedWallets(connection, matches.map((match) => match.identity), wh);
+          if (!cancelled) setConnectedLinkedWallets(wallets);
+        } catch {
+          if (!cancelled) setConnectedLinksError("Could not load linked wallets. Please refresh to try again.");
+        }
       } finally {
-        if (!cancelled) setWalletVerificationLoading(false);
+        if (!cancelled) {
+          setWalletVerificationLoading(false);
+          setConnectedLinksLoading(false);
+        }
       }
     }
 
     run().catch((e) => {
       if (!cancelled) {
         setWalletVerificationLoading(false);
+        setConnectedLinksError("Could not load linked wallets. Please refresh to try again.");
         setError(`Could not check wallet verification: ${String(e?.message || e)}`);
       }
     });
@@ -4846,16 +4866,16 @@ export default function Page() {
                       />
                       <InfoRow
                         label="wallet_hash (hex)"
-                        value={bytesToHex(walletHashBytes)}
+                        value={bytesToHex(publicKey && spaceSalt ? walletHash(spaceSalt, publicKey) : null)}
                         mono
                       />
                       <InfoRow
-                        label="Link PDA"
+                        label="Selected identity link PDA"
                         value={linkPda?.toBase58() || "—"}
                         mono
                       />
                       <InfoRow
-                        label="This wallet link"
+                        label="Selected identity link"
                         value={
                           linkExists == null
                             ? "—"
@@ -4865,13 +4885,13 @@ export default function Page() {
                         }
                       />
                       <InfoRow
-                        label="Total linked"
+                        label="Total linked in community"
                           value={
-                            linkedWalletsLoading
-                              ? "Loading..."
-                              : linkedWallets.length === 0 && linkExists
-                              ? "⚠️ 0 (try refresh)"
-                              : `${linkedWallets.length} wallet(s)`
+                            !publicKey ? "Connect a wallet"
+                              : connectedLinksLoading ? "Loading..."
+                              : connectedLinksError ? "Unavailable — try refresh"
+                              : !spaceSalt ? "Community data unavailable"
+                              : `${connectedLinkedWallets.length} wallet(s), including this wallet if linked`
                           }
                       />
                       {linkInfo && (
@@ -4936,8 +4956,17 @@ export default function Page() {
                     </Stack>
                   </Box>
 
+                  <Typography variant="body2" sx={{ mt: 2, opacity: 0.75, fontFamily: "system-ui" }}>
+                    Distinct wallets across this wallet’s linked identities in this community, including expired or revoked identities.
+                    Other wallets are shown as fingerprints because their addresses are not stored on-chain.
+                    Manage individual links through the selected verification method.
+                  </Typography>
+                  {connectedLinksError && <Alert severity="warning" sx={{ mt: 2 }}>{connectedLinksError}</Alert>}
+                  {publicKey && spaceSalt && !connectedLinksLoading && !connectedLinksError && connectedLinkedWallets.length === 0 && (
+                    <Typography sx={{ mt: 2, fontFamily: "system-ui" }}>No linked wallets found in this community.</Typography>
+                  )}
                   {/* Linked Wallets Table (Advanced) */}
-                  {linkedWallets.length > 0 && (
+                  {connectedLinkedWallets.length > 0 && (
                     <>
                       <Divider sx={{ my: 2 }} />
                       <Typography
@@ -4948,11 +4977,11 @@ export default function Page() {
                           mb: 1.5,
                         }}
                       >
-                        All Linked Wallets ({linkedWallets.length})
+                        Linked Wallets in This Community ({connectedLinkedWallets.length})
                       </Typography>
 
                       <Stack spacing={1}>
-                        {linkedWallets.map((lw) => (
+                        {connectedLinkedWallets.map((lw) => (
                           <LinkedWalletRow
                             key={lw.walletHashHex}
                             wallet={lw}
@@ -4960,7 +4989,8 @@ export default function Page() {
                             unlinking={
                               unlinkingWallet === lw.walletHashHex
                             }
-                            canUnlink={!!publicKey && !!signMessage}
+                            canUnlink={false}
+                            readOnly
                             connectedWalletAddress={publicKey?.toBase58() ?? null}
                             advanced
                           />
@@ -5112,6 +5142,7 @@ function LinkedWalletRow({
   canUnlink,
   connectedWalletAddress,
   advanced,
+  readOnly = false,
 }: {
   wallet: LinkedWallet;
   onUnlink: () => void;
@@ -5119,6 +5150,7 @@ function LinkedWalletRow({
   canUnlink: boolean;
   connectedWalletAddress: string | null;
   advanced?: boolean;
+  readOnly?: boolean;
 }) {
   const visibleValue = wallet.isCurrentWallet && connectedWalletAddress
     ? connectedWalletAddress
@@ -5199,7 +5231,7 @@ function LinkedWalletRow({
             <ContentCopyIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
-        <Tooltip title={canUnlink ? "Unlink this wallet" : "Connect wallet to unlink"}>
+        {!readOnly && <Tooltip title={canUnlink ? "Unlink this wallet" : "Connect wallet to unlink"}>
           <span>
             <IconButton
               size="small"
@@ -5223,7 +5255,7 @@ function LinkedWalletRow({
               )}
             </IconButton>
           </span>
-        </Tooltip>
+        </Tooltip>}
       </Stack>
     </Box>
   );
