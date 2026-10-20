@@ -47,6 +47,10 @@ export default async function PublicVerificationPage({ params, searchParams }: R
   const query = await searchParams;
   const compare = Array.isArray(query.compare) ? query.compare[0] : query.compare;
   const result = await getPublicVerification(daoId, publicKey, compare);
+  const comparedWallet = compare?.trim();
+  const comparedResult = comparedWallet
+    ? await getPublicVerification(daoId, comparedWallet)
+    : null;
   const comparisonMessages = {
     linked: "Shared verified identity found. These wallets share an active identity in this community. This does not establish that they belong to the same person.",
     notLinked: "No shared verified identity found. No direct active connection was found in this community; this does not prove different owners.",
@@ -142,6 +146,16 @@ export default async function PublicVerificationPage({ params, searchParams }: R
                 placeholder="Enter Solana wallet address" autoComplete="off" spellCheck={false} />
               <div className={styles.actions}><button type="submit">Check connection</button></div>
             </form>
+            {comparedResult && (
+              <div className={styles.addressBlock} role="status">
+                <span>Checked wallet</span>
+                <code>{comparedResult.wallet}</code>
+                <p>{comparedResult.error || (comparedResult.verified
+                  ? `Verified — ${comparedResult.methods.map(method => method.platform).join(", ")}`
+                  : "Not currently verified for this community.")}</p>
+                {comparedResult.valid && <Link href={`/dao/${encodeURIComponent(result.daoId)}/wallet/${encodeURIComponent(comparedResult.wallet)}`}>View wallet details →</Link>}
+              </div>
+            )}
             {result.comparison && (
               <p className={styles.comparison} role="status">{comparisonMessages[result.comparison]}</p>
             )}
