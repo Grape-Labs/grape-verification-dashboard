@@ -39,6 +39,7 @@ import {
 } from "@solana/web3.js";
 import { Buffer } from "buffer";
 
+import CommunityAdminPanel from "./components/CommunityAdminPanel";
 import CreateSpaceDialog from "./components/CreateSpaceDialog";
 import CreateCommunityDialog from "./components/CreateCommunityDialog";
 import WalletComicButton from "./components/WalletComicButton";
@@ -3119,6 +3120,9 @@ export default function Page() {
                 >
                   {`On-chain metadata: ${onChainCommunityLabel}`}
                 </Typography>
+              )}
+              {canManageSpaceAdmin && spacePda && (
+                <CommunityAdminPanel key={spacePda.toBase58()} connection={connection} space={spacePda} community={activeCommunityLabel} revision={refreshCounter} />
               )}
               {communityExplorerOpen && (
                 <Paper
