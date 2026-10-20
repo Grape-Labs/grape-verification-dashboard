@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Button, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Paper, Stack, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { loadCommunityStats } from "@/lib/community-stats";
 
@@ -37,6 +37,35 @@ export default function CommunityAdminPanel({ connection, space, community, revi
         <div key={label}><Typography variant="h4">{loading ? "…" : count ?? "—"}</Typography><Typography>{label}</Typography></div>
       )}
     </Stack>
+    {stats && <>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2, my: 3 }}>
+        {[
+          ["Active identities", stats.activeIdentities],
+          ["Expired identities", stats.expired],
+          ["Revoked / unverified identities", stats.revoked],
+          ["Identities expiring within 7 days", stats.expiringSoon],
+          ["Wallets without active verification", stats.unverifiedWallets],
+          ["Identities without linked wallets", stats.identitiesWithoutWallets],
+        ].map(([label, count]) => <Box key={label} sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+          <Typography variant="h5">{count}</Typography><Typography variant="body2">{label}</Typography>
+        </Box>)}
+      </Box>
+      <Typography variant="h6">Verification methods</Typography>
+      <TableContainer>
+        <Table size="small" aria-label="Verification method breakdown">
+          <TableHead><TableRow>
+            <TableCell>Method</TableCell><TableCell align="right">Identity records</TableCell>
+            <TableCell align="right">Active identities</TableCell><TableCell align="right">Verified wallets</TableCell>
+          </TableRow></TableHead>
+          <TableBody>{stats.methods.map(method => <TableRow key={method.platform}>
+            <TableCell component="th" scope="row">{method.platform}</TableCell>
+            <TableCell align="right">{method.identities}</TableCell><TableCell align="right">{method.active}</TableCell>
+            <TableCell align="right">{method.wallets}</TableCell>
+          </TableRow>)}</TableBody>
+        </Table>
+      </TableContainer>
+      <Typography variant="body2" sx={{ mt: 1, mb: 3, opacity: 0.75 }}>A wallet can appear under multiple methods. Expired counts exclude revoked identities. These counts describe current records, not historical activity or unique people.</Typography>
+    </>}
     <Typography variant="body2">Linked wallets are distinct wallets with an identity link in this community. Verified wallets have at least one verified, unexpired identity. Each wallet is counted once, even with multiple methods. Counts include existing records when the community is paused.</Typography>
     {stats && <Typography variant="caption">Updated {new Date(stats.checkedAt).toLocaleString()}</Typography>}
   </Paper>;

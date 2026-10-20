@@ -889,6 +889,7 @@ export default function Page() {
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
   const [communityCreateOpen, setCommunityCreateOpen] = useState(false);
   const [communityExplorerOpen, setCommunityExplorerOpen] = useState(false);
+  const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [showVerificationManager, setShowVerificationManager] = useState(false);
   const [publicLinkCopied, setPublicLinkCopied] = useState(false);
   const [communitySearch, setCommunitySearch] = useState("");
@@ -3109,6 +3110,15 @@ export default function Page() {
                   >
                     Create Community
                   </Button>
+                  <Button
+                    variant={adminPanelOpen ? "contained" : "outlined"}
+                    onClick={() => setAdminPanelOpen(open => !open)}
+                    aria-expanded={adminPanelOpen}
+                    aria-controls="community-admin-panel"
+                    sx={{ whiteSpace: "nowrap" }}
+                  >
+                    {adminPanelOpen ? "Hide admin panel" : "Admin panel"}
+                  </Button>
                 </Stack>
               </Stack>
               <Typography sx={{ mt: 0.75, fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}>
@@ -3121,8 +3131,26 @@ export default function Page() {
                   {`On-chain metadata: ${onChainCommunityLabel}`}
                 </Typography>
               )}
-              {canManageSpaceAdmin && spacePda && (
-                <CommunityAdminPanel key={spacePda.toBase58()} connection={connection} space={spacePda} community={activeCommunityLabel} revision={refreshCounter} />
+              {adminPanelOpen && (
+                <Box id="community-admin-panel" sx={{ mt: 2 }}>
+                  {canManageSpaceAdmin && spacePda ? (
+                    <CommunityAdminPanel key={spacePda.toBase58()} connection={connection} space={spacePda} community={activeCommunityLabel} revision={refreshCounter} />
+                  ) : (
+                    <Alert severity="info">
+                      <Typography fontWeight={700}>Community admin access</Typography>
+                      {spaceAuthority ? (
+                        <>
+                          <Typography>Connect this community’s authority wallet to view verified and linked wallet counts:</Typography>
+                          <Typography component="code" sx={{ display: "block", overflowWrap: "anywhere", my: 1 }}>{spaceAuthority.toBase58()}</Typography>
+                          <Typography variant="body2">{publicKey ? "Your connected wallet is not this community’s authority wallet." : "No wallet is connected."}</Typography>
+                        </>
+                      ) : (
+                        <Typography>{spaceExists === false ? "This community does not have an on-chain space yet." : "The community authority has not loaded. Refresh to check again."}</Typography>
+                      )}
+                      <Button onClick={() => refresh()}>Refresh access</Button>
+                    </Alert>
+                  )}
+                </Box>
               )}
               {communityExplorerOpen && (
                 <Paper

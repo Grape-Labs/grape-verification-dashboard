@@ -41,3 +41,24 @@ test('empty community returns zero counts', async () => {
 test('RPC failure propagates instead of becoming a zero count', async () => {
   await assert.rejects(loadCommunityStats({ getProgramAccounts: async () => { throw Error('offline'); } }, key(1)), /offline/);
 });
+test('breaks down methods, expiration, and identities without wallets', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const discord = identity(2, true, now + 3600);
+  const email = identity(3, true, 0);
+  email.account.data[41] = 3;
+  const expired = identity(4, true, 1);
+  const revoked = identity(5, false, 1);
+  const unlinked = identity(6, true, now + 8 * 86400);
+  const result = await loadCommunityStats({ getProgramAccounts: async (_, { filters }) => filters.length === 2
+    ? [discord, email, expired, revoked, unlinked]
+    : [link(2, 10), link(3, 10), link(4, 11), link(5, 12)] }, key(1));
+  assert.equal(result.activeIdentities, 3);
+  assert.equal(result.expired, 1);
+  assert.equal(result.revoked, 1);
+  assert.equal(result.expiringSoon, 1);
+  assert.equal(result.unverifiedWallets, 2);
+  assert.equal(result.identitiesWithoutWallets, 1);
+  assert.equal(result.methods.find(m => m.platform === 'Discord').wallets, 1);
+  assert.equal(result.methods.find(m => m.platform === 'Email').wallets, 1);
+  assert.equal(result.verified, 1);
+});
