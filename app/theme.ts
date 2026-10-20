@@ -37,7 +37,7 @@ export const theme = createTheme({
     ].join(","),
     h1: { fontWeight: 400, letterSpacing: 1.2 },
     h2: { fontFamily: "Bangers, system-ui", fontWeight: 400, fontSize: "2.5rem", letterSpacing: 1.0 },
-    h3: { fontWeight: 700, fontSize: "1.75rem", letterSpacing: 0 },
+    h3: { fontFamily: "Bangers, system-ui", fontWeight: 400, fontSize: "2.25rem", letterSpacing: 0.6 },
     button: { fontWeight: 900, letterSpacing: 0.4 },
     body1: { fontFamily: "system-ui" },
     body2: { fontFamily: "system-ui" },
@@ -89,8 +89,8 @@ export const theme = createTheme({
           boxShadow: "none",
           textTransform: "none",
           fontWeight: 600,
-          fontFamily: "system-ui !important",
-          letterSpacing: "0 !important",
+          fontFamily: "Bangers, system-ui",
+          letterSpacing: 0.6,
         },
         contained: {
           backgroundImage:

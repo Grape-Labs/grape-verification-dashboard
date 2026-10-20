@@ -3000,7 +3000,7 @@ export default function Page() {
               }}
             >
               {activeWalletVerifications.length > 0
-                ? "Your verification"
+                ? "Wallet verified!"
                 : "Verify your wallet"}
             </Typography>
             <Typography
@@ -3440,46 +3440,51 @@ export default function Page() {
             {!!publicKey && (
               <Paper
                 sx={{
-                  p: activeWalletVerifications.length > 0 ? { xs: 2.5, md: 4 } : 1.5,
+                  p: activeWalletVerifications.length > 0 ? { xs: 2.5, md: 3.5 } : 1.5,
+                  position: "relative",
+                  overflow: "hidden",
+                  borderRadius: 4,
                   mb: 2,
                   background:
                     activeWalletVerifications.length > 0
-                      ? "linear-gradient(135deg, rgba(22,101,52,.44), rgba(6,78,59,.30))"
+                      ? "radial-gradient(ellipse at 0% 0%, rgba(74,222,128,.22), transparent 60%), linear-gradient(120deg, #102d29, #101e29 85%)"
                       : "rgba(255,255,255,0.05)",
                   border:
                     activeWalletVerifications.length > 0
-                      ? "3px solid rgba(74,222,128,.72)"
+                      ? "2px solid rgba(74,222,128,.55)"
                       : "1px solid rgba(255,255,255,0.14)",
                   boxShadow:
                     activeWalletVerifications.length > 0
-                      ? "0 18px 55px rgba(34,197,94,.16), inset 0 0 40px rgba(74,222,128,.06)"
+                      ? "0 12px 40px rgba(0,0,0,.24), inset 0 1px 0 rgba(134,239,172,.15)"
                       : undefined,
                 }}
               >
                 <Stack
-                  direction="column"
-                  spacing={activeWalletVerifications.length > 0 ? 2.5 : 1}
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={activeWalletVerifications.length > 0 ? 3 : 1.5}
                   alignItems={{ xs: "flex-start", sm: "center" }}
-                  justifyContent="space-between"
                 >
-                  <VerifiedIcon
-                    sx={{
-                      color:
-                        activeWalletVerifications.length > 0 ? "#4ade80" : "inherit",
-                      fontSize: activeWalletVerifications.length > 0 ? 40 : undefined,
-                      filter:
-                        activeWalletVerifications.length > 0
-                          ? "drop-shadow(0 8px 18px rgba(74,222,128,.35))"
-                          : undefined,
-                    }}
-                  />
-                  <Box sx={{ flex: 1 }}>
+                  <Box sx={{
+                    display: "grid", placeItems: "center", flexShrink: 0,
+                    width: { xs: 64, sm: 96 }, height: { xs: 64, sm: 96 },
+                    borderRadius: "50%", border: "1px solid rgba(134,239,172,.25)",
+                    background: "radial-gradient(circle, rgba(74,222,128,.20), rgba(74,222,128,.03))",
+                    boxShadow: "0 0 36px rgba(74,222,128,.12)",
+                  }}>
+                    {activeWalletVerifications.length > 0
+                      ? <VerifiedIcon sx={{ color: "#4ade80", fontSize: { xs: 44, sm: 66 }, filter: "drop-shadow(0 4px 12px rgba(74,222,128,.3))" }} />
+                      : <WalletIcon sx={{ color: "text.secondary", fontSize: 36 }} />}
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
+                    {activeWalletVerifications.length > 0 && <Typography sx={{ fontFamily: "system-ui", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: "#86efac", mb: 0.75 }}>YOU’RE IN · {activeCommunityLabel.toUpperCase()}</Typography>}
                     <Typography
                       sx={{
                         fontFamily: '"Bangers", system-ui',
                         letterSpacing: 1,
-                        fontSize: activeWalletVerifications.length > 0 ? { xs: 22, md: 26 } : 14,
-                        fontWeight: 800,
+                        fontSize: activeWalletVerifications.length > 0 ? { xs: 34, sm: 42, md: 48 } : 16,
+                        fontWeight: 400,
+                        lineHeight: 1.1,
+                        mb: 1,
                         color: activeWalletVerifications.length > 0 ? "#dcfce7" : undefined,
                       }}
                     >
@@ -3489,35 +3494,16 @@ export default function Page() {
                         ? "Verification Complete"
                         : "Ready to verify"}
                     </Typography>
-                    <Typography
-                      sx={{
-                        fontFamily: "system-ui",
-                        fontSize: activeWalletVerifications.length > 0 ? 15 : 12,
-                        opacity: 0.86,
-                      }}
-                    >
-                      {activeWalletVerifications.length > 0
-                        ? `Verified with ${activeWalletVerifications
-                            .map((match) => platformLabel(match.platform))
-                            .join(", ")}.`
-                        : "Choose a method below to get started."}
+                    <Typography sx={{ fontFamily: "system-ui", fontSize: 14, color: "rgba(220,252,231,.8)", mb: 1.5 }}>
+                      {activeWalletVerifications.length > 0 ? "Your wallet is verified. You’re all set." : "Choose a method below to get started."}
                     </Typography>
-                    {activeWalletVerifications.length > 0 && (
-                      <Typography
-                        sx={{
-                          mt: 0.5,
-                          fontFamily: "system-ui",
-                          fontSize: 12,
-                          fontWeight: 800,
-                          color: "#86efac",
-                        }}
-                      >
-                        You&apos;re all set. No need to sign in again on another device.
-                      </Typography>
-                    )}
-                  </Box>
+                    {activeWalletVerifications.length > 0 && <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2.5 }}>
+                      {[...new Set(activeWalletVerifications.map(match => match.platform))].map(method => <Chip key={method}
+                        icon={platformIcon(method)} label={platformLabel(method)} size="small"
+                        sx={{ fontFamily: "system-ui", fontWeight: 500, fontSize: 12, color: "#dcfce7", background: "rgba(134,239,172,.07)", border: "1px solid rgba(134,239,172,.2)", '& .MuiChip-icon': { color: "#86efac" } }} />)}
+                    </Stack>}
                   {activeWalletVerifications.length > 0 && (
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ flexShrink: 0 }}>
+                    <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" sx={{ "& .MuiButton-root": { px: 2, py: 1, borderRadius: 2, fontSize: 16 } }}>
                       <Button
                         variant="contained"
                         onClick={() => {
@@ -3529,8 +3515,11 @@ export default function Page() {
                           );
                         }}
                         sx={{
-                          background: "rgba(70,230,165,.24)",
-                          color: "#dcfce7",
+                          background: "#86efac",
+                          color: "#10251c",
+                          border: "1px solid #a7f3c1",
+                          boxShadow: "0 3px 0 #235c40",
+                          "&:hover": { background: "#bbf7d0" },
                           fontFamily: '"Bangers", system-ui',
                           letterSpacing: 0.7,
                         }}
@@ -3552,8 +3541,8 @@ export default function Page() {
                           }
                         }}
                         sx={{
-                          borderColor: "rgba(38,198,255,.65)",
-                          color: publicLinkCopied ? "#86efac" : "#bdefff",
+                          borderColor: "rgba(134,239,172,.3)",
+                          color: publicLinkCopied ? "#86efac" : "#dcfce7",
                           fontFamily: '"Bangers", system-ui',
                           letterSpacing: 0.7,
                         }}
@@ -3561,10 +3550,10 @@ export default function Page() {
                         {publicLinkCopied ? "Link copied!" : "Copy verification link"}
                       </Button>
                       <Button
-                        variant="outlined"
+                        variant="text"
                         onClick={() => setShowVerificationManager((open) => !open)}
                         sx={{
-                          borderColor: "rgba(134,239,172,.65)",
+                          border: "none",
                           color: "#dcfce7",
                           fontFamily: '"Bangers", system-ui',
                           letterSpacing: 0.7,
@@ -3574,6 +3563,7 @@ export default function Page() {
                       </Button>
                     </Stack>
                   )}
+                  </Box>
                 </Stack>
               </Paper>
             )}
