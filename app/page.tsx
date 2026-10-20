@@ -19,7 +19,6 @@ import {
 
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import LinkIcon from "@mui/icons-material/Link";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import TravelExploreIcon from "@mui/icons-material/TravelExplore";
 import TuneIcon from "@mui/icons-material/Tune";
@@ -349,12 +348,6 @@ function platformIcon(platform: PlatformKey) {
     default:
       return <DiscordBrandIcon sx={{ fontSize: 18 }} />;
   }
-}
-
-function shortB58(pk: PublicKey | null | undefined) {
-  if (!pk) return "—";
-  const s = pk.toBase58();
-  return `${s.slice(0, 4)}…${s.slice(-4)}`;
 }
 
 function shortPkString(value: string | null | undefined) {
@@ -2415,13 +2408,6 @@ export default function Page() {
     }
   }
 
-  const linkChipLabel =
-    linkExists == null
-      ? "Link: —"
-      : linkExists
-      ? `Link: exists (${linkedWallets.length} wallet${linkedWallets.length !== 1 ? "s" : ""})`
-      : "Link: missing";
-
   const simpleSteps = useMemo(() => {
     const walletOk = !!publicKey;
     const spaceOk = spaceExists === true;
@@ -2939,7 +2925,7 @@ export default function Page() {
                   variant="body2"
                   sx={{ opacity: 0.75, fontFamily: "system-ui" }}
                 >
-                  Mainnet • Privacy-preserving identity ↔ wallet linking
+                  Verify your wallet for your community · Solana Mainnet
                 </Typography>
               </Box>
             </Stack>
@@ -2959,7 +2945,7 @@ export default function Page() {
                   "&:hover": { background: "rgba(255,255,255,0.12)" },
                 }}
               >
-                {advancedMode ? "Advanced" : "Simple"}
+                {advancedMode ? "Back to verification" : "Advanced tools"}
               </Button>
 
               <Box sx={{ transform: "rotate(-1deg)" }}>
@@ -2981,7 +2967,7 @@ export default function Page() {
               label={
                 activeWalletVerifications.length > 0
                   ? "Wallet: VERIFIED"
-                  : `Identity: ${identityStatus}`
+                  : walletVerificationLoading ? "Checking wallet…" : publicKey ? "Not verified yet" : "Connect your wallet"
               }
               sx={{
                 fontFamily: "system-ui",
@@ -2997,16 +2983,7 @@ export default function Page() {
                     : undefined,
               }}
             />
-            <Chip
-              icon={<LinkIcon />}
-              label={linkChipLabel}
-              sx={{ fontFamily: "system-ui" }}
-            />
-            <Chip
-              icon={<TravelExploreIcon />}
-              label="Token-gate Ready"
-              sx={{ fontFamily: "system-ui" }}
-            />
+
           </Stack>
         </Paper>
 
@@ -3023,16 +3000,16 @@ export default function Page() {
               }}
             >
               {activeWalletVerifications.length > 0
-                ? "Wallet Verified!"
-                : "Verify & Link"}
+                ? "Your verification"
+                : "Verify your wallet"}
             </Typography>
             <Typography
               variant="body2"
               sx={{ opacity: 0.78, fontFamily: "system-ui", mb: 2 }}
             >
               {activeWalletVerifications.length > 0
-                ? `${shortB58(publicKey)} is verified for ${activeCommunityLabel}. No further action is required.`
-                : "Choose one identity platform, verify it, then link your wallet. You only need one method."}
+                ? `Manage your verification for ${activeCommunityLabel}.`
+                : "Connect your wallet, choose one verification method, then confirm the link."}
             </Typography>
 
             <Paper
@@ -3051,10 +3028,10 @@ export default function Page() {
               >
                 <Box>
                   <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                    Active Community
+                    Community
                   </Typography>
                   <Typography sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.82 }}>
-                    {`${activeCommunityLabel} (${shortDaoId})`}
+                    {activeCommunityLabel}
                   </Typography>
                 </Box>
 
@@ -3097,7 +3074,7 @@ export default function Page() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {communityExplorerOpen ? "Hide Explorer" : "Explore Communities"}
+                    {communityExplorerOpen ? "Close communities" : "Find a community"}
                   </Button>
                   <Button
                     variant="outlined"
@@ -3122,9 +3099,9 @@ export default function Page() {
                 </Stack>
               </Stack>
               <Typography sx={{ mt: 0.75, fontFamily: "system-ui", fontSize: 12, opacity: 0.7 }}>
-                Verification and wallet links are scoped per community (DAO).
+                Your verification applies to the selected community.
               </Typography>
-              {onChainCommunityLabel && (
+              {advancedMode && onChainCommunityLabel && (
                 <Typography
                   sx={{ mt: 0.5, fontFamily: "system-ui", fontSize: 12, opacity: 0.82 }}
                 >
@@ -3480,7 +3457,7 @@ export default function Page() {
                 }}
               >
                 <Stack
-                  direction={{ xs: "column", sm: "row" }}
+                  direction="column"
                   spacing={activeWalletVerifications.length > 0 ? 2.5 : 1}
                   alignItems={{ xs: "flex-start", sm: "center" }}
                   justifyContent="space-between"
@@ -3489,7 +3466,7 @@ export default function Page() {
                     sx={{
                       color:
                         activeWalletVerifications.length > 0 ? "#4ade80" : "inherit",
-                      fontSize: activeWalletVerifications.length > 0 ? 72 : undefined,
+                      fontSize: activeWalletVerifications.length > 0 ? 40 : undefined,
                       filter:
                         activeWalletVerifications.length > 0
                           ? "drop-shadow(0 8px 18px rgba(74,222,128,.35))"
@@ -3501,16 +3478,16 @@ export default function Page() {
                       sx={{
                         fontFamily: '"Bangers", system-ui',
                         letterSpacing: 1,
-                        fontSize: activeWalletVerifications.length > 0 ? { xs: 28, md: 38 } : 13,
+                        fontSize: activeWalletVerifications.length > 0 ? { xs: 22, md: 26 } : 14,
                         fontWeight: 800,
                         color: activeWalletVerifications.length > 0 ? "#dcfce7" : undefined,
                       }}
                     >
                       {walletVerificationLoading
-                        ? "Checking this wallet on-chain…"
+                        ? "Checking your wallet…"
                         : activeWalletVerifications.length > 0
                         ? "Verification Complete"
-                        : "Wallet is not yet verified for this community"}
+                        : "Ready to verify"}
                     </Typography>
                     <Typography
                       sx={{
@@ -3520,10 +3497,10 @@ export default function Page() {
                       }}
                     >
                       {activeWalletVerifications.length > 0
-                        ? `${shortB58(publicKey)} is recognized on-chain on every device. Verified through: ${activeWalletVerifications
+                        ? `Verified with ${activeWalletVerifications
                             .map((match) => platformLabel(match.platform))
                             .join(", ")}.`
-                        : "Verification is checked from Solana, not this browser's local storage or login cookies."}
+                        : "Choose a method below to get started."}
                     </Typography>
                     {activeWalletVerifications.length > 0 && (
                       <Typography
@@ -3535,7 +3512,7 @@ export default function Page() {
                           color: "#86efac",
                         }}
                       >
-                        YOU'RE DONE — Discord, Telegram, and email do not need to be reconnected.
+                        You&apos;re all set. No need to sign in again on another device.
                       </Typography>
                     )}
                   </Box>
@@ -3593,7 +3570,7 @@ export default function Page() {
                           letterSpacing: 0.7,
                         }}
                       >
-                        {showVerificationManager ? "Hide optional settings" : "Manage methods (optional)"}
+                        {showVerificationManager ? "Hide methods" : "Manage methods"}
                       </Button>
                     </Stack>
                   )}
@@ -3622,7 +3599,7 @@ export default function Page() {
               >
                 {activeWalletVerifications.length > 0
                   ? "Optional: Manage Verification Methods"
-                  : "Step 1: Verify an Identity"}
+                  : "1. Choose a verification method"}
               </Typography>
 
               <Typography
@@ -3660,28 +3637,6 @@ export default function Page() {
                   )
                 )}
               </Stack>
-
-              <Paper
-                sx={{
-                  p: 1.25,
-                  mb: 2,
-                  background: "rgba(124,77,255,0.10)",
-                  border: "1px solid rgba(124,77,255,0.35)",
-                }}
-              >
-                <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                  {activeWalletVerifications.length > 0
-                    ? "Adding another method is optional"
-                    : "One verified method is enough"}
-                </Typography>
-                <Typography sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.8 }}>
-                  {activeWalletVerifications.length > 0
-                    ? `You are already verified through ${activeWalletVerifications
-                        .map((match) => platformLabel(match.platform))
-                        .join(", ")}. You do not need to verify every platform.`
-                    : "Verify with Discord, Telegram, or email, then link this wallet. You do not need to verify all three."}
-                </Typography>
-              </Paper>
 
               {/* Platform-Specific Connection UI */}
               {platform === "discord" && (
@@ -3797,38 +3752,15 @@ export default function Page() {
                 >
                   {activeWalletVerifications.length > 0
                     ? `Optional: Link ${platformLabel(platform)}`
-                    : "Step 2: Link Your Wallet"}
+                    : "2. Confirm your wallet"}
                 </Typography>
 
-                {/* Status Summary */}
-                <Stack spacing={1} sx={{ mb: 2 }}>
-                  <StatusChip
-                    label={`Wallet: ${
-                      publicKey ? shortB58(publicKey) : "Not connected"
-                    }`}
-                    ok={!!publicKey}
-                  />
-                  <StatusChip
-                    label={`Community: ${
-                      spaceExists === true
-                        ? "Ready"
-                        : spaceExists === false
-                        ? "Not enabled"
-                        : "Checking..."
-                    }`}
-                    ok={spaceExists === true}
-                  />
-                  <StatusChip
-                    label={`Identity: ${identityStatus}`}
-                    ok={identityInfo?.verified === true}
-                  />
-                  <StatusChip
-                    label={`This wallet: ${
-                      currentWalletLinked ? "Linked" : "Not linked"
-                    }`}
-                    ok={currentWalletLinked}
-                  />
-                </Stack>
+                <Typography variant="body2" sx={{ mb: 2, opacity: 0.8 }}>
+                  {currentWalletLinked ? "This method is linked to your wallet."
+                    : !publicKey ? "Connect your wallet using the button at the top of the page."
+                    : !platformUserId.trim() ? "Complete the sign-in above before linking your wallet."
+                    : "Confirm the request in your wallet to finish verification."}
+                </Typography>
 
                 {!currentWalletLinked && linkedElsewherePlatforms.length > 0 && (
                   <Paper
@@ -3890,14 +3822,14 @@ export default function Page() {
                   }}
                 >
                   {currentWalletLinked
-                    ? "✅ This Wallet Linked"
+                    ? "Wallet linked"
                     : spaceExists === false
                     ? "Community Not Enabled"
                     : !publicKey
                     ? "Connect Wallet First"
                     : linkedWallets.length > 0
-                    ? "🔗 Link This Wallet"
-                    : "🔗 Link Wallet Now"}
+                    ? "Confirm wallet link"
+                    : "Confirm wallet link"}
                 </Button>
 
                 {/* Add another wallet prompt — shows when current is linked */}

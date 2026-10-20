@@ -26,7 +26,7 @@ export const theme = createTheme({
   typography: {
     // You already import Bangers + Roboto Mono in Providers
     fontFamily: [
-      "Bangers",
+      "system-ui",
       "ui-sans-serif",
       "system-ui",
       "-apple-system",
@@ -36,8 +36,8 @@ export const theme = createTheme({
       "sans-serif",
     ].join(","),
     h1: { fontWeight: 400, letterSpacing: 1.2 },
-    h2: { fontWeight: 400, letterSpacing: 1.0 },
-    h3: { fontWeight: 400, letterSpacing: 0.8 },
+    h2: { fontFamily: "Bangers, system-ui", fontWeight: 400, fontSize: "2.5rem", letterSpacing: 1.0 },
+    h3: { fontWeight: 700, fontSize: "1.75rem", letterSpacing: 0 },
     button: { fontWeight: 900, letterSpacing: 0.4 },
     body1: { fontFamily: "system-ui" },
     body2: { fontFamily: "system-ui" },
@@ -61,8 +61,8 @@ export const theme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: {
-          border: "3px solid #0B1220",
-          boxShadow: "6px 6px 0 #0B1220",
+          border: "1px solid rgba(255,255,255,0.12)",
+          boxShadow: "none",
           backgroundImage:
             "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.00))",
           backdropFilter: "blur(10px)",
@@ -74,7 +74,7 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           border: "2px solid #0B1220",
-          boxShadow: "3px 3px 0 #0B1220",
+          boxShadow: "none",
           fontWeight: 900,
           background: "rgba(255,255,255,0.08)",
         },
@@ -86,9 +86,11 @@ export const theme = createTheme({
         root: {
           borderRadius: 16,
           border: "2px solid #0B1220",
-          boxShadow: "4px 4px 0 #0B1220",
+          boxShadow: "none",
           textTransform: "none",
-          fontWeight: 900,
+          fontWeight: 600,
+          fontFamily: "system-ui !important",
+          letterSpacing: "0 !important",
         },
         contained: {
           backgroundImage:

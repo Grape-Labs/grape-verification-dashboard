@@ -177,7 +177,7 @@ export default function CreateSpaceDialog({
                 SPACE SETUP
               </Typography>
               <Typography sx={{ opacity: 0.8 }}>
-                Create the per-DAO Space PDA
+                Enable wallet verification for this community. Confirm the transaction in your wallet.
               </Typography>
             </Box>
             <Stack direction="row" spacing={1}>
@@ -206,14 +206,16 @@ export default function CreateSpaceDialog({
           <Paper sx={{ p: 4 }}>
             <Stack spacing={2}>
               <Box>
-                <Typography>DAO ID</Typography>
+                <Typography>Community ID</Typography>
                 <Box sx={{ fontFamily: "monospace" }}>
                   {daoIdStr || "—"}
                 </Box>
               </Box>
 
-              <Box>
-                <Typography>Derived Space PDA</Typography>
+              <Box component="details" sx={{ '& summary': { cursor: 'pointer', fontFamily: 'system-ui' }, overflowWrap: 'anywhere' }}>
+                <summary>Technical settings (optional)</summary>
+              <Box sx={{ mt: 2 }}>
+                <Typography>Verification account address</Typography>
                 <Stack direction="row" spacing={1}>
                   <Box sx={{ fontFamily: "monospace", flex: 1 }}>
                     {spacePda?.toBase58() || "—"}
@@ -247,6 +249,7 @@ export default function CreateSpaceDialog({
                 </Stack>
               </Box>
 
+              </Box>
               {err && (
                 <Paper sx={{ p: 1, background: "rgba(255,0,0,0.1)" }}>
                   <Typography sx={{ fontSize: 12 }}>{err}</Typography>
@@ -261,7 +264,7 @@ export default function CreateSpaceDialog({
                   onClick={handleCreate}
                   disabled={busy || !wallet.publicKey || !daoPk}
                 >
-                  {busy ? "Creating…" : "Create Space"}
+                  {busy ? "Creating…" : "Enable verification"}
                 </Button>
                 <Button variant="outlined" onClick={onClose} disabled={busy}>
                   Cancel
