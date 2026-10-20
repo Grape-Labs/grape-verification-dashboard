@@ -4334,20 +4334,17 @@ export default function Page() {
                         }
                       />
                       <Typography
-                        sx={{
-                          fontFamily: "system-ui",
-                          fontSize: 12,
-                          opacity: 0.7,
-                          mt: 1,
-                        }}
+                        id="community-verification-setup"
+                        sx={{ fontFamily: "system-ui", fontSize: 18, fontWeight: 700, mt: 2, scrollMarginTop: 24 }}
                       >
-                        Set Space Attestor
+                        Enable member verification
                       </Typography>
                       <Typography
                         sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.65 }}
                       >
-                        Use a dedicated soft server/bot wallet for attestation and keep only a
-                        small operational balance in it.
+                        Choose “Create verification service” to generate and save a dedicated service wallet.
+                        You’ll approve an on-chain update and sign a message to authorize storage.
+                        Fund the service wallet with a small amount of SOL to cover verification transactions.
                       </Typography>
                       <Box
                         component="input"
@@ -4424,7 +4421,7 @@ export default function Page() {
                         >
                           {spaceAttestorGenerating
                             ? "Generating..."
-                            : "Generate + Apply Attestor"}
+                            : "Create verification service"}
                         </Button>
                       </Stack>
                       <InfoRow
@@ -5006,7 +5003,13 @@ export default function Page() {
         <CreateCommunityDialog
           open={communityCreateOpen}
           onClose={() => setCommunityCreateOpen(false)}
-          onCreated={({ daoId, name, slug, guildId, attestor }) => {
+          onConfigure={() => {
+            setAdvancedMode(true);
+            setAdvancedOpen(true);
+            setModeToLocalStorage(true);
+            window.setTimeout(() => document.getElementById("community-verification-setup")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+          }}
+          onCreated={({ daoId, name, slug, guildId }) => {
             if (name) {
               rememberLocalCommunity({
                 daoId,
@@ -5017,9 +5020,8 @@ export default function Page() {
             }
             applyDaoContext(daoId, name);
             setDeepLinkCommunityLabel(name || null);
-            setCommunityCreateOpen(false);
             setMsg(
-              `✅ Created community${name ? ` (${name})` : ""}.\nDAO: ${daoId}\nAttestor: ${attestor || "authority wallet"}\nSpace + metadata initialized.`
+              `Created ${name || "your community"}. Configure verification before inviting members.`
             );
             refresh().catch(() => {});
           }}
