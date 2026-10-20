@@ -37,7 +37,8 @@ export default function CommunityAdminPanel({ connection, space, community, revi
         <div key={label}><Typography variant="h4">{loading ? "…" : count ?? "—"}</Typography><Typography>{label}</Typography></div>
       )}
     </Stack>
-    {stats && <>
+    {stats && <Box component="details" sx={{ my: 2, '& summary': { cursor: 'pointer', fontFamily: 'system-ui' } }}>
+      <summary>View identity health and verification methods</summary>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2, my: 3 }}>
         {[
           ["Active identities", stats.activeIdentities],
@@ -65,7 +66,7 @@ export default function CommunityAdminPanel({ connection, space, community, revi
         </Table>
       </TableContainer>
       <Typography variant="body2" sx={{ mt: 1, mb: 3, opacity: 0.75 }}>A wallet can appear under multiple methods. Expired counts exclude revoked identities. These counts describe current records, not historical activity or unique people.</Typography>
-    </>}
+    </Box>}
     <Typography variant="body2">Linked wallets are distinct wallets with an identity link in this community. Verified wallets have at least one verified, unexpired identity. Each wallet is counted once, even with multiple methods. Counts include existing records when the community is paused.</Typography>
     {stats && <Typography variant="caption">Updated {new Date(stats.checkedAt).toLocaleString()}</Typography>}
   </Paper>;

@@ -265,10 +265,10 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                 CREATE COMMUNITY
               </Typography>
               <Typography sx={{ opacity: 0.82, fontFamily: "system-ui", fontSize: 13 }}>
-                Set up a new on-chain community space with metadata in one transaction.
+                Name your community, then confirm creation in your wallet.
               </Typography>
             </Box>
-            <Button onClick={onClose} disabled={busy}>
+            <Button onClick={onClose} disabled={busy} aria-label="Close community setup">
               <CloseIcon />
             </Button>
           </Stack>
@@ -284,6 +284,8 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
               </Typography>
               <Box
                 component="input"
+                aria-label="Community name"
+                autoFocus
                 value={communityName}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setCommunityName(e.target.value)
@@ -291,6 +293,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                 placeholder="e.g. Grape DAO"
                 style={{
                   width: "100%",
+                  boxSizing: "border-box",
                   padding: "10px 12px",
                   borderRadius: 10,
                   border: "2px solid rgba(255,255,255,0.18)",
@@ -301,8 +304,14 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                 }}
               />
 
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                Your connected wallet will manage this community. A community ID is generated automatically.
+              </Typography>
+              <Box component="details" sx={{ py: 1, '& summary': { cursor: 'pointer', fontFamily: 'system-ui' } }}>
+                <summary>Optional settings · Discord, verification service, custom ID</summary>
+                <Stack spacing={1.5} sx={{ mt: 2 }}>
               <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                Slug (optional)
+                Short name (optional)
               </Typography>
               <Box
                 component="input"
@@ -313,6 +322,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                 placeholder="e.g. grape"
                 style={{
                   width: "100%",
+                  boxSizing: "border-box",
                   padding: "10px 12px",
                   borderRadius: 10,
                   border: "2px solid rgba(255,255,255,0.18)",
@@ -324,7 +334,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
               />
 
               <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                Discord Guild ID (optional)
+                Discord server ID (optional)
               </Typography>
               <Box
                 component="input"
@@ -335,6 +345,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                 placeholder="e.g. 837189238289203201"
                 style={{
                   width: "100%",
+                  boxSizing: "border-box",
                   padding: "10px 12px",
                   borderRadius: 10,
                   border: "2px solid rgba(255,255,255,0.18)",
@@ -346,7 +357,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
               />
 
               <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                Attestor Wallet (optional)
+                Verification service wallet (optional)
               </Typography>
               <Typography sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.7 }}>
                 Recommended: use a dedicated soft wallet and keep only a small amount of funds in
@@ -361,6 +372,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                 placeholder="Defaults to connected authority wallet (not recommended long-term)"
                 style={{
                   width: "100%",
+                  boxSizing: "border-box",
                   padding: "10px 12px",
                   borderRadius: 10,
                   border: "2px solid rgba(255,255,255,0.18)",
@@ -374,7 +386,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <Box sx={{ flex: 1 }}>
                   <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                    DAO ID
+                    Community ID
                   </Typography>
                   <Box
                     component="input"
@@ -385,6 +397,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                     placeholder="DAO public key"
                     style={{
                       width: "100%",
+                  boxSizing: "border-box",
                       padding: "10px 12px",
                       borderRadius: 10,
                       border: "2px solid rgba(255,255,255,0.18)",
@@ -403,7 +416,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                     disabled={busy}
                     sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
                   >
-                    Generate DAO ID
+                    Generate Community ID
                   </Button>
                 </Stack>
               </Stack>
@@ -412,6 +425,12 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
                 {`Derived Space PDA: ${spacePda?.toBase58() || "—"}`}
               </Typography>
 
+                </Stack>
+              </Box>
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                Creation requires a Solana transaction and SOL for network fees and account storage.
+                {attestorInput.trim() ? " Your configured verification service wallet will be used." : " Your wallet will initially approve verifications. Configure a verification service in Advanced tools to enable automated verification."}
+              </Typography>
               {!wallet.publicKey && (
                 <Typography sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.8 }}>
                   Connect a wallet to create this community.
