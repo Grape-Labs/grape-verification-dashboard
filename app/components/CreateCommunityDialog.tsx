@@ -7,11 +7,18 @@ import {
   Dialog,
   DialogContent,
   Divider,
+  Alert,
+  TextField,
+  Stepper,
+  Step,
+  StepLabel,
+  CircularProgress,
   Paper,
   Stack,
   Typography,
 } from "@mui/material";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import WalletComicButton from "./WalletComicButton";
 import CloseIcon from "@mui/icons-material/Close";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -31,6 +38,7 @@ import {
 type Props = {
   open: boolean;
   onClose: () => void;
+  onConfigure?: () => void;
   onCreated?: (result: {
     daoId: string;
     name?: string;
@@ -96,7 +104,7 @@ function buildSetSpaceAttestorIx(args: {
   });
 }
 
-export default function CreateCommunityDialog({ open, onClose, onCreated }: Props) {
+export default function CreateCommunityDialog({ open, onClose, onCreated, onConfigure }: Props) {
   const { connection } = useConnection();
   const wallet = useWallet();
 
@@ -108,13 +116,11 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
   const [salt, setSalt] = useState<Uint8Array | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [step, setStep] = useState(0);
+  const [created, setCreated] = useState(false);
+  const [progress, setProgress] = useState("");
 
   const daoPk = useMemo(() => safePk(daoIdInput), [daoIdInput]);
-  const spacePda = useMemo(() => {
-    if (!daoPk) return null;
-    const [pda] = deriveSpacePda(daoPk);
-    return pda;
-  }, [daoPk]);
 
   useEffect(() => {
     if (!open) {
@@ -125,6 +131,9 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
 
     setErr("");
     setBusy(false);
+    setStep(0);
+    setCreated(false);
+    setProgress("");
     setCommunityName("");
     setSlug("");
     setGuildId("");
@@ -138,6 +147,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
   async function handleCreateCommunity() {
     setErr("");
     setBusy(true);
+    setProgress("Preparing your community…");
     try {
       if (!wallet.publicKey) throw new Error("Connect a wallet first.");
       if (!wallet.sendTransaction)
@@ -208,15 +218,19 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
         await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
 
+      setProgress("Confirm the request in your wallet…");
       const sig = await wallet.sendTransaction(tx, connection, {
         preflightCommitment: "confirmed",
       });
 
-      await connection.confirmTransaction(
+      setProgress("Creating your community on Solana…");
+      const confirmation = await connection.confirmTransaction(
         { signature: sig, blockhash, lastValidBlockHeight },
         "confirmed"
       );
 
+      if (confirmation.value.err) throw new Error("The transaction failed. Your community was not created. Please try again.");
+      setCreated(true);
       onCreated?.({
         daoId: daoPk.toBase58(),
         name: trimmedName,
@@ -226,7 +240,7 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
           ? configuredAttestor.toBase58()
           : wallet.publicKey.toBase58(),
       });
-      onClose();
+
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
       setErr(message);
@@ -235,232 +249,89 @@ export default function CreateCommunityDialog({ open, onClose, onCreated }: Prop
     }
   }
 
+  const nameBytes = new TextEncoder().encode(JSON.stringify({ name: communityName.trim(), ...(slug.trim() ? { slug: slug.trim() } : {}), ...(guildId.trim() ? { guildId: guildId.trim() } : {}) })).length;
+  const nameTooLong = nameBytes > COMMUNITY_METADATA_MAX_LEN;
+  const serviceInvalid = !!attestorInput.trim() && !safePk(attestorInput);
+  const canContinue = !!communityName.trim() && !nameTooLong;
+
   return (
-    <Dialog
-      open={open}
-      onClose={busy ? undefined : onClose}
-      fullWidth
-      maxWidth="md"
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-          overflow: "hidden",
-          border: "3px solid rgba(0,0,0,0.55)",
-          boxShadow: "14px 14px 0 rgba(0,0,0,0.35)",
-          background:
-            "radial-gradient(800px 380px at 10% 0%, rgba(124,77,255,0.35), transparent 60%)," +
-            "radial-gradient(700px 340px at 90% 10%, rgba(38,198,255,0.25), transparent 55%)," +
-            "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.08) 1px, rgba(0,0,0,0) 1.8px)," +
-            "linear-gradient(180deg, rgba(10,14,26,0.96), rgba(6,8,16,0.96))",
-          backgroundSize: "auto, auto, 14px 14px, auto",
-          color: "rgba(255,255,255,0.92)",
-        },
-      }}
-    >
-      <DialogContent sx={{ p: 0 }}>
-        <Box sx={{ px: 4, pt: 4, pb: 2 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Box>
-              <Typography variant="h3" sx={{ fontFamily: '"Bangers"' }}>
-                CREATE COMMUNITY
-              </Typography>
-              <Typography sx={{ opacity: 0.82, fontFamily: "system-ui", fontSize: 13 }}>
-                Name your community, then confirm creation in your wallet.
-              </Typography>
+    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm" aria-labelledby="create-community-title"
+      PaperProps={{ sx: { borderRadius: 4, border: "2px solid rgba(124,77,255,.35)",
+        background: "radial-gradient(ellipse at top left, rgba(124,77,255,.22), transparent 65%), #111625",
+        boxShadow: "0 24px 80px rgba(0,0,0,.5)" } }}>
+      <Box sx={{ p: { xs: 2.5, sm: 3.5 }, pb: 2 }}>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+          <Box>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: "#b9a4ff", mb: 1 }}>COMMUNITY SETUP</Typography>
+            <Typography id="create-community-title" variant="h3">{created ? "Your community is created!" : step === 0 ? "Start your community" : "Ready to create?"}</Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
+              {created ? "One more step before inviting members." : step === 0 ? "Give your members a place to verify their wallets." : "Review the details, then approve one transaction."}
+            </Typography>
+          </Box>
+          <Button onClick={onClose} disabled={busy} aria-label="Close community setup" sx={{ minWidth: 40, p: 1 }}><CloseIcon /></Button>
+        </Stack>
+        {!created && <Stepper activeStep={step} sx={{ mt: 3, '& .MuiStepLabel-label': { fontFamily: "system-ui", fontSize: 13 } }}>
+          <Step><StepLabel>Name</StepLabel></Step><Step><StepLabel>Review & create</StepLabel></Step>
+        </Stepper>}
+      </Box>
+      <Divider />
+      <DialogContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+        {created ? <Stack spacing={2.5}>
+          <Box sx={{ p: 2.5, borderRadius: 3, background: "rgba(74,222,128,.08)", border: "1px solid rgba(74,222,128,.3)" }}>
+            <CheckCircleOutlineIcon sx={{ color: "#86efac", fontSize: 40, mb: 1 }} />
+            <Typography variant="h5" sx={{ overflowWrap: "anywhere" }}>{communityName.trim()}</Typography>
+            <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>Your community is saved. Your wallet is its administrator.</Typography>
+          </Box>
+          <Box>
+            <Typography fontWeight={700}>Next: enable member verification</Typography>
+            <Typography variant="body2" sx={{ mt: 0.75, color: "text.secondary" }}>Configure and check your verification service before sharing your community with members.</Typography>
+          </Box>
+          <Button variant="contained" size="large" onClick={() => { onClose(); onConfigure?.(); }}>Set up verification</Button>
+          <Button onClick={onClose}>I’ll do this later</Button>
+        </Stack> : <Stack spacing={2.5}>
+          {step === 0 ? <>
+            <TextField autoFocus fullWidth label="Community name" placeholder="e.g. Grape DAO" value={communityName}
+              onChange={event => setCommunityName(event.target.value)} error={nameTooLong}
+              helperText={nameTooLong ? "Please shorten the name or optional details." : "The name members will see when verifying."}
+              onKeyDown={event => { if (event.key === "Enter" && canContinue) { event.preventDefault(); setStep(1); } }} />
+            <Paper variant="outlined" sx={{ p: 2, background: "rgba(124,77,255,.07)" }}>
+              <Typography variant="body2">We’ll create your community ID automatically. You can add Discord details later.</Typography>
+            </Paper>
+          </> : <>
+            <Box sx={{ p: 2.5, borderRadius: 3, background: "rgba(124,77,255,.10)", border: "1px solid rgba(124,77,255,.25)" }}>
+              <Typography variant="caption" color="text.secondary">YOUR COMMUNITY</Typography>
+              <Typography variant="h5" sx={{ mt: 0.5, overflowWrap: "anywhere" }}>{communityName.trim()}</Typography>
             </Box>
-            <Button onClick={onClose} disabled={busy} aria-label="Close community setup">
-              <CloseIcon />
+            <Box>
+              <Typography fontWeight={700} sx={{ mb: 1 }}>Administrator wallet</Typography>
+              {busy ? <Typography variant="body2">{wallet.publicKey?.toBase58()}</Typography> : <WalletComicButton />}
+              <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>{wallet.publicKey ? "This wallet will manage your community and approve setup changes." : "Connect the wallet you want to manage this community."}</Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary">You’ll approve a Solana transaction. Your wallet needs SOL for network fees and account storage.</Typography>
+            <Alert severity="info">After creation, we’ll take you to verification setup so members can start joining.</Alert>
+            <Box component="details" sx={{ '& summary': { cursor: 'pointer', fontFamily: 'system-ui', fontSize: 13, color: '#b9a4ff' } }}>
+              <summary>Advanced configuration</summary>
+              <Stack spacing={2} sx={{ mt: 2 }}>
+                <Typography variant="body2" color="text.secondary">Leave these unchanged unless you already have an integration or verification service.</Typography>
+                <TextField disabled={busy} label="Short name (optional)" value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))} />
+                <TextField disabled={busy} label="Discord server ID (optional)" value={guildId} onChange={e => setGuildId(e.target.value)} helperText="Adds a server reference; it does not install a bot." />
+                <TextField disabled={busy} label="Verification service wallet (optional)" value={attestorInput} onChange={e => setAttestorInput(e.target.value)} error={serviceInvalid}
+                  helperText={serviceInvalid ? "Enter a valid Solana public address." : "Public address only. If blank, your administrator wallet is used until you configure a service."} />
+                <TextField disabled={busy} label="Community ID" value={daoIdInput} onChange={e => setDaoIdInput(e.target.value)} error={!daoPk} helperText="Generated automatically. Change only to use an existing DAO address." />
+              </Stack>
+            </Box>
+          </>}
+          {err && <Alert severity="error">{err}</Alert>}
+          {nameTooLong && step === 1 && <Alert severity="error">Please shorten the name or optional details before creating.</Alert>}
+          {busy && <Stack direction="row" spacing={1.5} alignItems="center" role="status"><CircularProgress size={18} /><Typography variant="body2">{progress}</Typography></Stack>}
+          <Stack direction="row" spacing={1.5}>
+            {step === 1 && <Button disabled={busy} onClick={() => { setStep(0); setErr(""); }}>Back</Button>}
+            <Button variant="contained" size="large" fullWidth disabled={busy || !canContinue || (step === 1 && (!wallet.publicKey || !daoPk || serviceInvalid))}
+              onClick={() => step === 0 ? setStep(1) : handleCreateCommunity()}>
+              {busy ? "Creating…" : step === 0 ? "Continue" : "Create community"}
             </Button>
           </Stack>
-        </Box>
-
-        <Divider />
-
-        <Box sx={{ px: 4, py: 3 }}>
-          <Paper sx={{ p: 2 }}>
-            <Stack spacing={1.25}>
-              <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                Community Name
-              </Typography>
-              <Box
-                component="input"
-                aria-label="Community name"
-                autoFocus
-                value={communityName}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setCommunityName(e.target.value)
-                }
-                placeholder="e.g. Grape DAO"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "2px solid rgba(255,255,255,0.18)",
-                  outline: "none",
-                  fontFamily: "system-ui",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.92)",
-                }}
-              />
-
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                Your connected wallet will manage this community. A community ID is generated automatically.
-              </Typography>
-              <Box component="details" sx={{ py: 1, '& summary': { cursor: 'pointer', fontFamily: 'system-ui' } }}>
-                <summary>Optional settings · Discord, verification service, custom ID</summary>
-                <Stack spacing={1.5} sx={{ mt: 2 }}>
-              <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                Short name (optional)
-              </Typography>
-              <Box
-                component="input"
-                value={slug}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))
-                }
-                placeholder="e.g. grape"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "2px solid rgba(255,255,255,0.18)",
-                  outline: "none",
-                  fontFamily: "system-ui",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.92)",
-                }}
-              />
-
-              <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                Discord server ID (optional)
-              </Typography>
-              <Box
-                component="input"
-                value={guildId}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setGuildId(e.target.value)
-                }
-                placeholder="e.g. 837189238289203201"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "2px solid rgba(255,255,255,0.18)",
-                  outline: "none",
-                  fontFamily: "system-ui",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.92)",
-                }}
-              />
-
-              <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                Verification service wallet (optional)
-              </Typography>
-              <Typography sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.7 }}>
-                Recommended: use a dedicated soft wallet and keep only a small amount of funds in
-                it.
-              </Typography>
-              <Box
-                component="input"
-                value={attestorInput}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setAttestorInput(e.target.value)
-                }
-                placeholder="Defaults to connected authority wallet (not recommended long-term)"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "2px solid rgba(255,255,255,0.18)",
-                  outline: "none",
-                  fontFamily: "monospace",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.92)",
-                }}
-              />
-
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}>
-                    Community ID
-                  </Typography>
-                  <Box
-                    component="input"
-                    value={daoIdInput}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setDaoIdInput(e.target.value)
-                    }
-                    placeholder="DAO public key"
-                    style={{
-                      width: "100%",
-                  boxSizing: "border-box",
-                      padding: "10px 12px",
-                      borderRadius: 10,
-                      border: "2px solid rgba(255,255,255,0.18)",
-                      outline: "none",
-                      fontFamily: "monospace",
-                      background: "rgba(255,255,255,0.08)",
-                      color: "rgba(255,255,255,0.92)",
-                    }}
-                  />
-                </Box>
-                <Stack justifyContent="flex-end">
-                  <Button
-                    startIcon={<AutoAwesomeIcon />}
-                    variant="outlined"
-                    onClick={() => setDaoIdInput(randomDaoId())}
-                    disabled={busy}
-                    sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
-                  >
-                    Generate Community ID
-                  </Button>
-                </Stack>
-              </Stack>
-
-              <Typography sx={{ fontFamily: "system-ui", fontSize: 11, opacity: 0.74 }}>
-                {`Derived Space PDA: ${spacePda?.toBase58() || "—"}`}
-              </Typography>
-
-                </Stack>
-              </Box>
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                Creation requires a Solana transaction and SOL for network fees and account storage.
-                {attestorInput.trim() ? " Your configured verification service wallet will be used." : " Your wallet will initially approve verifications. Configure a verification service in Advanced tools to enable automated verification."}
-              </Typography>
-              {!wallet.publicKey && (
-                <Typography sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.8 }}>
-                  Connect a wallet to create this community.
-                </Typography>
-              )}
-
-              {err && (
-                <Paper sx={{ p: 1, background: "rgba(255,0,0,0.12)" }}>
-                  <Typography sx={{ fontFamily: "system-ui", fontSize: 12 }}>
-                    {err}
-                  </Typography>
-                </Paper>
-              )}
-
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                <Button
-                  variant="contained"
-                  onClick={handleCreateCommunity}
-                  disabled={busy || !wallet.publicKey || !daoPk || !communityName.trim()}
-                  sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.7 }}
-                >
-                  {busy ? "Creating..." : "Create Community"}
-                </Button>
-                <Button variant="outlined" onClick={onClose} disabled={busy}>
-                  Cancel
-                </Button>
-              </Stack>
-            </Stack>
-          </Paper>
-        </Box>
+        </Stack>}
       </DialogContent>
     </Dialog>
   );
