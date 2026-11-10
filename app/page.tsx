@@ -2267,6 +2267,49 @@ export default function Page() {
     }
   }
 
+  async function disconnectLinkedWallet(wallet: LinkedWallet) {
+    if (unlinkingWallet) return;
+    setError("");
+    setMsg("Disconnecting wallet…");
+    setUnlinkingWallet(wallet.walletHashHex);
+    try {
+      if (!publicKey || !signMessage || !daoPk) throw new Error("Connect a wallet that supports message signing first.");
+      // Remove every link shared with the connected wallet, including across methods.
+      const matches = [...walletVerificationMatches];
+      let removed = 0;
+      for (const match of matches) {
+        const [targetLink] = deriveLinkPda(match.identity, wallet.walletHashBytes);
+        if (!await connection.getAccountInfo(targetLink)) continue;
+        const payload = {
+          daoId: daoPk.toBase58(), identity: match.identity.toBase58(),
+          platform: match.platform, walletHashHex: wallet.walletHashHex,
+          wallet: publicKey.toBase58(), ts: Date.now(),
+        };
+        const message = new TextEncoder().encode(
+          `Grape Verification Unlink Request\n` +
+          `daoId=${payload.daoId}\nidentity=${payload.identity}\n` +
+          `platform=${payload.platform}\nwallet=${payload.wallet}\n` +
+          `walletHash=${payload.walletHashHex}\nts=${payload.ts}`
+        );
+        const signature = await signMessage(message);
+        const res = await fetch("/api/attestor/unlink", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ payload, signatureBase64: btoa(String.fromCharCode(...signature)) }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "Could not disconnect wallet");
+        removed++;
+      }
+      setMsg(removed ? "✅ Wallet disconnected from linked identities in this community." : "Wallet is already disconnected.");
+    } catch (e: any) {
+      setError(String(e?.message || e));
+      setMsg("");
+    } finally {
+      setUnlinkingWallet(null);
+      await refresh();
+    }
+  }
+
   // Legacy functions (kept for advanced mode)
   async function signLinkRequest() {
     setError("");
@@ -4910,7 +4953,7 @@ export default function Page() {
                   <Typography variant="body2" sx={{ mt: 2, opacity: 0.75, fontFamily: "system-ui" }}>
                     Distinct wallets across this wallet’s linked identities in this community, including expired or revoked identities.
                     Other wallets are shown as fingerprints because their addresses are not stored on-chain.
-                    Manage individual links through the selected verification method.
+                    Disconnect a wallet to remove its links to identities shared with your connected wallet.
                   </Typography>
                   {connectedLinksError && <Alert severity="warning" sx={{ mt: 2 }}>{connectedLinksError}</Alert>}
                   {publicKey && spaceSalt && !connectedLinksLoading && !connectedLinksError && connectedLinkedWallets.length === 0 && (
@@ -4936,12 +4979,11 @@ export default function Page() {
                           <LinkedWalletRow
                             key={lw.walletHashHex}
                             wallet={lw}
-                            onUnlink={() => unlinkWallet(lw.walletHashHex)}
+                            onUnlink={() => disconnectLinkedWallet(lw)}
                             unlinking={
                               unlinkingWallet === lw.walletHashHex
                             }
-                            canUnlink={false}
-                            readOnly
+                            canUnlink={!!publicKey && !!signMessage && !unlinkingWallet}
                             connectedWalletAddress={publicKey?.toBase58() ?? null}
                             advanced
                           />
@@ -5192,6 +5234,7 @@ function LinkedWalletRow({
             <IconButton
               size="small"
               onClick={onUnlink}
+              aria-label="Disconnect wallet"
               disabled={!canUnlink || unlinking}
               sx={{
                 color: "rgba(255,100,100,0.8)",
