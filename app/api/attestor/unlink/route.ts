@@ -13,6 +13,7 @@ import {
   TAG_TWITTER,
   TAG_EMAIL,
   buildUnlinkWalletIx,
+  parseLink,
   deriveSpacePda,
   deriveIdentityPda,
   deriveLinkPda,
@@ -268,6 +269,10 @@ export async function POST(req: Request) {
     const walletStr = String(payload.wallet || "").trim();
     const targetWalletHashHex = String(payload.walletHashHex || "").trim();
     const ts = payload.ts;
+    const identityAddress = String(payload.identity || "").trim();
+    if (identityAddress && (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > 300_000)) {
+      return NextResponse.json({ error: "Unlink request expired. Please sign again." }, { status: 400 });
+    }
 
     if (!daoId)
       return NextResponse.json(
@@ -302,7 +307,7 @@ export async function POST(req: Request) {
     const platformProof = payload.platformProof
       ? String(payload.platformProof)
       : "";
-    if (platform === "discord") {
+    if (!identityAddress && platform === "discord") {
       if (!discordProofSecret) {
         return NextResponse.json(
           { error: "DISCORD_PROOF_SECRET missing" },
@@ -359,11 +364,11 @@ export async function POST(req: Request) {
 
     // Resolve platform user ID (from proof or payload)
     let platformUserId = String(payload.platformUserId || "").trim();
-    if (platform === "discord") {
+    if (!identityAddress && platform === "discord") {
       const proof = verifyDiscordProof(platformProof, discordProofSecret!);
       platformUserId = proof.discordId;
     }
-    if (!platformUserId) {
+    if (!identityAddress && !platformUserId) {
       return NextResponse.json(
         { error: "platformUserId missing" },
         { status: 400 }
@@ -371,7 +376,45 @@ export async function POST(req: Request) {
     }
 
     // Derive identity hash and PDAs
-    const idhRaw = identityHash(salt, platformTag(platform), platformUserId);
+    let idhRaw;
+    if (identityAddress) {
+      const identityKey = new PublicKey(identityAddress);
+      const identityAccount = await connection.getAccountInfo(identityKey);
+      if (!identityAccount || !identityAccount.owner.equals(programId)) {
+        return NextResponse.json({ error: "Identity not found" }, { status: 400 });
+      }
+      const data = identityAccount.data;
+      const discriminator = crypto.createHash("sha256").update("account:GrapeVerificationIdentity").digest().subarray(0, 8);
+      if (data.length < 118 || !data.subarray(0, 8).equals(discriminator)) {
+        return NextResponse.json({ error: "Invalid identity record" }, { status: 400 });
+      }
+      const identity = { space: new PublicKey(data.subarray(9, 41)), platform: data[41], idHash: new Uint8Array(data.subarray(42, 74)) };
+      if (!identity.space.equals(spacePda) || identity.platform !== platformSeedNum(platform)) {
+        return NextResponse.json({ error: "Identity does not match this community and method" }, { status: 403 });
+      }
+      const [expectedIdentity] = deriveIdentityPda(spacePda, identity.platform, identity.idHash);
+      if (!expectedIdentity.equals(identityKey)) {
+        return NextResponse.json({ error: "Invalid identity address" }, { status: 403 });
+      }
+      // A signed request alone is insufficient: the signer must already own a link to this identity.
+      const signerHash = walletHash(salt, walletPk);
+      const [signerLink] = deriveLinkPda(identityKey, signerHash);
+      const signerAccount = await connection.getAccountInfo(signerLink);
+      if (!signerAccount || !signerAccount.owner.equals(programId)) {
+        return NextResponse.json({ error: "Connected wallet is not linked to this identity" }, { status: 403 });
+      }
+      const linkDiscriminator = crypto.createHash("sha256").update("account:GrapeVerificationLink").digest().subarray(0, 8);
+      if (signerAccount.data.length < 82 || !signerAccount.data.subarray(0, 8).equals(linkDiscriminator)) {
+        return NextResponse.json({ error: "Invalid signer link" }, { status: 403 });
+      }
+      const link = parseLink(signerAccount.data);
+      if (!link.identity.equals(identityKey) || bytesToHex(link.walletHash) !== bytesToHex(signerHash)) {
+        return NextResponse.json({ error: "Invalid signer link" }, { status: 403 });
+      }
+      idhRaw = identity.idHash;
+    } else {
+      idhRaw = identityHash(salt, platformTag(platform), platformUserId);
+    }
     const idh = requireU8Array32("identityHash(idh)", idhRaw);
 
     // The walletHash to unlink comes from the payload (could be any linked wallet, not just the connected one)
@@ -405,6 +448,7 @@ export async function POST(req: Request) {
     // Verify wallet signature on the consent message
     const message = new TextEncoder().encode(
       `Grape Verification Unlink Request\n` +
+        (identityAddress ? `daoId=${daoId}\nidentity=${identityAddress}\n` : "") +
         `platform=${platform}\n` +
         `wallet=${walletPk.toBase58()}\n` +
         `walletHash=${targetWalletHashHex}\n` +
