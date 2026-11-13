@@ -777,6 +777,10 @@ export default function Page() {
 
   // Mode state
   const [advancedMode, setAdvancedMode] = useState(false);
+  const [showMethodChoices, setShowMethodChoices] = useState(false);
+  const [showCommunityChoices, setShowCommunityChoices] = useState(false);
+  const [editingSignIn, setEditingSignIn] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [rpcInput, setRpcInput] = useState("");
   const [rpcTesting, setRpcTesting] = useState(false);
@@ -1137,7 +1141,7 @@ export default function Page() {
     else if (communityFromGuild?.name) setDeepLinkCommunityLabel(communityFromGuild.name);
     if (targetPlatform) setDeepLinkPlatform(targetPlatform);
 
-    if (targetPlatform) setPlatform(targetPlatform);
+    if (targetPlatform) setPlatform(targetPlatform === "twitter" ? "discord" : targetPlatform);
 
     if (platformUserIdParam) {
       setPlatformUserId(platformUserIdParam);
@@ -1183,7 +1187,8 @@ export default function Page() {
         return;
       }
       setDeepLinkAutoStarted(true);
-      startDiscordConnect();
+      // Keep the invitation’s method selected; let the member start sign-in
+      // from step two rather than redirecting before wallet connection.
       return;
     }
 
@@ -2099,7 +2104,9 @@ export default function Page() {
   // ===========================
   async function linkWalletOneClick() {
     setError("");
-    setMsg("Processing...");
+    if (linking) return;
+    setLinking(true);
+    setMsg("Open your wallet and approve the signature request…");
 
     try {
       if (!signMessage) {
@@ -2156,6 +2163,7 @@ export default function Page() {
       const sig = await signMessage(message);
       const sigB64 = btoa(String.fromCharCode(...sig));
 
+      setMsg("Saving your verification. Please keep this page open…");
       const res = await fetch(`/api/attestor/link`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -2176,8 +2184,12 @@ export default function Page() {
       // Auto-refresh to pick up the new on-chain state
       setTimeout(() => refresh(), 2000);
     } catch (e: any) {
-      setError(String(e?.message || e));
+      setError(/reject|cancel|declin/i.test(String(e?.message || e))
+        ? "Request cancelled. Try again when you’re ready."
+        : String(e?.message || e));
       setMsg("");
+    } finally {
+      setLinking(false);
     }
   }
 
@@ -2507,6 +2519,7 @@ export default function Page() {
   );
 
   const canLinkCurrentPlatformWallet =
+    !linking &&
     !!publicKey &&
     !!spaceSalt &&
     !!platformUserId.trim() &&
@@ -2992,7 +3005,7 @@ export default function Page() {
               </Button>
 
               <Box sx={{ transform: "rotate(-1deg)" }}>
-                <WalletComicButton />
+                {(advancedMode || !!publicKey) && <WalletComicButton />}
               </Box>
             </Stack>
           </Stack>
@@ -3034,7 +3047,7 @@ export default function Page() {
             SIMPLE MODE (default)
            =========================== */}
         {!advancedMode && (
-          <Paper sx={{ p: 2.5, mt: 2.5 }}>
+          <Paper sx={{ p: { xs: 2, sm: 3.5 }, mt: 2.5, maxWidth: 720, mx: "auto", borderRadius: 4 }}>
             <Typography
               variant="h3"
               sx={{
@@ -3044,7 +3057,7 @@ export default function Page() {
             >
               {activeWalletVerifications.length > 0
                 ? "Wallet verified!"
-                : "Verify your wallet"}
+                : `Verify for ${activeCommunityLabel}`}
             </Typography>
             <Typography
               variant="body2"
@@ -3052,12 +3065,677 @@ export default function Page() {
             >
               {activeWalletVerifications.length > 0
                 ? `Manage your verification for ${activeCommunityLabel}.`
-                : "Connect your wallet, choose one verification method, then confirm the link."}
+                : "Connect your wallet and sign in to finish verification."}
             </Typography>
 
+            <Typography sx={{ fontFamily: "system-ui", mb: 2, fontSize: 14 }}>
+              {activeCommunityLabel}
+              <Button size="small" onClick={() => setShowCommunityChoices(open => !open)} aria-expanded={showCommunityChoices}>Change community</Button>
+            </Typography>
+            {showCommunityChoices && (
+              <Paper sx={{ p: 2, mb: 2 }}>
+                <Typography component="label" htmlFor="member-community-search" sx={{ fontFamily: "system-ui", display: "block", mb: 1 }}>Find your community</Typography>
+                <Box component="input" id="member-community-search" value={communitySearch}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => setCommunitySearch(event.target.value)}
+                  placeholder="Search community names" sx={{ width: "100%", boxSizing: "border-box", p: 1.5, mb: 1, borderRadius: 2, border: "1px solid #64748b", background: "#101e29", color: "white", fontSize: 16 }} />
+                <Stack spacing={1} sx={{ maxHeight: 240, overflowY: "auto" }}>
+                  {communityExplorerResults.map(community => <Button key={community.daoId} onClick={() => {
+                    switchCommunity(community.daoId); setShowCommunityChoices(false); setCommunitySearch(""); setEditingSignIn(false);
+                  }} sx={{ justifyContent: "flex-start", textTransform: "none", fontFamily: "system-ui" }}>{community.name}{community.daoId === daoIdStr.trim() ? " ✓" : ""}</Button>)}
+                  {communityExplorerResults.length === 0 && <Typography>No communities found. Check the invitation link from your community.</Typography>}
+                </Stack>
+              </Paper>
+            )}
+            {activeWalletVerifications.length === 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography role="status" aria-live="polite" sx={{ fontFamily: "system-ui", color: "#86efac", mb: 2 }}>
+                  {walletVerificationLoading ? "Checking your wallet…" : `Step ${!publicKey ? 1 : !currentPlatformConnected ? 2 : 3} of 3`}
+                </Typography>
+                <Stack spacing={1} sx={{ mb: 2, fontFamily: "system-ui", fontSize: 14 }}>
+                  <Box>{publicKey ? "✓ Wallet connected" : "1. Connect your wallet"}</Box>
+                  <Box>{currentPlatformConnected ? `✓ Signed in as ${platform === "email" ? emailAddress || "Email" : platform === "telegram" ? telegramLabel || "Telegram" : discordLabel || "Discord"}` : "2. Sign in"}
+                    {publicKey && currentPlatformConnected && <Button size="small" disabled={linking} onClick={() => setEditingSignIn(open => !open)}>{editingSignIn ? "Done" : "Change"}</Button>}
+                  </Box>
+                  <Box>3. Finish verification</Box>
+                </Stack>
+                {!publicKey && (
+                  <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, background: "rgba(124,77,255,.12)" }}>
+                    <Typography variant="h3" sx={{ mb: 1 }}>Connect your wallet</Typography>
+                    <Typography sx={{ fontFamily: "system-ui", mb: 2 }}>Choose the wallet you want to verify for {activeCommunityLabel}.</Typography>
+                    <WalletComicButton />
+                  </Paper>
+                )}
+              </Box>
+            )}
+
+            {!!publicKey && activeWalletVerifications.length > 0 && (
+              <Paper
+                sx={{
+                  p: activeWalletVerifications.length > 0 ? { xs: 2.5, md: 3.5 } : 1.5,
+                  position: "relative",
+                  overflow: "hidden",
+                  borderRadius: 4,
+                  mb: 2,
+                  background:
+                    activeWalletVerifications.length > 0
+                      ? "radial-gradient(ellipse at 0% 0%, rgba(74,222,128,.22), transparent 60%), linear-gradient(120deg, #102d29, #101e29 85%)"
+                      : "rgba(255,255,255,0.05)",
+                  border:
+                    activeWalletVerifications.length > 0
+                      ? "2px solid rgba(74,222,128,.55)"
+                      : "1px solid rgba(255,255,255,0.14)",
+                  boxShadow:
+                    activeWalletVerifications.length > 0
+                      ? "0 12px 40px rgba(0,0,0,.24), inset 0 1px 0 rgba(134,239,172,.15)"
+                      : undefined,
+                }}
+              >
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={activeWalletVerifications.length > 0 ? 3 : 1.5}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                >
+                  <Box sx={{
+                    display: "grid", placeItems: "center", flexShrink: 0,
+                    width: { xs: 64, sm: 96 }, height: { xs: 64, sm: 96 },
+                    borderRadius: "50%", border: "1px solid rgba(134,239,172,.25)",
+                    background: "radial-gradient(circle, rgba(74,222,128,.20), rgba(74,222,128,.03))",
+                    boxShadow: "0 0 36px rgba(74,222,128,.12)",
+                  }}>
+                    {activeWalletVerifications.length > 0
+                      ? <VerifiedIcon sx={{ color: "#4ade80", fontSize: { xs: 44, sm: 66 }, filter: "drop-shadow(0 4px 12px rgba(74,222,128,.3))" }} />
+                      : <WalletIcon sx={{ color: "text.secondary", fontSize: 36 }} />}
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
+                    {activeWalletVerifications.length > 0 && <Typography sx={{ fontFamily: "system-ui", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: "#86efac", mb: 0.75 }}>YOU’RE IN · {activeCommunityLabel.toUpperCase()}</Typography>}
+                    <Typography
+                      sx={{
+                        fontFamily: '"Bangers", system-ui',
+                        letterSpacing: 1,
+                        fontSize: activeWalletVerifications.length > 0 ? { xs: 34, sm: 42, md: 48 } : 16,
+                        fontWeight: 400,
+                        lineHeight: 1.1,
+                        mb: 1,
+                        color: activeWalletVerifications.length > 0 ? "#dcfce7" : undefined,
+                      }}
+                    >
+                      {walletVerificationLoading
+                        ? "Checking your wallet…"
+                        : activeWalletVerifications.length > 0
+                        ? "Verification Complete"
+                        : "Ready to verify"}
+                    </Typography>
+                    <Typography sx={{ fontFamily: "system-ui", fontSize: 14, color: "rgba(220,252,231,.8)", mb: 1.5 }}>
+                      {activeWalletVerifications.length > 0 ? "Your wallet is verified. You’re all set." : "Choose a method below to get started."}
+                    </Typography>
+                    {activeWalletVerifications.length > 0 && <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2.5 }}>
+                      {[...new Set(activeWalletVerifications.map(match => match.platform))].map(method => <Chip key={method}
+                        icon={platformIcon(method)} label={platformLabel(method)} size="small"
+                        sx={{ fontFamily: "system-ui", fontWeight: 500, fontSize: 12, color: "#dcfce7", background: "rgba(134,239,172,.07)", border: "1px solid rgba(134,239,172,.2)", '& .MuiChip-icon': { color: "#86efac" } }} />)}
+                    </Stack>}
+                  {activeWalletVerifications.length > 0 && (
+                    <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" sx={{ "& .MuiButton-root": { px: 2, py: 1, borderRadius: 2, fontSize: 16 } }}>
+                      <Button
+                        variant="contained"
+                        onClick={() => {
+                          if (!daoPk || !publicKey) return;
+                          window.open(
+                            `/dao/${daoPk.toBase58()}/wallet/${publicKey.toBase58()}`,
+                            "_blank",
+                            "noopener,noreferrer"
+                          );
+                        }}
+                        sx={{
+                          background: "#86efac",
+                          color: "#10251c",
+                          border: "1px solid #a7f3c1",
+                          boxShadow: "0 3px 0 #235c40",
+                          "&:hover": { background: "#bbf7d0" },
+                          fontFamily: '"Bangers", system-ui',
+                          letterSpacing: 0.7,
+                        }}
+                      >
+                        View public card
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        startIcon={<ContentCopyIcon sx={{ fontSize: 16 }} />}
+                        onClick={async () => {
+                          if (!daoPk || !publicKey) return;
+                          const shareUrl = `${window.location.origin}/dao/${daoPk.toBase58()}/wallet/${publicKey.toBase58()}`;
+                          try {
+                            await navigator.clipboard.writeText(shareUrl);
+                            setPublicLinkCopied(true);
+                            window.setTimeout(() => setPublicLinkCopied(false), 1800);
+                          } catch {
+                            setError("Could not copy the verification link. Open the public card and copy its URL instead.");
+                          }
+                        }}
+                        sx={{
+                          borderColor: "rgba(134,239,172,.3)",
+                          color: publicLinkCopied ? "#86efac" : "#dcfce7",
+                          fontFamily: '"Bangers", system-ui',
+                          letterSpacing: 0.7,
+                        }}
+                      >
+                        {publicLinkCopied ? "Link copied!" : "Copy verification link"}
+                      </Button>
+                      <Button
+                        variant="text"
+                        onClick={() => setShowVerificationManager((open) => !open)}
+                        sx={{
+                          border: "none",
+                          color: "#dcfce7",
+                          fontFamily: '"Bangers", system-ui',
+                          letterSpacing: 0.7,
+                        }}
+                      >
+                        {showVerificationManager ? "Hide methods" : "Manage methods"}
+                      </Button>
+                    </Stack>
+                  )}
+                  </Box>
+                </Stack>
+              </Paper>
+            )}
+
+            {/* Step 2: Sign in */}
+            {((!!publicKey && !walletVerificationLoading && (!currentPlatformConnected || editingSignIn) && activeWalletVerifications.length === 0) || showVerificationManager) && (
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                background: "rgba(255,255,255,0.04)",
+                border: "2px solid rgba(255,255,255,0.08)",
+                mb: 2,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontFamily: '"Bangers", system-ui',
+                  letterSpacing: 0.6,
+                  mb: 1.5,
+                  fontSize: 16,
+                }}
+              >
+                {activeWalletVerifications.length > 0
+                  ? "Optional: Manage Verification Methods"
+                  : "Sign in"}
+              </Typography>
+
+              <Typography
+                sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8, mb: 1.5 }}
+              >
+                {activeWalletVerifications.length > 0
+                  ? "Only continue below if you want to add another identity method or manage an existing link. Your wallet is already verified."
+                  : "Continue with the account you use for this community. You only need one method."}
+              </Typography>
+
+              <Button size="small" onClick={() => setShowMethodChoices(open => !open)} aria-expanded={showMethodChoices} sx={{ mb: 2 }}>
+                {showMethodChoices ? "Hide other methods" : "Use another method"}
+              </Button>
+              {/* Platform Tabs */}
+              {showMethodChoices && (
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ mb: 2 }}
+                flexWrap="wrap"
+                useFlexGap
+              >
+                {(["discord", "email", "telegram"] as const).map(
+                  (p) => (
+                    <Button
+                      key={p}
+                      onClick={() => { setPlatform(p); setEditingSignIn(false); setShowMethodChoices(false); setError(""); setMsg(""); }}
+                      startIcon={platformIcon(p)}
+                      variant={platform === p ? "contained" : "outlined"}
+                      sx={{
+                        fontFamily: '"Bangers", system-ui',
+                        letterSpacing: 0.6,
+                        textTransform: "none",
+                        minWidth: 100,
+                      }}
+                    >
+                      {platformLabel(p)}
+                    </Button>
+                  )
+                )}
+              </Stack>
+
+              )}
+
+              {/* Platform-Specific Connection UI */}
+              {platform === "discord" && (
+                <PlatformConnectionCard
+                  platform="Discord"
+                  connected={discordConnected}
+                  label={discordLabel}
+                  onConnect={startDiscordConnect}
+                  onDisconnect={disconnectDiscord}
+                  onRefresh={() => {
+                    loadDiscordSession();
+                    loadDiscordProof();
+                  }}
+                />
+              )}
+
+              {platform === "email" && (
+                <EmailConnectionCard
+                  connected={emailConnected}
+                  email={emailAddress}
+                  emailInput={emailInput}
+                  setEmailInput={setEmailInput}
+                  emailCodeSent={emailCodeSent}
+                  emailCode={emailCode}
+                  setEmailCode={setEmailCode}
+                  emailSending={emailSending}
+                  emailVerifying={emailVerifying}
+                  sendCode={sendEmailCode}
+                  verifyCode={verifyEmailCode}
+                  disconnect={disconnectEmail}
+                  onRefresh={() => {
+                    loadEmailSession();
+                    loadEmailProof();
+                  }}
+                  onCancel={() => {
+                    setEmailCodeSent(false);
+                    setEmailCode("");
+                  }}
+                  deepLinkHint={
+                    deepLinkPlatform === "email" && !emailConnected
+                      ? `Enter your email to continue${deepLinkCommunityLabel ? ` for ${deepLinkCommunityLabel}` : ""}.`
+                      : null
+                  }
+                  autoFocusInput={deepLinkPlatform === "email" && !emailConnected}
+                />
+              )}
+
+              {platform === "telegram" && (
+                <TelegramConnectionCard
+                  connected={telegramConnected}
+                  label={telegramLabel}
+                  onConnect={() => setShowTelegramWidget(true)}
+                  onDisconnect={disconnectTelegram}
+                  onRefresh={() => {
+                    loadTelegramSession();
+                    loadTelegramProof();
+                  }}
+                  onAuth={handleTelegramAuth}
+                  showWidget={showTelegramWidget}
+                  botUsername={
+                    process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || ""
+                  }
+                />
+              )}
+
+              {platform === "twitter" && (
+                <Paper
+                  sx={{
+                    p: 2,
+                    background: "rgba(255,255,255,0.06)",
+                    border: "2px solid rgba(255,255,255,0.10)",
+                  }}
+                >
+                  <Typography
+                    sx={{ fontFamily: "system-ui", fontSize: 14, opacity: 0.9 }}
+                  >
+                    X verification coming soon!
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontFamily: "system-ui",
+                      fontSize: 13,
+                      opacity: 0.7,
+                      mt: 0.5,
+                    }}
+                  >
+                    For now, you can test with Discord, Telegram or Email.
+                  </Typography>
+                </Paper>
+              )}
+            </Box>
+            )}
+
+            {/* Step 3: Finish verification */}
+            {!!publicKey && !walletVerificationLoading && !editingSignIn && currentPlatformConnected &&
+              (activeWalletVerifications.length === 0 || showVerificationManager) && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  background: "rgba(34,197,94,0.08)",
+                  border: "2px solid rgba(34,197,94,0.2)",
+                  mb: 2,
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontFamily: '"Bangers", system-ui',
+                    letterSpacing: 0.6,
+                    mb: 1.5,
+                    fontSize: 16,
+                  }}
+                >
+                  {activeWalletVerifications.length > 0
+                    ? `Optional: Link ${platformLabel(platform)}`
+                    : "Finish verification"}
+                </Typography>
+
+                <Typography variant="body2" sx={{ mb: 2, opacity: 0.8 }}>
+                  {currentWalletLinked ? "This method is linked to your wallet."
+                    : !publicKey ? "Connect your wallet using the button at the top of the page."
+                    : !platformUserId.trim() ? "Complete the sign-in above before linking your wallet."
+                    : "Your wallet will open. Sign the verification message to finish. This signature does not authorize a payment."}
+                </Typography>
+
+                {!currentWalletLinked && linkedElsewherePlatforms.length > 0 && (
+                  <Paper
+                    sx={{
+                      mb: 2,
+                      p: 1.25,
+                      background: "rgba(56,189,248,0.10)",
+                      border: "1px solid rgba(56,189,248,0.35)",
+                    }}
+                  >
+                    <Typography
+                      sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}
+                    >
+                      Same wallet, new platform
+                    </Typography>
+                    <Typography
+                      sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.8, mb: 1 }}
+                    >
+                      {`This wallet is already linked on ${linkedElsewherePlatforms
+                        .map(platformLabel)
+                        .join(", ")}. Link it on ${platformLabel(platform)} with one click.`}
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => linkWalletOneClick()}
+                      disabled={!canLinkCurrentPlatformWallet}
+                      sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
+                    >
+                      {`Link same wallet on ${platformLabel(platform)}`}
+                    </Button>
+                  </Paper>
+                )}
+
+                {/* Primary Action Button */}
+                <Button
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  onClick={() => linkWalletOneClick()}
+                  disabled={!canLinkCurrentPlatformWallet}
+                  sx={{
+                    fontFamily: '"Bangers", system-ui',
+                    letterSpacing: 0.8,
+                    fontSize: 18,
+                    py: 1.5,
+                    background: currentWalletLinked
+                      ? "rgba(34,197,94,0.3)"
+                      : "linear-gradient(135deg, #7c4dff 0%, #26c6ff 100%)",
+                    "&:hover": {
+                      background: currentWalletLinked
+                        ? "rgba(34,197,94,0.3)"
+                        : "linear-gradient(135deg, #6a3de8 0%, #1fa8e8 100%)",
+                    },
+                    "&:disabled": {
+                      background: "rgba(255,255,255,0.1)",
+                      color: "rgba(255,255,255,0.3)",
+                    },
+                  }}
+                >
+                  {linking ? "Finishing verification…" : currentWalletLinked
+                    ? "Wallet linked"
+                    : spaceExists === false
+                    ? "Community Not Enabled"
+                    : !publicKey
+                    ? "Connect Wallet First"
+                    : linkedWallets.length > 0
+                    ? "Finish verification"
+                    : "Finish verification"}
+                </Button>
+
+                {/* Add another wallet prompt — shows when current is linked */}
+                {currentWalletLinked && (
+                  <Paper
+                    sx={{
+                      mt: 2,
+                      p: 1.5,
+                      background: "rgba(124,77,255,0.08)",
+                      border: "2px solid rgba(124,77,255,0.2)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1.5}
+                      alignItems="center"
+                      justifyContent="space-between"
+                    >
+                      <Box>
+                        <Typography
+                          sx={{
+                            fontFamily: '"Bangers", system-ui',
+                            letterSpacing: 0.6,
+                            fontSize: 15,
+                          }}
+                        >
+                          <WalletIcon
+                            sx={{
+                              fontSize: 16,
+                              mr: 0.75,
+                              verticalAlign: "text-bottom",
+                            }}
+                          />
+                          Want to link another wallet?
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontFamily: "system-ui",
+                            fontSize: 12,
+                            opacity: 0.7,
+                            mt: 0.25,
+                          }}
+                        >
+                          Disconnect this wallet using the button above, then
+                          connect a different one. Each wallet you connect can
+                          be linked to this same{" "}
+                          {platform.charAt(0).toUpperCase() + platform.slice(1)}{" "}
+                          identity.
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={`${linkedWallets.length} linked`}
+                        size="small"
+                        sx={{
+                          fontFamily: "system-ui",
+                          background: "rgba(124,77,255,0.2)",
+                          color: "#c4b5fd",
+                          flexShrink: 0,
+                        }}
+                      />
+                    </Stack>
+                  </Paper>
+                )}
+
+                {!publicKey && (
+                  <Typography
+                    sx={{
+                      mt: 1.5,
+                      textAlign: "center",
+                      fontFamily: "system-ui",
+                      fontSize: 13,
+                      opacity: 0.7,
+                    }}
+                  >
+                    ↑ Connect your wallet first (top right)
+                  </Typography>
+                )}
+
+                {spaceExists === false && (
+                  <Paper
+                    sx={{
+                      mt: 2,
+                      p: 1.25,
+                      background: "rgba(255,204,0,.12)",
+                      borderStyle: "dashed",
+                    }}
+                  >
+                    <Typography sx={{ fontFamily: "system-ui", fontSize: 13 }}>
+                      Verification is not enabled for this community yet.
+                    </Typography>
+                    <Typography sx={{ mt: 1, fontFamily: "system-ui", fontSize: 14 }}>Ask your community admin for help, or check that you opened the correct invitation link.</Typography>
+                    <Button onClick={() => refresh()}>Try again</Button>
+                  </Paper>
+                )}
+              </Box>
+            )}
+
+            {/* ===========================
+                Linked Wallets List
+               =========================== */}
+            {linkedWallets.length > 0 && showVerificationManager && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "2px solid rgba(255,255,255,0.08)",
+                  mb: 2,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ mb: 1.5 }}
+                >
+                  <Typography
+                    sx={{
+                      fontFamily: '"Bangers", system-ui',
+                      letterSpacing: 0.6,
+                      fontSize: 16,
+                    }}
+                  >
+                    <WalletIcon
+                      sx={{ fontSize: 18, mr: 0.75, verticalAlign: "text-bottom" }}
+                    />
+                    Linked Wallets ({linkedWallets.length})
+                  </Typography>
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={() => refresh()}
+                    sx={{ fontFamily: "system-ui", fontSize: 12 }}
+                  >
+                    Refresh
+                  </Button>
+                </Stack>
+
+                <Typography
+                  sx={{
+                    fontFamily: "system-ui",
+                    fontSize: 12,
+                    opacity: 0.68,
+                    mb: 1.5,
+                  }}
+                >
+                  Your connected wallet shows its full address. Other linked wallets
+                  remain private on-chain and are shown only by their fingerprint.
+                </Typography>
+
+                <Stack spacing={1}>
+                  {linkedWallets.map((lw) => (
+                    <LinkedWalletRow
+                      key={lw.walletHashHex}
+                      wallet={lw}
+                      onUnlink={() => unlinkWallet(lw.walletHashHex)}
+                      unlinking={unlinkingWallet === lw.walletHashHex}
+                      canUnlink={!!publicKey && !!signMessage}
+                      connectedWalletAddress={publicKey?.toBase58() ?? null}
+                    />
+                  ))}
+                </Stack>
+
+                {linkedWalletsLoading && (
+                  <Typography
+                    sx={{
+                      fontFamily: "system-ui",
+                      fontSize: 12,
+                      opacity: 0.6,
+                      mt: 1,
+                    }}
+                  >
+                    Loading linked wallets...
+                  </Typography>
+                )}
+              </Box>
+            )}
+
+            {/* Errors & Messages */}
+            {error && (
+              <Paper
+                sx={{
+                  mt: 2,
+                  p: 1.5,
+                  background: "rgba(255,0,0,.10)",
+                  borderColor: "rgba(220,38,38,.7)",
+                }}
+              >
+                <Typography
+                  role="alert"
+                  sx={{
+                    fontFamily: "system-ui",
+                    color: "#ff8fa3",
+                    fontSize: 14,
+                  }}
+                >
+                  {error}
+                </Typography>
+              </Paper>
+            )}
+
+            {msg && (
+              <Paper
+                sx={{
+                  mt: 2,
+                  p: 1.5,
+                  background: msg.startsWith("✅")
+                    ? "rgba(34,197,94,.10)"
+                    : "rgba(0,0,0,.25)",
+                  borderColor: msg.startsWith("✅")
+                    ? "rgba(34,197,94,.5)"
+                    : "transparent",
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontFamily: "system-ui",
+                    color: msg.startsWith("✅") ? "#86efac" : "inherit",
+                    fontSize: 14,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {msg}
+                </Typography>
+              </Paper>
+            )}
+          </Paper>
+        )}
+
+        {/* ===========================
+            ADVANCED MODE
+           =========================== */}
+        {advancedMode && (
+          <>
             <Paper
               sx={{
                 p: 1.25,
+                mt: 2.5,
                 mb: 2,
                 background: "rgba(255,255,255,0.05)",
                 border: "1px solid rgba(255,255,255,0.14)",
@@ -3436,686 +4114,7 @@ export default function Page() {
               )}
             </Paper>
 
-            {activeWalletVerifications.length === 0 &&
-              (deepLinkSource || deepLinkGuildId || deepLinkCommunityLabel) && (
-              <Paper
-                sx={{
-                  p: 1.25,
-                  mb: 2,
-                  background: "rgba(38,198,255,0.12)",
-                  border: "1px solid rgba(38,198,255,0.4)",
-                }}
-              >
-                <Typography
-                  sx={{ fontFamily: "system-ui", fontSize: 13, fontWeight: 700 }}
-                >
-                  Direct verification link detected
-                </Typography>
-                <Typography
-                  sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.82 }}
-                >
-                  {`platform=${platformLabel(
-                    deepLinkPlatform || platform
-                  )}, source=${deepLinkSource || "unknown"}`}
-                </Typography>
-                {(deepLinkCommunityLabel || deepLinkGuildId || deepLinkDaoId) && (
-                  <Typography
-                    sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.75, mt: 0.5 }}
-                  >
-                    {`community=${
-                      deepLinkCommunityLabel ||
-                      (deepLinkGuildId ? `Discord guild ${deepLinkGuildId}` : "unknown")
-                    }${
-                      deepLinkGuildId ? `, guild_id=${deepLinkGuildId}` : ""
-                    }${deepLinkDaoId ? `, dao=${deepLinkDaoId}` : ""}`}
-                  </Typography>
-                )}
-                {deepLinkPlatform === "email" && !emailConnected && (
-                  <Typography
-                    sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.9, mt: 0.75 }}
-                  >
-                    Enter your email below to continue this direct verification.
-                  </Typography>
-                )}
-              </Paper>
-            )}
 
-            {!!publicKey && (
-              <Paper
-                sx={{
-                  p: activeWalletVerifications.length > 0 ? { xs: 2.5, md: 3.5 } : 1.5,
-                  position: "relative",
-                  overflow: "hidden",
-                  borderRadius: 4,
-                  mb: 2,
-                  background:
-                    activeWalletVerifications.length > 0
-                      ? "radial-gradient(ellipse at 0% 0%, rgba(74,222,128,.22), transparent 60%), linear-gradient(120deg, #102d29, #101e29 85%)"
-                      : "rgba(255,255,255,0.05)",
-                  border:
-                    activeWalletVerifications.length > 0
-                      ? "2px solid rgba(74,222,128,.55)"
-                      : "1px solid rgba(255,255,255,0.14)",
-                  boxShadow:
-                    activeWalletVerifications.length > 0
-                      ? "0 12px 40px rgba(0,0,0,.24), inset 0 1px 0 rgba(134,239,172,.15)"
-                      : undefined,
-                }}
-              >
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={activeWalletVerifications.length > 0 ? 3 : 1.5}
-                  alignItems={{ xs: "flex-start", sm: "center" }}
-                >
-                  <Box sx={{
-                    display: "grid", placeItems: "center", flexShrink: 0,
-                    width: { xs: 64, sm: 96 }, height: { xs: 64, sm: 96 },
-                    borderRadius: "50%", border: "1px solid rgba(134,239,172,.25)",
-                    background: "radial-gradient(circle, rgba(74,222,128,.20), rgba(74,222,128,.03))",
-                    boxShadow: "0 0 36px rgba(74,222,128,.12)",
-                  }}>
-                    {activeWalletVerifications.length > 0
-                      ? <VerifiedIcon sx={{ color: "#4ade80", fontSize: { xs: 44, sm: 66 }, filter: "drop-shadow(0 4px 12px rgba(74,222,128,.3))" }} />
-                      : <WalletIcon sx={{ color: "text.secondary", fontSize: 36 }} />}
-                  </Box>
-                  <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
-                    {activeWalletVerifications.length > 0 && <Typography sx={{ fontFamily: "system-ui", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: "#86efac", mb: 0.75 }}>YOU’RE IN · {activeCommunityLabel.toUpperCase()}</Typography>}
-                    <Typography
-                      sx={{
-                        fontFamily: '"Bangers", system-ui',
-                        letterSpacing: 1,
-                        fontSize: activeWalletVerifications.length > 0 ? { xs: 34, sm: 42, md: 48 } : 16,
-                        fontWeight: 400,
-                        lineHeight: 1.1,
-                        mb: 1,
-                        color: activeWalletVerifications.length > 0 ? "#dcfce7" : undefined,
-                      }}
-                    >
-                      {walletVerificationLoading
-                        ? "Checking your wallet…"
-                        : activeWalletVerifications.length > 0
-                        ? "Verification Complete"
-                        : "Ready to verify"}
-                    </Typography>
-                    <Typography sx={{ fontFamily: "system-ui", fontSize: 14, color: "rgba(220,252,231,.8)", mb: 1.5 }}>
-                      {activeWalletVerifications.length > 0 ? "Your wallet is verified. You’re all set." : "Choose a method below to get started."}
-                    </Typography>
-                    {activeWalletVerifications.length > 0 && <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2.5 }}>
-                      {[...new Set(activeWalletVerifications.map(match => match.platform))].map(method => <Chip key={method}
-                        icon={platformIcon(method)} label={platformLabel(method)} size="small"
-                        sx={{ fontFamily: "system-ui", fontWeight: 500, fontSize: 12, color: "#dcfce7", background: "rgba(134,239,172,.07)", border: "1px solid rgba(134,239,172,.2)", '& .MuiChip-icon': { color: "#86efac" } }} />)}
-                    </Stack>}
-                  {activeWalletVerifications.length > 0 && (
-                    <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" sx={{ "& .MuiButton-root": { px: 2, py: 1, borderRadius: 2, fontSize: 16 } }}>
-                      <Button
-                        variant="contained"
-                        onClick={() => {
-                          if (!daoPk || !publicKey) return;
-                          window.open(
-                            `/dao/${daoPk.toBase58()}/wallet/${publicKey.toBase58()}`,
-                            "_blank",
-                            "noopener,noreferrer"
-                          );
-                        }}
-                        sx={{
-                          background: "#86efac",
-                          color: "#10251c",
-                          border: "1px solid #a7f3c1",
-                          boxShadow: "0 3px 0 #235c40",
-                          "&:hover": { background: "#bbf7d0" },
-                          fontFamily: '"Bangers", system-ui',
-                          letterSpacing: 0.7,
-                        }}
-                      >
-                        View public card
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        startIcon={<ContentCopyIcon sx={{ fontSize: 16 }} />}
-                        onClick={async () => {
-                          if (!daoPk || !publicKey) return;
-                          const shareUrl = `${window.location.origin}/dao/${daoPk.toBase58()}/wallet/${publicKey.toBase58()}`;
-                          try {
-                            await navigator.clipboard.writeText(shareUrl);
-                            setPublicLinkCopied(true);
-                            window.setTimeout(() => setPublicLinkCopied(false), 1800);
-                          } catch {
-                            setError("Could not copy the verification link. Open the public card and copy its URL instead.");
-                          }
-                        }}
-                        sx={{
-                          borderColor: "rgba(134,239,172,.3)",
-                          color: publicLinkCopied ? "#86efac" : "#dcfce7",
-                          fontFamily: '"Bangers", system-ui',
-                          letterSpacing: 0.7,
-                        }}
-                      >
-                        {publicLinkCopied ? "Link copied!" : "Copy verification link"}
-                      </Button>
-                      <Button
-                        variant="text"
-                        onClick={() => setShowVerificationManager((open) => !open)}
-                        sx={{
-                          border: "none",
-                          color: "#dcfce7",
-                          fontFamily: '"Bangers", system-ui',
-                          letterSpacing: 0.7,
-                        }}
-                      >
-                        {showVerificationManager ? "Hide methods" : "Manage methods"}
-                      </Button>
-                    </Stack>
-                  )}
-                  </Box>
-                </Stack>
-              </Paper>
-            )}
-
-            {/* Step 1: Platform Selection & Connection */}
-            {(activeWalletVerifications.length === 0 || showVerificationManager) && (
-            <Box
-              sx={{
-                p: 2,
-                borderRadius: 2,
-                background: "rgba(255,255,255,0.04)",
-                border: "2px solid rgba(255,255,255,0.08)",
-                mb: 2,
-              }}
-            >
-              <Typography
-                sx={{
-                  fontFamily: '"Bangers", system-ui',
-                  letterSpacing: 0.6,
-                  mb: 1.5,
-                  fontSize: 16,
-                }}
-              >
-                {activeWalletVerifications.length > 0
-                  ? "Optional: Manage Verification Methods"
-                  : "1. Choose a verification method"}
-              </Typography>
-
-              <Typography
-                sx={{ fontFamily: "system-ui", fontSize: 13, opacity: 0.8, mb: 1.5 }}
-              >
-                {activeWalletVerifications.length > 0
-                  ? "Only continue below if you want to add another identity method or manage an existing link. Your wallet is already verified."
-                  : "Choose one method. You only need to complete verification once; afterward this wallet is recognized on other devices."}
-              </Typography>
-
-              {/* Platform Tabs */}
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{ mb: 2 }}
-                flexWrap="wrap"
-                useFlexGap
-              >
-                {(["discord", "email", "telegram", "twitter"] as const).map(
-                  (p) => (
-                    <Button
-                      key={p}
-                      onClick={() => setPlatform(p)}
-                      startIcon={platformIcon(p)}
-                      variant={platform === p ? "contained" : "outlined"}
-                      sx={{
-                        fontFamily: '"Bangers", system-ui',
-                        letterSpacing: 0.6,
-                        textTransform: "none",
-                        minWidth: 100,
-                      }}
-                    >
-                      {platformLabel(p)}
-                    </Button>
-                  )
-                )}
-              </Stack>
-
-              {/* Platform-Specific Connection UI */}
-              {platform === "discord" && (
-                <PlatformConnectionCard
-                  platform="Discord"
-                  connected={discordConnected}
-                  label={discordLabel}
-                  onConnect={startDiscordConnect}
-                  onDisconnect={disconnectDiscord}
-                  onRefresh={() => {
-                    loadDiscordSession();
-                    loadDiscordProof();
-                  }}
-                />
-              )}
-
-              {platform === "email" && (
-                <EmailConnectionCard
-                  connected={emailConnected}
-                  email={emailAddress}
-                  emailInput={emailInput}
-                  setEmailInput={setEmailInput}
-                  emailCodeSent={emailCodeSent}
-                  emailCode={emailCode}
-                  setEmailCode={setEmailCode}
-                  emailSending={emailSending}
-                  emailVerifying={emailVerifying}
-                  sendCode={sendEmailCode}
-                  verifyCode={verifyEmailCode}
-                  disconnect={disconnectEmail}
-                  onRefresh={() => {
-                    loadEmailSession();
-                    loadEmailProof();
-                  }}
-                  onCancel={() => {
-                    setEmailCodeSent(false);
-                    setEmailCode("");
-                  }}
-                  deepLinkHint={
-                    deepLinkPlatform === "email" && !emailConnected
-                      ? `Enter your email to continue${deepLinkCommunityLabel ? ` for ${deepLinkCommunityLabel}` : ""}.`
-                      : null
-                  }
-                  autoFocusInput={deepLinkPlatform === "email" && !emailConnected}
-                />
-              )}
-
-              {platform === "telegram" && (
-                <TelegramConnectionCard
-                  connected={telegramConnected}
-                  label={telegramLabel}
-                  onConnect={() => setShowTelegramWidget(true)}
-                  onDisconnect={disconnectTelegram}
-                  onRefresh={() => {
-                    loadTelegramSession();
-                    loadTelegramProof();
-                  }}
-                  onAuth={handleTelegramAuth}
-                  showWidget={showTelegramWidget}
-                  botUsername={
-                    process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || ""
-                  }
-                />
-              )}
-
-              {platform === "twitter" && (
-                <Paper
-                  sx={{
-                    p: 2,
-                    background: "rgba(255,255,255,0.06)",
-                    border: "2px solid rgba(255,255,255,0.10)",
-                  }}
-                >
-                  <Typography
-                    sx={{ fontFamily: "system-ui", fontSize: 14, opacity: 0.9 }}
-                  >
-                    X verification coming soon!
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontFamily: "system-ui",
-                      fontSize: 13,
-                      opacity: 0.7,
-                      mt: 0.5,
-                    }}
-                  >
-                    For now, you can test with Discord, Telegram or Email.
-                  </Typography>
-                </Paper>
-              )}
-            </Box>
-            )}
-
-            {/* Step 2: Link Wallet (Only shows when platform connected) */}
-            {currentPlatformConnected &&
-              (activeWalletVerifications.length === 0 || showVerificationManager) && (
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  background: "rgba(34,197,94,0.08)",
-                  border: "2px solid rgba(34,197,94,0.2)",
-                  mb: 2,
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontFamily: '"Bangers", system-ui',
-                    letterSpacing: 0.6,
-                    mb: 1.5,
-                    fontSize: 16,
-                  }}
-                >
-                  {activeWalletVerifications.length > 0
-                    ? `Optional: Link ${platformLabel(platform)}`
-                    : "2. Confirm your wallet"}
-                </Typography>
-
-                <Typography variant="body2" sx={{ mb: 2, opacity: 0.8 }}>
-                  {currentWalletLinked ? "This method is linked to your wallet."
-                    : !publicKey ? "Connect your wallet using the button at the top of the page."
-                    : !platformUserId.trim() ? "Complete the sign-in above before linking your wallet."
-                    : "Confirm the request in your wallet to finish verification."}
-                </Typography>
-
-                {!currentWalletLinked && linkedElsewherePlatforms.length > 0 && (
-                  <Paper
-                    sx={{
-                      mb: 2,
-                      p: 1.25,
-                      background: "rgba(56,189,248,0.10)",
-                      border: "1px solid rgba(56,189,248,0.35)",
-                    }}
-                  >
-                    <Typography
-                      sx={{ fontFamily: "system-ui", fontSize: 12, fontWeight: 700 }}
-                    >
-                      Same wallet, new platform
-                    </Typography>
-                    <Typography
-                      sx={{ fontFamily: "system-ui", fontSize: 12, opacity: 0.8, mb: 1 }}
-                    >
-                      {`This wallet is already linked on ${linkedElsewherePlatforms
-                        .map(platformLabel)
-                        .join(", ")}. Link it on ${platformLabel(platform)} with one click.`}
-                    </Typography>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => linkWalletOneClick()}
-                      disabled={!canLinkCurrentPlatformWallet}
-                      sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
-                    >
-                      {`Link same wallet on ${platformLabel(platform)}`}
-                    </Button>
-                  </Paper>
-                )}
-
-                {/* Primary Action Button */}
-                <Button
-                  variant="contained"
-                  size="large"
-                  fullWidth
-                  onClick={() => linkWalletOneClick()}
-                  disabled={!canLinkCurrentPlatformWallet}
-                  sx={{
-                    fontFamily: '"Bangers", system-ui',
-                    letterSpacing: 0.8,
-                    fontSize: 18,
-                    py: 1.5,
-                    background: currentWalletLinked
-                      ? "rgba(34,197,94,0.3)"
-                      : "linear-gradient(135deg, #7c4dff 0%, #26c6ff 100%)",
-                    "&:hover": {
-                      background: currentWalletLinked
-                        ? "rgba(34,197,94,0.3)"
-                        : "linear-gradient(135deg, #6a3de8 0%, #1fa8e8 100%)",
-                    },
-                    "&:disabled": {
-                      background: "rgba(255,255,255,0.1)",
-                      color: "rgba(255,255,255,0.3)",
-                    },
-                  }}
-                >
-                  {currentWalletLinked
-                    ? "Wallet linked"
-                    : spaceExists === false
-                    ? "Community Not Enabled"
-                    : !publicKey
-                    ? "Connect Wallet First"
-                    : linkedWallets.length > 0
-                    ? "Confirm wallet link"
-                    : "Confirm wallet link"}
-                </Button>
-
-                {/* Add another wallet prompt — shows when current is linked */}
-                {currentWalletLinked && (
-                  <Paper
-                    sx={{
-                      mt: 2,
-                      p: 1.5,
-                      background: "rgba(124,77,255,0.08)",
-                      border: "2px solid rgba(124,77,255,0.2)",
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      spacing={1.5}
-                      alignItems="center"
-                      justifyContent="space-between"
-                    >
-                      <Box>
-                        <Typography
-                          sx={{
-                            fontFamily: '"Bangers", system-ui',
-                            letterSpacing: 0.6,
-                            fontSize: 15,
-                          }}
-                        >
-                          <WalletIcon
-                            sx={{
-                              fontSize: 16,
-                              mr: 0.75,
-                              verticalAlign: "text-bottom",
-                            }}
-                          />
-                          Want to link another wallet?
-                        </Typography>
-                        <Typography
-                          sx={{
-                            fontFamily: "system-ui",
-                            fontSize: 12,
-                            opacity: 0.7,
-                            mt: 0.25,
-                          }}
-                        >
-                          Disconnect this wallet using the button above, then
-                          connect a different one. Each wallet you connect can
-                          be linked to this same{" "}
-                          {platform.charAt(0).toUpperCase() + platform.slice(1)}{" "}
-                          identity.
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={`${linkedWallets.length} linked`}
-                        size="small"
-                        sx={{
-                          fontFamily: "system-ui",
-                          background: "rgba(124,77,255,0.2)",
-                          color: "#c4b5fd",
-                          flexShrink: 0,
-                        }}
-                      />
-                    </Stack>
-                  </Paper>
-                )}
-
-                {!publicKey && (
-                  <Typography
-                    sx={{
-                      mt: 1.5,
-                      textAlign: "center",
-                      fontFamily: "system-ui",
-                      fontSize: 13,
-                      opacity: 0.7,
-                    }}
-                  >
-                    ↑ Connect your wallet first (top right)
-                  </Typography>
-                )}
-
-                {spaceExists === false && (
-                  <Paper
-                    sx={{
-                      mt: 2,
-                      p: 1.25,
-                      background: "rgba(255,204,0,.12)",
-                      borderStyle: "dashed",
-                    }}
-                  >
-                    <Typography sx={{ fontFamily: "system-ui", fontSize: 13 }}>
-                      Verification is not enabled for this community yet.
-                    </Typography>
-                    <Typography
-                      sx={{ mt: 0.5, fontFamily: "system-ui", fontSize: 12, opacity: 0.78 }}
-                    >
-                      If you are an admin, create the community space and metadata now.
-                    </Typography>
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      spacing={1}
-                      sx={{ mt: 1.25 }}
-                    >
-                      <Button
-                        variant="contained"
-                        onClick={() => setCommunityCreateOpen(true)}
-                        sx={{ fontFamily: '"Bangers", system-ui', letterSpacing: 0.6 }}
-                      >
-                        Create Community
-                      </Button>
-                      <Button variant="outlined" onClick={() => refresh()}>
-                        Refresh
-                      </Button>
-                    </Stack>
-                  </Paper>
-                )}
-              </Box>
-            )}
-
-            {/* ===========================
-                Linked Wallets List
-               =========================== */}
-            {linkedWallets.length > 0 && (
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  background: "rgba(255,255,255,0.04)",
-                  border: "2px solid rgba(255,255,255,0.08)",
-                  mb: 2,
-                }}
-              >
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  sx={{ mb: 1.5 }}
-                >
-                  <Typography
-                    sx={{
-                      fontFamily: '"Bangers", system-ui',
-                      letterSpacing: 0.6,
-                      fontSize: 16,
-                    }}
-                  >
-                    <WalletIcon
-                      sx={{ fontSize: 18, mr: 0.75, verticalAlign: "text-bottom" }}
-                    />
-                    Linked Wallets ({linkedWallets.length})
-                  </Typography>
-                  <Button
-                    variant="text"
-                    size="small"
-                    onClick={() => refresh()}
-                    sx={{ fontFamily: "system-ui", fontSize: 12 }}
-                  >
-                    Refresh
-                  </Button>
-                </Stack>
-
-                <Typography
-                  sx={{
-                    fontFamily: "system-ui",
-                    fontSize: 12,
-                    opacity: 0.68,
-                    mb: 1.5,
-                  }}
-                >
-                  Your connected wallet shows its full address. Other linked wallets
-                  remain private on-chain and are shown only by their fingerprint.
-                </Typography>
-
-                <Stack spacing={1}>
-                  {linkedWallets.map((lw) => (
-                    <LinkedWalletRow
-                      key={lw.walletHashHex}
-                      wallet={lw}
-                      onUnlink={() => unlinkWallet(lw.walletHashHex)}
-                      unlinking={unlinkingWallet === lw.walletHashHex}
-                      canUnlink={!!publicKey && !!signMessage}
-                      connectedWalletAddress={publicKey?.toBase58() ?? null}
-                    />
-                  ))}
-                </Stack>
-
-                {linkedWalletsLoading && (
-                  <Typography
-                    sx={{
-                      fontFamily: "system-ui",
-                      fontSize: 12,
-                      opacity: 0.6,
-                      mt: 1,
-                    }}
-                  >
-                    Loading linked wallets...
-                  </Typography>
-                )}
-              </Box>
-            )}
-
-            {/* Errors & Messages */}
-            {error && (
-              <Paper
-                sx={{
-                  mt: 2,
-                  p: 1.5,
-                  background: "rgba(255,0,0,.10)",
-                  borderColor: "rgba(220,38,38,.7)",
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontFamily: "system-ui",
-                    color: "#ff8fa3",
-                    fontSize: 14,
-                  }}
-                >
-                  ❌ {error}
-                </Typography>
-              </Paper>
-            )}
-
-            {msg && (
-              <Paper
-                sx={{
-                  mt: 2,
-                  p: 1.5,
-                  background: msg.startsWith("✅")
-                    ? "rgba(34,197,94,.10)"
-                    : "rgba(0,0,0,.25)",
-                  borderColor: msg.startsWith("✅")
-                    ? "rgba(34,197,94,.5)"
-                    : "transparent",
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontFamily: msg.startsWith("✅") ? "system-ui" : "monospace",
-                    color: msg.startsWith("✅") ? "#86efac" : "inherit",
-                    fontSize: 14,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {msg}
-                </Typography>
-              </Paper>
-            )}
-          </Paper>
-        )}
-
-        {/* ===========================
-            ADVANCED MODE
-           =========================== */}
-        {advancedMode && (
-          <>
             <Paper sx={{ p: 2.5, mt: 2.5 }}>
               <Stack
                 direction="row"
@@ -5320,7 +5319,7 @@ function PlatformConnectionCard({
                 letterSpacing: 0.6,
               }}
             >
-              Connect {platform}
+              Continue with {platform}
             </Button>
           ) : (
             <>

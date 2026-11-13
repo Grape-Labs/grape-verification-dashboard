@@ -70,7 +70,7 @@ export default function WalletComicButton() {
           "&:hover": { background: "linear-gradient(180deg, rgba(124,77,255,0.45), rgba(38,198,255,0.32))" },
         }}
       >
-        Select Wallet
+        Connect wallet
       </Button>
     );
   }
