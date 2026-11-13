@@ -2944,9 +2944,9 @@ export default function Page() {
         backgroundSize: "auto, auto, 12px 12px, auto",
       }}
     >
-      <Container maxWidth="lg">
+      <Container maxWidth={advancedMode ? "lg" : "md"}>
         {/* Header */}
-        <Paper sx={{ p: 2.5 }}>
+        <Paper sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: "20px" }}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={2}
@@ -2956,8 +2956,9 @@ export default function Page() {
             <Stack direction="row" spacing={2} alignItems="center">
               <Box
                 sx={{
-                  width: 64,
-                  height: 64,
+                  width: { xs: 44, sm: 48 },
+                  height: { xs: 44, sm: 48 },
+                  flexShrink: 0,
                   borderRadius: "18px",
                   border: "3px solid #0b1220",
                   boxShadow: "4px 4px 0 #0b1220",
@@ -2974,7 +2975,7 @@ export default function Page() {
               </Box>
 
               <Box>
-                <Typography variant="h2" sx={{ lineHeight: 1 }}>
+                <Typography variant="h2" sx={{ lineHeight: 1.1, fontSize: { xs: 26, sm: 32 } }}>
                   Grape Verification
                 </Typography>
                 <Typography
@@ -3047,7 +3048,9 @@ export default function Page() {
             SIMPLE MODE (default)
            =========================== */}
         {!advancedMode && (
-          <Paper sx={{ p: { xs: 2, sm: 3.5 }, mt: 2.5, maxWidth: 720, mx: "auto", borderRadius: 4 }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 }, mt: 2.5, borderRadius: "24px" }}>
+            {activeWalletVerifications.length === 0 && (
+              <>
             <Typography
               variant="h3"
               sx={{
@@ -3068,9 +3071,12 @@ export default function Page() {
                 : "Connect your wallet and sign in to finish verification."}
             </Typography>
 
-            <Typography sx={{ fontFamily: "system-ui", mb: 2, fontSize: 14 }}>
+              </>
+            )}
+
+            <Typography component="div" sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", fontFamily: "system-ui", mb: 2, fontSize: 14 }}>
               {activeCommunityLabel}
-              <Button size="small" onClick={() => setShowCommunityChoices(open => !open)} aria-expanded={showCommunityChoices}>Change community</Button>
+              <Button size="small" onClick={() => setShowCommunityChoices(open => !open)} aria-expanded={showCommunityChoices} sx={{ border: 0, borderRadius: "8px", fontFamily: "system-ui", fontSize: 12, px: 1 }}>Change community</Button>
             </Typography>
             {showCommunityChoices && (
               <Paper sx={{ p: 2, mb: 2 }}>
@@ -3099,7 +3105,7 @@ export default function Page() {
                   <Box>3. Finish verification</Box>
                 </Stack>
                 {!publicKey && (
-                  <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, background: "rgba(124,77,255,.12)" }}>
+                  <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: "16px", background: "rgba(124,77,255,.12)" }}>
                     <Typography variant="h3" sx={{ mb: 1 }}>Connect your wallet</Typography>
                     <Typography sx={{ fontFamily: "system-ui", mb: 2 }}>Choose the wallet you want to verify for {activeCommunityLabel}.</Typography>
                     <WalletComicButton />
@@ -3111,11 +3117,11 @@ export default function Page() {
             {!!publicKey && activeWalletVerifications.length > 0 && (
               <Paper
                 sx={{
-                  p: activeWalletVerifications.length > 0 ? { xs: 2.5, md: 3.5 } : 1.5,
+                  p: { xs: 2.5, sm: 3.5 },
                   position: "relative",
                   overflow: "hidden",
-                  borderRadius: 4,
-                  mb: 2,
+                  borderRadius: "20px",
+                  mb: 0,
                   background:
                     activeWalletVerifications.length > 0
                       ? "radial-gradient(ellipse at 0% 0%, rgba(74,222,128,.22), transparent 60%), linear-gradient(120deg, #102d29, #101e29 85%)"
@@ -3137,13 +3143,13 @@ export default function Page() {
                 >
                   <Box sx={{
                     display: "grid", placeItems: "center", flexShrink: 0,
-                    width: { xs: 64, sm: 96 }, height: { xs: 64, sm: 96 },
+                    width: { xs: 56, sm: 72 }, height: { xs: 56, sm: 72 },
                     borderRadius: "50%", border: "1px solid rgba(134,239,172,.25)",
                     background: "radial-gradient(circle, rgba(74,222,128,.20), rgba(74,222,128,.03))",
                     boxShadow: "0 0 36px rgba(74,222,128,.12)",
                   }}>
                     {activeWalletVerifications.length > 0
-                      ? <VerifiedIcon sx={{ color: "#4ade80", fontSize: { xs: 44, sm: 66 }, filter: "drop-shadow(0 4px 12px rgba(74,222,128,.3))" }} />
+                      ? <VerifiedIcon sx={{ color: "#4ade80", fontSize: { xs: 36, sm: 48 }, filter: "drop-shadow(0 4px 12px rgba(74,222,128,.3))" }} />
                       : <WalletIcon sx={{ color: "text.secondary", fontSize: 36 }} />}
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
@@ -3152,7 +3158,7 @@ export default function Page() {
                       sx={{
                         fontFamily: '"Bangers", system-ui',
                         letterSpacing: 1,
-                        fontSize: activeWalletVerifications.length > 0 ? { xs: 34, sm: 42, md: 48 } : 16,
+                        fontSize: { xs: 30, sm: 38, md: 40 },
                         fontWeight: 400,
                         lineHeight: 1.1,
                         mb: 1,
@@ -3174,7 +3180,7 @@ export default function Page() {
                         sx={{ fontFamily: "system-ui", fontWeight: 500, fontSize: 12, color: "#dcfce7", background: "rgba(134,239,172,.07)", border: "1px solid rgba(134,239,172,.2)", '& .MuiChip-icon': { color: "#86efac" } }} />)}
                     </Stack>}
                   {activeWalletVerifications.length > 0 && (
-                    <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" sx={{ "& .MuiButton-root": { px: 2, py: 1, borderRadius: 2, fontSize: 16 } }}>
+                    <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" sx={{ "& .MuiButton-root": { px: 2, py: 1, borderRadius: "12px", fontSize: 15 } }}>
                       <Button
                         variant="contained"
                         onClick={() => {
@@ -3244,7 +3250,7 @@ export default function Page() {
             <Box
               sx={{
                 p: 2,
-                borderRadius: 2,
+                borderRadius: "16px",
                 background: "rgba(255,255,255,0.04)",
                 border: "2px solid rgba(255,255,255,0.08)",
                 mb: 2,
